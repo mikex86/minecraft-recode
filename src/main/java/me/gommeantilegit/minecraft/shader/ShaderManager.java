@@ -1,4 +1,4 @@
-package me.michael.kei.minecraft.shader;
+package me.gommeantilegit.minecraft.shader;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;

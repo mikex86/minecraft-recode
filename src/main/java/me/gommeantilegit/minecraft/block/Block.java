@@ -1,11 +1,13 @@
-package me.michael.kei.minecraft.block;
+package me.gommeantilegit.minecraft.block;
 
 import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
 import com.badlogic.gdx.math.Vector2;
 import com.sun.istack.internal.NotNull;
-import me.michael.kei.minecraft.block.texturemap.BlockTextureMap;
-import me.michael.kei.minecraft.world.World;
+import me.gommeantilegit.minecraft.block.texturemap.BlockTextureMap;
+import me.gommeantilegit.minecraft.entity.Entity;
+import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
+import me.gommeantilegit.minecraft.world.World;
 
 public class Block {
 
@@ -39,7 +41,7 @@ public class Block {
      * textureUVs[x] is the uv position of the image {@link #textureResources}[x] in the final texture map.
      */
     @NotNull
-    private final Vector2[] textureUVs;
+    protected final Vector2[] textureUVs;
 
     /**
      * TextureMap object
@@ -66,6 +68,16 @@ public class Block {
         }
     }
 
+    /**
+     * Setting the shape of the block
+     *
+     * @param x0 minX
+     * @param y0 minY
+     * @param z0 minZ
+     * @param x1 maxX
+     * @param y1 maxY
+     * @param z1 maxZ
+     */
     protected void setShape(float x0, float y0, float z0, float x1, float y1, float z1) {
         this.xx0 = x0;
         this.yy0 = y0;
@@ -83,6 +95,16 @@ public class Block {
         return this;
     }
 
+    /**
+     * Renders the block at the specified coordinates.
+     *
+     * @param builder        the MeshBuilder building the chunk's mesh.
+     * @param x              the x coordinate of the block.
+     * @param y              the y coordinate of the block.
+     * @param z              the z coordinate of the block.
+     * @param world          the world of the block.
+     * @param renderAllFaces state if every face should just be rendered without checking the neighboring blocks to determine if a face of the block should be rendered.
+     */
     public void render(MeshBuilder builder, int x, int y, int z, World world, boolean renderAllFaces) {
         if (shouldRenderFace(world, x, y, z, 0) || renderAllFaces)
             renderFace(builder, x, y, z, 0);
@@ -98,34 +120,67 @@ public class Block {
             renderFace(builder, x, y, z, 5);
     }
 
+    /**
+     * @param world the world of the block.
+     * @param x     x coordinate
+     * @param y     y coordinate
+     * @param z     z coordinate
+     * @param face  the face to be checked.
+     * @return if the given face should be rendered at the specified coordinates considering the blocks neighbors.
+     * The face should only be rendered if it's visible.
+     */
     private boolean shouldRenderFace(World world, int x, int y, int z, int face) {
         switch (face) {
             case 0:
-                return canSeeThrough(world.getBlockID(x, y - 1, z));
+                return world.canSeeThrough(world.getBlockID(x, y - 1, z));
             case 1:
-                return canSeeThrough(world.getBlockID(x, y + 1, z));
+                return world.canSeeThrough(world.getBlockID(x, y + 1, z));
             case 2:
-                return canSeeThrough(world.getBlockID(x, y, z - 1));
+                return world.canSeeThrough(world.getBlockID(x, y, z - 1));
             case 3:
-                return canSeeThrough(world.getBlockID(x, y, z + 1));
+                return world.canSeeThrough(world.getBlockID(x, y, z + 1));
             case 4:
-                return canSeeThrough(world.getBlockID(x - 1, y, z));
+                return world.canSeeThrough(world.getBlockID(x - 1, y, z));
             case 5:
-                return canSeeThrough(world.getBlockID(x + 1, y, z));
+                return world.canSeeThrough(world.getBlockID(x + 1, y, z));
             default:
                 return false;
         }
     }
 
-    private boolean canSeeThrough(int blockID) {
-        Block block = Blocks.getBlockByID(blockID);
-        return block == null || block.transparent;
+    /**
+     * Called on block collision
+     *
+     * @param entity        the entity which collided
+     * @param axisAlignedBB the boundingBox of the block it collided with
+     */
+    public void onEntityCollide(Entity entity, AxisAlignedBB axisAlignedBB) {
     }
 
+    /**
+     * @param x x coordinate
+     * @param y y coordinate
+     * @param z z coordinate
+     * @return the bounding box of the block at the specified coordinates.
+     */
+    public AxisAlignedBB getBoundingBox(int x, int y, int z) {
+        return new AxisAlignedBB(x + this.xx0, y + this.yy0, z + this.zz0, x + this.xx1, y + this.yy1, z + this.zz1);
+    }
+
+    /**
+     * Renders the specified face into the meshbuilder
+     *
+     * @param builder the builder for building the chunk's mesh
+     * @param x       the x coordinate of the block.
+     * @param y       the y coordinate of the block.
+     * @param z       the z coordinate of the block.
+     * @param face    current face rendered.
+     */
     public void renderFace(MeshBuilder builder, int x, int y, int z, int face) {
+        renderFace(builder, x, y, z, getUV(face), face);
+    }
 
-        Vector2 uv = getUV(face);
-
+    public void renderFace(MeshBuilder builder, int x, int y, int z, Vector2 uv, int face) {
         float u0 = uv.x;
         float u1 = uv.x + 16;
         float v0 = uv.y;
@@ -199,28 +254,36 @@ public class Block {
             }
             case 4: {
                 rect(builder,
-                        x0, y1, z1,
-                        u1, v1,
-                        x0, y1, z0,
-                        u0, v1,
-                        x0, y0, z0,
-                        u0, v0,
                         x0, y0, z1,
+                        u1, v1,
+                        x0, y0, z0,
+                        u0, v1,
+                        x0, y1, z0,
+                        u0, v0,
+                        x0, y1, z1,
                         u1, v0,
                         -1, 0, 0);
                 return;
             }
             case 5: {
                 rect(builder,
-                        x1, y1, z1, u0, v0,
-                        x1, y1, z0, u1, v0,
-                        x1, y0, z0, u1, v1,
-                        x1, y0, z1, u0, v1,
+                        x1, y1, z1,
+                        u0, v0,
+
+                        x1, y1, z0,
+                        u1, v0,
+
+                        x1, y0, z0,
+                        u1, v1,
+
+                        x1, y0, z1,
+                        u0, v1,
                         1, 0, 0);
             }
         }
 
     }
+
 
     protected void rect(MeshBuilder builder,
                         float x00, float y00, float z00,
@@ -238,6 +301,26 @@ public class Block {
                 new MeshPartBuilder.VertexInfo().setPos(x10, y10, z10).setNor(normalX, normalY, normalZ).setUV(u10, v10),
                 new MeshPartBuilder.VertexInfo().setPos(x11, y11, z11).setNor(normalX, normalY, normalZ).setUV(u11, v11),
                 new MeshPartBuilder.VertexInfo().setPos(x01, y01, z01).setNor(normalX, normalY, normalZ).setUV(u01, v01)
+        );
+
+    }
+
+    protected void rect(MeshBuilder builder,
+                        float x00, float y00, float z00,
+                        float u00, float v00,
+                        float x10, float y10, float z10,
+                        float u10, float v10,
+                        float x11, float y11, float z11,
+                        float u11, float v11,
+                        float x01, float y01, float z01,
+                        float u01, float v01,
+                        float normalX, float normalY, float normalZ, float r, float g, float b, float a) {
+
+        builder.rect(
+                new MeshPartBuilder.VertexInfo().setPos(x00, y00, z00).setNor(normalX, normalY, normalZ).setUV(u00, v00).setCol(r, g, b, a),
+                new MeshPartBuilder.VertexInfo().setPos(x10, y10, z10).setNor(normalX, normalY, normalZ).setUV(u10, v10).setCol(r, g, b, a),
+                new MeshPartBuilder.VertexInfo().setPos(x11, y11, z11).setNor(normalX, normalY, normalZ).setUV(u11, v11).setCol(r, g, b, a),
+                new MeshPartBuilder.VertexInfo().setPos(x01, y01, z01).setNor(normalX, normalY, normalZ).setUV(u01, v01).setCol(r, g, b, a)
         );
 
     }
@@ -261,5 +344,4 @@ public class Block {
     public Vector2[] getTextureUVs() {
         return textureUVs;
     }
-
 }

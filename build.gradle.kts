@@ -8,7 +8,7 @@ plugins {
     kotlin("jvm") version "1.2.71"
 }
 
-group = "me.michael.kei"
+group = "me.gommeantilegit.minecraft"
 version = "1.0-SNAPSHOT"
 
 repositories {

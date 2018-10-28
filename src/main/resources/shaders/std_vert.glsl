@@ -1,10 +1,12 @@
-attribute vec3 a_Position;
-attribute vec3 a_Normal;
-attribute vec4 a_Color;
-attribute vec2 a_TextureCoord;
+#version 420 core
 
-uniform mat4 matViewProj;
+in vec3 a_Position;
+in vec3 a_Normal;
+in vec4 a_Color;
+in vec2 a_TextureCoord;
+
 uniform vec3 lightDirection;
+uniform mat4 matViewProj;
 
 out vec3 lightingColor;
 out vec4 fragColorAttr;

@@ -1,11 +1,11 @@
-package me.michael.kei.minecraft.block.texturemap;
+package me.gommeantilegit.minecraft.block.texturemap;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import com.sun.istack.internal.NotNull;
-import me.michael.kei.minecraft.annotations.IOAccess;
+import me.gommeantilegit.minecraft.annotations.IOAccess;
 
 import java.util.HashMap;
 import java.util.Map;

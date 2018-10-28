@@ -1,11 +1,11 @@
-package me.michael.kei.minecraft.world.chunk;
+package me.gommeantilegit.minecraft.world.chunk;
 
 import com.badlogic.gdx.graphics.Mesh;
 import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
-import me.michael.kei.minecraft.Minecraft;
-import me.michael.kei.minecraft.block.Block;
-import me.michael.kei.minecraft.block.Blocks;
-import me.michael.kei.minecraft.world.World;
+import me.gommeantilegit.minecraft.Minecraft;
+import me.gommeantilegit.minecraft.block.Block;
+import me.gommeantilegit.minecraft.block.Blocks;
+import me.gommeantilegit.minecraft.world.World;
 
 import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
 
