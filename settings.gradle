@@ -1,2 +1,4 @@
 rootProject.name = 'libgdxtest2'
+include 'core'
+include 'desktop'
 
