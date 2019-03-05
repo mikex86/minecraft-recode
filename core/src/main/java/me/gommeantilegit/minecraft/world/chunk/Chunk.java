@@ -331,7 +331,6 @@ public class Chunk implements Tickable {
     /**
      * Sets the block state for the given world absolute coordinate. (WITHOUT SCHEDULING THE ACTION ON THE {@link me.gommeantilegit.minecraft.world.block.change.WorldBlockChanger} INSTANCE)
      * USAGE IS DANGEROUS!!!
-     * NOTE: Adds a block change object to {@link World#blockChanges}
      *
      * @param x          world x position
      * @param y          world y position
@@ -340,13 +339,11 @@ public class Chunk implements Tickable {
      * @throws IllegalStateException if the specified coordinates are not managed by the chunk.
      */
     public void setBlockWithoutWorldBlockChangerObject(int x, int y, int z, @Nullable IBlockState blockState) {
-        setBlockChanged(x, y, z, blockState);
         changeBlock(x, y, z, blockState);
     }
 
     /**
      * Sets the block state for the given world absolute coordinate. (Schedules an action on {@link me.gommeantilegit.minecraft.world.block.change.WorldBlockChanger} INSTANCE)
-     * NOTE: Adds a block change object to {@link World#blockChanges}
      *
      * @param x             world x position
      * @param y             world y position
@@ -356,20 +353,6 @@ public class Chunk implements Tickable {
      */
     public void setBlock(int x, int y, int z, @Nullable IBlockState newBlockState) {
         world.getBlockChanger().blockChange(x, y, z, newBlockState, true, this);
-    }
-
-    /**
-     * Adds a blockChange instance to {@link World#blockChanges} if none exists for this coordinate or adjusts its block value if one is already present.
-     * If the block change returns to it original state, the element is removed
-     * IMPORTANT: NEEDS TO BE PERFORMED BEFORE BLOCK CHANGE IN WORLD
-     *
-     * @param x          x coordinate
-     * @param y          y coordinate
-     * @param z          z coordinate
-     * @param blockState the new block state
-     */
-    private void setBlockChanged(int x, int y, int z, @Nullable IBlockState blockState) {
-        world.setBlockChanged(x, y, z, blockState);
     }
 
     /**
@@ -391,7 +374,7 @@ public class Chunk implements Tickable {
     }
 
     /**
-     * Sets the block at a given position to block id without adding a new block change to {@link World#blockChanges}.
+     * Sets the block at a given position to block id
      * WITHOUT SCHEDULING AN ACTION ON THE BLOCK CHANGER OF THE WORLD {@link me.gommeantilegit.minecraft.world.block.change.WorldBlockChanger}.
      * DANGEROUS!
      * ALSO: USE ONLY IN WORLD GENERATION
@@ -406,7 +389,7 @@ public class Chunk implements Tickable {
     }
 
     /**
-     * Sets the block at a given position to block id without adding a new block change to {@link World#blockChanges}.
+     * Sets the block at a given position to block id
      *
      * @param x          x coordinate
      * @param y          y coordinate

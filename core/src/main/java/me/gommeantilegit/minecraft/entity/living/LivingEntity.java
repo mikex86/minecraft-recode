@@ -2,7 +2,7 @@ package me.gommeantilegit.minecraft.entity.living;
 
 import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
-import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
+import me.gommeantilegit.minecraft.util.Clock;
 import me.gommeantilegit.minecraft.util.MathHelper;
 import me.gommeantilegit.minecraft.world.World;
 
@@ -85,11 +85,38 @@ public class LivingEntity extends Entity {
     private int swings = 0;
 
     /**
+     * Health of the entity.
+     */
+    private int health;
+
+    /**
+     * The time the entity is resistant to further hurt in ticks.
+     */
+    private int hurtResistanceTime;
+
+    /**
+     * Stores the maximum health of the entity.
+     */
+    private int maxHealth;
+
+    /**
+     * Stores the time the entity is still going to be hurt in ticks. Zero if not hurt, 10 if just hurt.
+     */
+    private int hurtTime;
+
+    /**
+     * Clock instance used for timing of regeneration.
+     */
+    private final Clock healTimer = new Clock(false);
+
+    /**
      * @param world     sets {@link #world}
      * @param maxHealth sets {@link #maxHealth}
      */
     public LivingEntity(World world, int maxHealth) {
-        super(world, maxHealth);
+        super(world);
+        this.maxHealth = maxHealth;
+        this.health = this.maxHealth;
     }
 
     @Override
@@ -99,6 +126,54 @@ public class LivingEntity extends Entity {
         updateLimbSwing();
         updateYawOffset();
         updateArmSwingProgress();
+    }
+
+    /**
+     * Subtracts the given amount of health of the players health
+     *
+     * @param amount the amount to be subtracted
+     */
+    public void hurt(int amount) {
+        if (hurtResistanceTime == 0) {
+            setHealth(getHealth() - amount);
+        }
+    }
+
+    /**
+     * Regeneration update
+     */
+    protected void regenerate() {
+        if (hurtResistanceTime > 0)
+            hurtResistanceTime--;
+
+        if (hurtTime > 0)
+            hurtTime--;
+
+        if (this.getHealth() < getMaxHealth() && hurtTime == 0) {
+            if (healTimer.getTimePassed() > 1500) {
+                this.healHeart();
+                healTimer.reset();
+            }
+        }
+    }
+
+    /**
+     * Fills up live by a half heart
+     */
+    private void healHeart() {
+        this.setHealth(getHealth() + 1);
+        this.hurtResistanceTime = 5;
+    }
+
+    /**
+     * Sets the health of the entity. Protects from setting to to big or negative values.
+     *
+     * @param health the new amount of health
+     */
+    public void setHealth(int health) {
+        this.hurtTime = 10;
+        this.hurtResistanceTime = 10;
+        this.health = Math.max(0, Math.min(health, 20));
     }
 
     /**
@@ -345,4 +420,25 @@ public class LivingEntity extends Entity {
     public void setSprinting(boolean sprinting) {
         this.sprinting = sprinting;
     }
+
+    public int getMaxHealth() {
+        return maxHealth;
+    }
+
+    public int getHurtResistanceTime() {
+        return hurtResistanceTime;
+    }
+
+    public int getHealth() {
+        return health;
+    }
+
+    public int getHurtTime() {
+        return hurtTime;
+    }
+
+    public void setHurtTime(int hurtTime) {
+        this.hurtTime = hurtTime;
+    }
+
 }

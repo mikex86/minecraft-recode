@@ -78,7 +78,7 @@ public class Particle extends Entity {
      */
     public Particle(World world, float posX, float posY, float posZ, float xSpeed, float ySpeed, float zSpeed, @NotNull CustomTexture texture,
                     @NotNull TextureWrapper.RenderData textureRegion) {
-        super(world, 0);
+        super(world);
         this.texture = texture;
         this.textureRegion = textureRegion;
 
@@ -101,7 +101,7 @@ public class Particle extends Entity {
     }
 
     @NeedsOpenGLContext
-    public void setupMesh(){
+    void setupMesh(){
         /*
          * Randomly generated values used as u and v offset to the textureRegion, whose size is reduced when rendering the particle. The those values
          * are a random offset moving the actually rendered region around inside of the specified region textureRegion
@@ -199,24 +199,21 @@ public class Particle extends Entity {
             }
             {
                 if (!onGround)
-                    pitch = (distanceToBlockBelow + (this.posY - lastPosY) * partialTicks) * 100;
+                    pitch = (distanceToBlockBelow + (this.posY - lastPosY) * partialTicks) * 10;
                 else pitch = -90;
             }
         }
 
         this.texture.bind();
         {
+
+            shaderProgram.pushMatrix();
             shaderProgram.translate(posX, posY, posZ);
 
             shaderProgram.rotate(0, 1, 0, (float) yaw);
             shaderProgram.rotate(1, 0, 0, (float) pitch);
-
             mesh.render(shaderProgram, GL_TRIANGLES);
-
-            shaderProgram.rotate(-1, 0, 0, (float) pitch);
-            shaderProgram.rotate(0, -1, 0, (float) yaw);
-
-            shaderProgram.translate(-posX, -posY, -posZ);
+            shaderProgram.popMatrix();
         }
     }
 }

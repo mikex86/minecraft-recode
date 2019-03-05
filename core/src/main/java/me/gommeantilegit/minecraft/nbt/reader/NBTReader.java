@@ -4,6 +4,7 @@ import me.gommeantilegit.minecraft.nbt.NBTObject;
 import me.gommeantilegit.minecraft.nbt.exception.NBTCorruptionException;
 import me.gommeantilegit.minecraft.nbt.impl.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -20,6 +21,7 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
      */
     protected final byte id;
 
+    @NotNull
     public static final NBTReader<NBTByte> BYTE_READER = new NBTReader<NBTByte>((byte) 0) {
 
         @Override
@@ -35,6 +37,7 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
 
     };
 
+    @NotNull
     public static final NBTReader<NBTBoolean> BOOLEAN_READER = new NBTReader<NBTBoolean>((byte) 1) {
 
         @Override
@@ -50,6 +53,7 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
 
     };
 
+    @NotNull
     public static final NBTReader<NBTInteger> INTEGER_READER = new NBTReader<NBTInteger>((byte) 2) {
 
         @Override
@@ -64,6 +68,7 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
         }
     };
 
+    @NotNull
     public static final NBTReader<NBTDouble> DOUBLE_READER = new NBTReader<NBTDouble>((byte) 3) {
 
         @Override
@@ -79,6 +84,7 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
 
     };
 
+    @NotNull
     public static final NBTReader<NBTFloat> FLOAT_READER = new NBTReader<NBTFloat>((byte) 4) {
 
         @Override
@@ -94,6 +100,7 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
 
     };
 
+    @NotNull
     public static final NBTReader<NBTLong> LONG_READER = new NBTReader<NBTLong>((byte) 5) {
 
         @Override
@@ -109,6 +116,7 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
 
     };
 
+    @NotNull
     public static final NBTReader<NBTString> STRING_READER = new NBTReader<NBTString>((byte) 6) {
 
         @Override
@@ -144,15 +152,16 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
 
     };
 
+    @NotNull
     public static final NBTReader<NBTStringMap> STRING_MAP_READER = new NBTReader<NBTStringMap>((byte) 7) {
 
         @Override
         public NBTStringMap read(@NotNull DataInputStream dataInputStream) throws IOException, NBTCorruptionException {
             byte idFromNBTArray = dataInputStream.readByte();
-            if (idFromNBTArray != NBTARRAY_READER.id)
+            if (idFromNBTArray != NBT_ARRAY_READER.id)
                 throw new NBTCorruptionException("Invalidly formatted StringMap");
 
-            NBTArray dualArray = NBTARRAY_READER.read(dataInputStream);
+            NBTArray dualArray = NBT_ARRAY_READER.read(dataInputStream);
             return NBTStringMap.fromDualArray(dualArray);
         }
 
@@ -160,12 +169,13 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
         public void write(@NotNull DataOutputStream dataOutputStream, @NotNull NBTStringMap object) throws IOException {
             dataOutputStream.writeByte(id);
             NBTArray array = object.toNBTArray();
-            NBTARRAY_READER.write(dataOutputStream, array);
+            NBT_ARRAY_READER.write(dataOutputStream, array);
         }
 
     };
 
-    public static final NBTReader<NBTArray> NBTARRAY_READER = new NBTReader<NBTArray>((byte) 8) {
+    @NotNull
+    public static final NBTReader<NBTArray> NBT_ARRAY_READER = new NBTReader<NBTArray>((byte) 8) {
 
         @Override
         public NBTArray read(@NotNull DataInputStream dataInputStream) throws IOException, NBTCorruptionException {
@@ -198,8 +208,10 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
         public void write(@NotNull DataOutputStream dataOutputStream, @NotNull NBTArray object) throws IOException {
             dataOutputStream.writeByte(id);
             NBTObject<?>[] objects = object.getValue();
-            dataOutputStream.writeInt(objects.length);
+            dataOutputStream.writeInt(object.getValue().length);
             for (NBTObject<?> nbtObject : objects) {
+                if (nbtObject == null)
+                    NULL_READER.write(dataOutputStream, null);
                 if (nbtObject instanceof NBTInteger) {
                     INTEGER_READER.write(dataOutputStream, (NBTInteger) nbtObject);
                 } else if (nbtObject instanceof NBTDouble) {
@@ -215,7 +227,7 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
                 } else if (nbtObject instanceof NBTStringMap) {
                     STRING_MAP_READER.write(dataOutputStream, (NBTStringMap) nbtObject);
                 } else if (nbtObject instanceof NBTArray) {
-                    NBTARRAY_READER.write(dataOutputStream, (NBTArray) nbtObject);
+                    NBT_ARRAY_READER.write(dataOutputStream, (NBTArray) nbtObject);
                 } else if (nbtObject instanceof NBTBoolean) {
                     BOOLEAN_READER.write(dataOutputStream, (NBTBoolean) nbtObject);
                 }
@@ -223,6 +235,21 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
             dataOutputStream.writeByte(-2);
         }
     };
+
+    public static NBTReader<NBTObject<?>> NULL_READER = new NBTReader<NBTObject<?>>((byte) 9) {
+
+        @Nullable
+        @Override
+        public NBTObject<?> read(@NotNull DataInputStream dataInputStream) throws NBTCorruptionException {
+            return null;
+        }
+
+        @Override
+        public void write(@NotNull DataOutputStream dataOutputStream, @Nullable NBTObject<?> object) throws IOException {
+            dataOutputStream.writeByte(id);
+        }
+    };
+
 
     public static final NBTReader<?>[] READERS = new NBTReader[]{
             BYTE_READER,
@@ -233,7 +260,8 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
             LONG_READER,
             STRING_READER,
             STRING_MAP_READER,
-            NBTARRAY_READER
+            NBT_ARRAY_READER,
+            NULL_READER
     };
 
     NBTReader(byte id) {

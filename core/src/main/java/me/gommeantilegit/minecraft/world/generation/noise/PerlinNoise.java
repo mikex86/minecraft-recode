@@ -12,7 +12,7 @@ public class PerlinNoise implements Noise3D {
     /**
      * @param seed seed for creation of permutation values
      */
-    public PerlinNoise(int seed) {
+    public PerlinNoise(long seed) {
         Random random = new Random(seed);
         //Generating permutation using a random instance
         for (int i = 0; i < 256; i++) permutation[256 + i] = permutation[i] = random.nextInt(256);

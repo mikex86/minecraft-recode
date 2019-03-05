@@ -3,7 +3,7 @@ package me.gommeantilegit.minecraft.block.state;
 import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.nbt.NBTObject;
-import me.gommeantilegit.minecraft.nbt.api.INBTRepresentable;
+import me.gommeantilegit.minecraft.nbt.api.INBTConverter;
 import me.gommeantilegit.minecraft.nbt.exception.NBTParsingException;
 import me.gommeantilegit.minecraft.nbt.impl.NBTArray;
 import me.gommeantilegit.minecraft.nbt.impl.NBTInteger;
@@ -56,7 +56,7 @@ public class BlockState implements IBlockState {
         return "BlockState{blockName: " + block.getName() + ", id: " + block.getId() + ", Facing: " + facing.name() + "}";
     }
 
-    public static final class NBTConverter implements INBTRepresentable<NBTArray, IBlockState> {
+    public static final class NBTConverter implements INBTConverter<NBTArray, IBlockState> {
 
         @NotNull
         @Override
@@ -69,7 +69,7 @@ public class BlockState implements IBlockState {
 
         @Nullable
         @Override
-        public IBlockState fromNBTData(NBTArray object) throws NBTParsingException {
+        public IBlockState fromNBTData(NBTArray object, Object... args) throws NBTParsingException {
             try {
                 int blockID = ((NBTInteger) object.getValue()[0]).getValue();
                 int facingOrdinal = ((NBTInteger) object.getValue()[1]).getValue();

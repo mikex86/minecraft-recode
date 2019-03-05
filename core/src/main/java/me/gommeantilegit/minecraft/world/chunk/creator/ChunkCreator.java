@@ -233,7 +233,7 @@ public class ChunkCreator implements Tickable, AsyncOperation {
         if (this.world.getOnChunkCreationListener() != null) {
             this.world.getOnChunkCreationListener().onChunkCreated(chunk);
         }
-        this.world.applyBlockChanges(chunk); //Changing up the chunk by applying the block changes regarding this chunk
+        this.world.applyBlockStates(chunk); // Changing up the chunk by applying the block changes regarding this chunk
         this.world.getWorldChunkHandler().getChunks().add(chunk); // Adding the chunk to the world chunks list
         this.world.getWorldChunkHandler().addUnloadedChunk(chunk); //Adding the chunk to the list of unloaded chunks because the chunk is not loaded by default and therefore unloaded. If it gets loaded later on, it gets removed.
     }

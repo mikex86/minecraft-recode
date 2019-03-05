@@ -4,6 +4,7 @@ import me.gommeantilegit.minecraft.nbt.NBTObject;
 import me.gommeantilegit.minecraft.nbt.impl.*;
 import me.gommeantilegit.minecraft.nbt.reader.NBTReader;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -17,7 +18,14 @@ public class NBTStreamWriter {
         this.dataOutputStream = dataOutputStream;
     }
 
-    public NBTStreamWriter write(NBTObject<?> object) throws IOException {
+    public NBTStreamWriter write(@Nullable NBTObject<?> object) throws IOException {
+        writeObject(object, dataOutputStream);
+        return this;
+    }
+
+    public static void writeObject(@Nullable NBTObject<?> object, @NotNull DataOutputStream dataOutputStream) throws IOException {
+        if (object == null)
+            NBTReader.NULL_READER.write(dataOutputStream, null);
         if (object instanceof NBTInteger) {
             NBTReader.INTEGER_READER.write(dataOutputStream, (NBTInteger) object);
         } else if (object instanceof NBTDouble) {
@@ -33,11 +41,10 @@ public class NBTStreamWriter {
         } else if (object instanceof NBTStringMap) {
             NBTReader.STRING_MAP_READER.write(dataOutputStream, (NBTStringMap) object);
         } else if (object instanceof NBTArray) {
-            NBTReader.NBTARRAY_READER.write(dataOutputStream, (NBTArray) object);
+            NBTReader.NBT_ARRAY_READER.write(dataOutputStream, (NBTArray) object);
         } else if (object instanceof NBTBoolean) {
             NBTReader.BOOLEAN_READER.write(dataOutputStream, (NBTBoolean) object);
         }
-        return this;
     }
 
     @NotNull

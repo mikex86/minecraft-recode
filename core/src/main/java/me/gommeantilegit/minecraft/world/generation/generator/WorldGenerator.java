@@ -24,8 +24,10 @@ public class WorldGenerator implements World.OnChunkCreationListener {
     @NotNull
     private final WorldType worldType;
 
-    @NotNull
-    private final int seed;
+    /**
+     * World Generation seed
+     */
+    private final long seed;
 
     @NotNull
     private final ChunkGenerator chunkGenerator;
@@ -36,7 +38,7 @@ public class WorldGenerator implements World.OnChunkCreationListener {
     @NotNull
     private final WorldGenerationOptions worldGenerationOptions;
 
-    public WorldGenerator(int seed, @NotNull WorldType worldType, @NotNull WorldGenerationOptions worldGenerationOptions) {
+    public WorldGenerator(long seed, @NotNull WorldType worldType, @NotNull WorldGenerationOptions worldGenerationOptions) {
         this.seed = seed;
         this.random = new Random(seed);
         this.worldType = worldType;
@@ -73,7 +75,7 @@ public class WorldGenerator implements World.OnChunkCreationListener {
         return random;
     }
 
-    public int getSeed() {
+    public long getSeed() {
         return seed;
     }
 

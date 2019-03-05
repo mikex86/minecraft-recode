@@ -10,12 +10,18 @@ import org.jetbrains.annotations.Nullable;
  * @param <N> The type of NBTObject that should represent the object
  * @param <C> The type of the object to be represented.
  */
-public interface INBTRepresentable<N extends NBTObject<?>, C> {
+public interface INBTConverter<N extends NBTObject<?>, C> {
 
     @NotNull
     N toNBTData(C object);
 
-    @Nullable
-    C fromNBTData(N object) throws NBTParsingException;
+    /**
+     * @param object the NBTObject to be parsed into an instance of type C
+     * @param args extra arguments if needed
+     * @param <T> type of the arguments
+     * @return the object instance represented by object
+     * @throws NBTParsingException if parsing fails
+     */
+    <T> C fromNBTData(N object, T... args) throws NBTParsingException;
 
 }

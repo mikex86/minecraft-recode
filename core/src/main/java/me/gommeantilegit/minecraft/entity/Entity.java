@@ -64,11 +64,6 @@ public class Entity {
     public float lastRotationYaw, lastRotationPitch;
 
     /**
-     * Clock instance used for timing of regeneration.
-     */
-    private final Clock healTimer = new Clock(false);
-
-    /**
      * Bounding box / Hitbox of the entity.
      */
     public AxisAlignedBB boundingBox;
@@ -82,6 +77,7 @@ public class Entity {
      * State if the entity is collided with a block on the horizontal axis.
      */
     public boolean collidedHorizontally = false;
+
     /**
      * State if the entity is dead. (Entity will be removed of the world if true in the next tick)
      */
@@ -100,26 +96,6 @@ public class Entity {
     protected float bbHeight = 1.8f;
 
     /**
-     * Health of the entity.
-     */
-    private int health;
-
-    /**
-     * The time the entity is resistant to further hurt in ticks.
-     */
-    private int hurtResistanceTime;
-
-    /**
-     * Stores the maximum health of the entity.
-     */
-    private int maxHealth;
-
-    /**
-     * Stores the time the entity is still going to be hurt in ticks. Zero if not hurt, 10 if just hurt.
-     */
-    private int hurtTime;
-
-    /**
      * Stores the tick that the entity was last updated on.
      */
     public long lastUpdated;
@@ -131,12 +107,9 @@ public class Entity {
 
     /**
      * @param world     sets {@link #world}
-     * @param maxHealth sets {@link #maxHealth}
      */
-    public Entity(World world, int maxHealth) {
+    public Entity(World world) {
         this.world = world;
-        this.maxHealth = maxHealth;
-        this.health = this.maxHealth;
         this.resetPos();
     }
 
@@ -207,32 +180,6 @@ public class Entity {
     }
 
     /**
-     * Regeneration update
-     */
-    protected void regenerate() {
-        if (hurtResistanceTime > 0)
-            hurtResistanceTime--;
-
-        if (hurtTime > 0)
-            hurtTime--;
-
-        if (this.getHealth() < getMaxHealth() && hurtTime == 0) {
-            if (healTimer.getTimePassed() > 1500) {
-                this.healHeart();
-                healTimer.reset();
-            }
-        }
-    }
-
-    /**
-     * Fills up live by a half heart
-     */
-    private void healHeart() {
-        this.setHealth(getHealth() + 1);
-        this.hurtResistanceTime = 5;
-    }
-
-    /**
      * Modifies the entities view by the given parameters
      *
      * @param yaw   rotationYaw gain
@@ -254,10 +201,6 @@ public class Entity {
      * The entity is still in the entity list of it's chunk when the method is called but removed immediately after this method has been called.
      */
     public void onDeath() {
-    }
-
-    public int getHurtResistanceTime() {
-        return hurtResistanceTime;
     }
 
     /**
@@ -446,40 +389,6 @@ public class Entity {
     }
 
     /**
-     * Sets the health of the entity. Protects from setting to to big or negative values.
-     *
-     * @param health the new amount of health
-     */
-    public void setHealth(int health) {
-        this.hurtTime = 10;
-        this.hurtResistanceTime = 10;
-        this.health = max(0, min(health, 20));
-    }
-
-    public int getHealth() {
-        return health;
-    }
-
-    public int getHurtTime() {
-        return hurtTime;
-    }
-
-    public void setHurtTime(int hurtTime) {
-        this.hurtTime = hurtTime;
-    }
-
-    /**
-     * Subtracts the given amount of health of the players health
-     *
-     * @param amount the amount to be subtracted
-     */
-    public void hurt(int amount) {
-        if (hurtResistanceTime == 0) {
-            setHealth(getHealth() - amount);
-        }
-    }
-
-    /**
      * @param chunk the given chunk
      * @return the state if the entity is in the given chunk.
      */
@@ -489,10 +398,6 @@ public class Entity {
 
     public World getWorld() {
         return world;
-    }
-
-    public int getMaxHealth() {
-        return maxHealth;
     }
 
     public void setWorld(World world) {

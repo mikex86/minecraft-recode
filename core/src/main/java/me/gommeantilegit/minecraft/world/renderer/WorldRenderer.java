@@ -6,6 +6,7 @@ import me.gommeantilegit.minecraft.entity.player.Player;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.world.World;
 import me.gommeantilegit.minecraft.world.chunk.Chunk;
+import me.gommeantilegit.minecraft.world.renderer.graphics.Graphics;
 import org.jetbrains.annotations.NotNull;
 
 public class WorldRenderer {
@@ -39,6 +40,8 @@ public class WorldRenderer {
     public WorldRenderer(@NotNull World world, @NotNull Player viewer) {
         this.world = world;
         this.viewer = viewer;
+        Graphics graphics = new Graphics(world); //Special graphics instance
+        graphics.apply();
     }
 
     /**

@@ -5,28 +5,64 @@ import com.badlogic.gdx.graphics.Camera;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.Matrix4;
+import me.gommeantilegit.minecraft.shader.api.TypicalShader;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Stack;
 
-public class StdShader extends ShaderProgram {
+/**
+ * Standard universal shader program
+ */
+public class StdShader extends ShaderProgram implements TypicalShader {
 
+    /**
+     * Uniform variable name of transformation matrix
+     */
     private static final String TRANSFORMATION_MATRIX_UNIFORM_NAME = "transMat";
+
+    /**
+     * Uniform variable name of view matrix
+     */
     private static final String VIEW_MATRIX_UNIFORM_NAME = "viewMat";
+
+    /**
+     * Uniform variable name of projection matrix
+     */
     private static final String PROJECTION_MATRIX_UNIFORM_NAME = "projectionMat";
 
     /* FOG UNIFORM NAMES */
+    /**
+     * Uniform variable name of the boolean enableFog storing the state whether or not fog should be enabled
+     */
     private static final String ENABLE_FOG_BOOLEAN_UNIFORM_NAME = "enableFog";
+
+    /**
+     * Uniform variable name of the fog color used
+     */
     private static final String FOG_COLOR_UNIFORM_NAME = "fogColor";
+
+    /**
+     * Uniform variable name of the fog density value
+     */
     private static final String FOG_DENSITY_UNIFORM_NAME = "fogDensity";
+
+    /**
+     * Uniform variable name of the fog gradient value
+     */
     private static final String FOG_GRADIENT_UNIFORM_NAME = "fogGradient";
 
+    /**
+     * Camera object
+     */
     private Camera camera;
 
+    /**
+     * Transformation matrix stack
+     */
     private final Stack<Matrix4> matrixStack = new Stack<>();
 
     public StdShader() {
-        super(Gdx.files.classpath("shaders/std_vert.glsl"), Gdx.files.classpath("shaders/std_frag.glsl"));
+        super(Gdx.files.classpath("shaders/std_shader/std_vert.glsl"), Gdx.files.classpath("shaders/std_shader/std_frag.glsl"));
         System.err.println(getLog());
         this.matrixStack.push(new Matrix4());
     }

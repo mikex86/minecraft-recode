@@ -1,5 +1,6 @@
 package me.gommeantilegit.minecraft.world;
 
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.collision.Ray;
 import me.gommeantilegit.minecraft.Minecraft;
@@ -17,7 +18,7 @@ import me.gommeantilegit.minecraft.timer.api.Tickable;
 import me.gommeantilegit.minecraft.util.block.position.BlockPos;
 import me.gommeantilegit.minecraft.util.collections.ThreadBoundList;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
-import me.gommeantilegit.minecraft.world.block.change.BlockChange;
+import me.gommeantilegit.minecraft.world.saveformat.components.SavedBlockState;
 import me.gommeantilegit.minecraft.world.block.change.WorldBlockChanger;
 import me.gommeantilegit.minecraft.world.chunk.Chunk;
 import me.gommeantilegit.minecraft.world.chunk.creator.ChunkCreator;
@@ -25,6 +26,8 @@ import me.gommeantilegit.minecraft.world.chunk.loader.ChunkLoader;
 import me.gommeantilegit.minecraft.world.chunk.world.WorldChunkHandler;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
 import me.gommeantilegit.minecraft.world.renderer.WorldRenderer;
+import me.gommeantilegit.minecraft.world.saveformat.components.SavedChunkState;
+import me.gommeantilegit.minecraft.world.saveformat.components.SavedWorldState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -74,14 +77,6 @@ public class World implements Tickable, Runnable, AsyncOperation, OpenGLOperatio
     public final ChunkLoader chunkLoader;
 
     /**
-     * List of all changes that were made to the originally generated world by the WorldGenerator.
-     */
-    @NotNull
-    public List<BlockChange> getBlockChanges() {
-        return blockChanges;
-    }
-
-    /**
      * Object capable of creating the chunks to be later loaded and built
      */
     @NotNull
@@ -117,29 +112,31 @@ public class World implements Tickable, Runnable, AsyncOperation, OpenGLOperatio
     /**
      * Height of the world
      */
-    public final int height = 256;
+    public final int height;
 
     /**
-     * List storing all block changes
+     * Saved world state of loaded world. Null if newly created world
      */
-    @NotNull
-    private final List<BlockChange> blockChanges;
+    @Nullable
+    private final SavedWorldState savedWorldState;
 
     /**
      * Default world constructor
      *
-     * @param viewer         the player viewing the world
-     * @param worldGenerator world generator for world generation
-     * @param blockChanges   block changes
+     * @param viewer          the player viewing the world
+     * @param worldGenerator  world generator for world generation
+     * @param savedWorldState saved world state
+     * @param height          block height of the world
      */
-    public World(@NotNull Player viewer, @NotNull WorldGenerator worldGenerator, @NotNull List<BlockChange> blockChanges) {
+    public World(@NotNull Player viewer, @NotNull WorldGenerator worldGenerator, @Nullable SavedWorldState savedWorldState, int height) {
         this.viewer = viewer;
         this.worldGenerator = worldGenerator;
-        this.blockChanges = blockChanges;
-        this.worldRenderer = new WorldRenderer(this, viewer); // Must be initialized before #chunkLoader
-        this.chunkLoader = new ChunkLoader(this); // Must be initialized after #worldRenderer
+        this.savedWorldState = savedWorldState;
+        this.height = height;
         this.chunkCreator = new ChunkCreator(this);
+        this.worldRenderer = new WorldRenderer(this, viewer); // Must be initialized before #chunkLoader
         this.blockChanger = new WorldBlockChanger(this);
+        this.chunkLoader = new ChunkLoader(this); // Must be initialized after #worldRenderer
         this.worldThread = new Thread(this, "World-thread");
         this.worldThread.start();
         this.setOnChunkCreationListener(worldGenerator);
@@ -380,20 +377,6 @@ public class World implements Tickable, Runnable, AsyncOperation, OpenGLOperatio
     }
 
     /**
-     * Applies changes from {@link #blockChanges} for this chunk to the loaded chunk
-     *
-     * @param chunk the chunk that is currently loaded
-     */
-    public void applyBlockChanges(@NotNull Chunk chunk) {
-        for (BlockChange blockChange : blockChanges) {
-            BlockPos bp = blockChange.getPosition();
-            if (chunk.contains(bp.getX(), bp.getZ())) {
-                chunk.setBlockNoChangeWithoutWorldBlockChangerObject(bp.getX(), bp.getY(), bp.getZ(), blockChange.getNewBlockState());
-            }
-        }
-    }
-
-    /**
      * @param x x position
      * @param y y position
      * @param z z position
@@ -534,30 +517,6 @@ public class World implements Tickable, Runnable, AsyncOperation, OpenGLOperatio
         return new Vec2i(chunkX, chunkZ);
     }
 
-    /**
-     * Adds a blockChange instance to {@link World#blockChanges} if none exists for this coordinate or adjusts its block value if one is already present.
-     * If the block change returns to it original state, the element is removed.
-     * IMPORTANT: NEEDS TO BE PERFORMED BEFORE BLOCK CHANGE IN WORLD
-     *
-     * @param x          x coordinate
-     * @param y          y coordinate
-     * @param z          z coordinate
-     * @param blockState the new block state
-     */
-    public void setBlockChanged(int x, int y, int z, @Nullable IBlockState blockState) {
-        BlockPos bp = new BlockPos(x, y, z);
-        BlockChange change = getBlockChangeFor(bp);
-        if (change == null) {
-            blockChanges.add(new BlockChange(new BlockPos(x, y, z), blockState, getBlockState(x, y, z)));
-        } else {
-            if (blockState == change.getOriginalBlockState()) {
-                this.blockChanges.remove(change);
-            } else {
-                change.setNewBlock(blockState);
-            }
-        }
-    }
-
     @Nullable
     public IBlockState getBlockState(int x, int y, int z) {
         Chunk chunk = this.getChunkAt(x, z);
@@ -568,20 +527,6 @@ public class World implements Tickable, Runnable, AsyncOperation, OpenGLOperatio
     @Nullable
     public IBlockState getBlockState(@NotNull BlockPos blockPos) {
         return getBlockState(blockPos.getX(), blockPos.getY(), blockPos.getZ());
-    }
-
-    /**
-     * @param bp the specified position
-     * @return the BlockChange instance for the given position if present. Else null.
-     */
-    @Nullable
-    private BlockChange getBlockChangeFor(@NotNull BlockPos bp) {
-        for (BlockChange blockChange : this.blockChanges) {
-            if (blockChange.getPosition().equals(bp)) {
-                return blockChange;
-            }
-        }
-        return null;
     }
 
     /**
@@ -620,6 +565,51 @@ public class World implements Tickable, Runnable, AsyncOperation, OpenGLOperatio
             }
         }
         return new RayTracer.RayTraceResult(null, null, RayTracer.RayTraceResult.EnumResultType.MISS, null);
+    }
+
+    /**
+     * Changes up the chunk to match its saved state of {@link #savedWorldState} if present
+     *
+     * @param chunk the given chunk
+     */
+    public void applyBlockStates(@NotNull Chunk chunk) {
+        if (this.savedWorldState == null)
+            return;
+        @NotNull
+        SavedWorldState savedWorldState = this.savedWorldState;
+        for (SavedChunkState savedChunkState : savedWorldState.getChunkStates()) {
+            if (chunk.getChunkOrigin().equals(savedChunkState.getChunkOrigin())) {
+                Vector2 origin = chunk.getChunkOrigin();
+                SavedBlockState[][][] blockStates = savedChunkState.getBlockStates();
+                assert blockStates.length == CHUNK_SIZE;
+                assert blockStates[0].length == height;
+                assert blockStates[1].length == CHUNK_SIZE;
+                for (int xo = 0; xo < CHUNK_SIZE; xo++) {
+                    for (int y = 0; y < height; y++) {
+                        for (int zo = 0; zo < CHUNK_SIZE; zo++) {
+                            int x = (int) (origin.x + xo), z = (int) (origin.y + zo);
+                            SavedBlockState savedBlockState = blockStates[xo][y][zo];
+                            if (savedBlockState != null) {
+                                BlockPos bp = savedBlockState.getPosition();
+                                assert xo == bp.getX() - origin.x;
+                                assert y == bp.getY();
+                                assert zo == bp.getZ() - origin.y;
+                                chunk.setBlockNoChangeWithoutWorldBlockChangerObject(x, y, z, savedBlockState.getBlockState());
+                            } else {
+                                chunk.setBlockNoChangeWithoutWorldBlockChangerObject(x, y, z, null);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @return the block height of the world
+     */
+    public int getHeight() {
+        return height;
     }
 
     /**
@@ -679,4 +669,5 @@ public class World implements Tickable, Runnable, AsyncOperation, OpenGLOperatio
     public OnChunkCreationListener getOnChunkCreationListener() {
         return onChunkCreationListener;
     }
+
 }

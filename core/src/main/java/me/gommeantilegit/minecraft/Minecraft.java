@@ -25,13 +25,11 @@ import me.gommeantilegit.minecraft.timer.tick.MinecraftThread;
 import me.gommeantilegit.minecraft.world.World;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
 import me.gommeantilegit.minecraft.world.generation.generator.options.WorldGenerationOptions;
-import me.gommeantilegit.minecraft.world.generation.noise.PerlinNoise;
 import me.gommeantilegit.minecraft.world.saveformat.LevelLoader;
 import me.gommeantilegit.minecraft.world.saveformat.LevelSaver;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
-import java.util.ArrayList;
 
 import static java.lang.Math.max;
 
@@ -193,7 +191,7 @@ public class Minecraft implements ApplicationListener, Tickable, OpenGLOperation
             String levelFileName = "saves/test_save.lvl";
             if (!new File(levelFileName).exists()) {
                 WorldGenerator worldGenerator = new WorldGenerator(123, WorldGenerator.WorldType.OVERWORLD, new WorldGenerationOptions(false));
-                theWorld = new World(thePlayer, worldGenerator, new ArrayList<>());
+                theWorld = new World(thePlayer, worldGenerator, null, 256);
             } else {
                 try {
                     LevelLoader levelLoader = new LevelLoader(new DataInputStream(new FileInputStream(levelFileName)));
@@ -202,7 +200,7 @@ public class Minecraft implements ApplicationListener, Tickable, OpenGLOperation
                     } catch (Exception e) {
                         throw new RuntimeException("Loading of world fails. (NBT Reading)", e);
                     }
-                } catch (FileNotFoundException e) {
+                } catch (IOException e) {
                     throw new RuntimeException("Level file not found!", e);
                 }
             }
@@ -221,9 +219,6 @@ public class Minecraft implements ApplicationListener, Tickable, OpenGLOperation
         loaded = true;
         this.minecraftThread.start(); //Starting Tick Thread.
     }
-
-    @NotNull
-    private final PerlinNoise noise = new PerlinNoise(100);
 
     /**
      * Resizing the game
@@ -366,8 +361,11 @@ public class Minecraft implements ApplicationListener, Tickable, OpenGLOperation
         /* Test Only */
         LevelSaver levelSaver = new LevelSaver(theWorld);
         try {
+            // TODO: REWRITE LEVEL SAVING / LOADING
             new File("saves").mkdirs();
-            levelSaver.save(new DataOutputStream(new FileOutputStream("saves/test_save.lvl")));
+            ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+            levelSaver.save(new DataOutputStream(byteOut));
+            new FileOutputStream("saves/test_save.lvl").write(byteOut.toByteArray());
         } catch (IOException e) {
             throw new RuntimeException("Saving of level failed", e);
         }
