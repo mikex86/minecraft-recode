@@ -27,16 +27,20 @@ public class ClientChunkDataHandler extends PacketHandler<ServerChunkDataPacket>
         int worldHeight = packet.getWorldHeight();
         assert worldHeight == netHandlerPlayClient.mc.theWorld.height;
         Vector2 origin = packet.getChunkOrigin();
-        ClientChunk chunk = netHandlerPlayClient.mc.theWorld.getChunkAtOrigin((int) origin.x, (int) origin.y);
+        ClientChunk chunk = (ClientChunk) netHandlerPlayClient.mc.theWorld.getChunkAtOrigin((int) origin.x, (int) origin.y);
         if (chunk != null) {
             assert chunk.getHeight() == packet.getWorldHeight();
             assert chunk.getChunkSections().length == packet.getChunkSectionsSent().length;
             netHandlerPlayClient.mc.asyncExecutor.submit((AsyncTask<Void>) () -> {
-                chunk.setChunkData(decompress(packet.getChunkData()), packet.getChunkSectionsSent());
-                chunk.nullifyMesh();
-                chunk.dataReceived = true;
-                chunk.load();
-                context.channel().writeAndFlush(new ClientChunkLoadConfirmPacket(null, origin));
+                try {
+                    chunk.setChunkData(decompress(packet.getChunkData()), packet.getChunkSectionsSent());
+                    chunk.nullifyMesh();
+                    chunk.dataReceived = true;
+                    chunk.load();
+                    context.channel().writeAndFlush(new ClientChunkLoadConfirmPacket(null, origin));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
                 return null;
             });
         }

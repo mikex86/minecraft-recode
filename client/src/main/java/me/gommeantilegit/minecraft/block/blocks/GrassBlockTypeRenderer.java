@@ -5,15 +5,23 @@ import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.ClientBlock;
-import me.gommeantilegit.minecraft.block.ClientBlocks;
+import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
+import me.gommeantilegit.minecraft.block.Blocks;
+import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.block.texturemap.BlockTextureMap;
 import org.jetbrains.annotations.NotNull;
 
 import static me.gommeantilegit.minecraft.util.RenderUtils.rect;
 
 @SideOnly(side = Side.CLIENT)
-public class ClientGrassBlock extends ClientBlock {
+public class GrassBlockTypeRenderer extends BlockTypeRenderer {
+
+    /**
+     * Parent Client minecraft instance
+     */
+    @NotNull
+    private final ClientMinecraft mc;
 
 //    /**
 //     * Color buffer for grass.
@@ -27,13 +35,14 @@ public class ClientGrassBlock extends ClientBlock {
 //    @NotNull
 //    private static final Color COLOR = new Color(getGrassColor(0.45, 0.15));
 
-    public ClientGrassBlock(@NotNull ClientBlocks blocks, @NotNull ClientMinecraft mc) {
-        super("Grass", (short)3, new String[]{
+    public GrassBlockTypeRenderer(@NotNull BlockBase grassBlock, @NotNull ClientMinecraft mc) {
+        super(grassBlock, mc,
                 "dirt",
                 "grass_side",
                 "grass_side_overlay",
                 "grass_top_old"
-        }, true, blocks, mc, false);
+        );
+        this.mc = mc;
     }
 
     @Override
@@ -52,11 +61,11 @@ public class ClientGrassBlock extends ClientBlock {
         v0 /= map.getHeight();
         v1 /= map.getHeight();
 
-        float x0 = (float) x + this.x0;
-        float x1 = (float) x + this.x1;
-        float y1 = (float) y + this.y1;
-        float z0 = (float) z + this.z0;
-        float z1 = (float) z + this.z1;
+        float x0 = (float) x + block.x0;
+        float x1 = (float) x + block.x1;
+        float y1 = (float) y + block.y1;
+        float z0 = (float) z + block.z0;
+        float z1 = (float) z + block.z1;
 
         builder.setColor(1, 1, 1, 1);
         switch (face) {

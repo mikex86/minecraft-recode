@@ -14,7 +14,7 @@ import me.gommeantilegit.minecraft.utils.collections.LongHashMap;
 import me.gommeantilegit.minecraft.utils.io.IOUtils;
 import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
 import me.gommeantilegit.minecraft.world.ServerWorld;
-import me.gommeantilegit.minecraft.world.chunk.ServerChunk;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
 import org.jetbrains.annotations.NotNull;
 
@@ -99,7 +99,7 @@ public class WorldLoader {
     public ServerWorld loadWorld() {
         ServerWorld world = new ServerWorld(this.mc, WorldGenerator.NBT_CONVERTER.fromNBTData(this.worldGeneratorOptions, this.mc));
         world.setSpawnPoint(new Vector3(((NBTFloat) this.worldData.getValue()[0]).getValue(), ((NBTFloat) this.worldData.getValue()[1]).getValue(), ((NBTFloat) this.worldData.getValue()[2]).getValue()));
-        world.setInvokeTerraionGenerationDecider(WorldLoader.this::invokedTerrainGeneration);
+        world.setInvokeTerrainGenerationDecider(WorldLoader.this::invokedTerrainGeneration);
         world.addOnChunkCreationListener(WorldLoader.this::applyBlockStates);
         return world;
     }
@@ -109,7 +109,7 @@ public class WorldLoader {
      *
      * @param chunk the given chunk
      */
-    private void applyBlockStates(@NotNull ServerChunk chunk) {
+    private void applyBlockStates(@NotNull ChunkBase chunk) {
         ServerChunkDataPacket packet = chunkData.get(chunk.getChunkOrigin().hash64());
         if (packet != null)
             chunk.setChunkData(decompress(packet.getChunkData()), packet.getChunkSectionsSent());
@@ -119,7 +119,7 @@ public class WorldLoader {
      * @param chunk the given chunk
      * @return true if terrain generation should be invoked for the given chunk
      */
-    private boolean invokedTerrainGeneration(@NotNull ServerChunk chunk) {
+    private boolean invokedTerrainGeneration(@NotNull ChunkBase chunk) {
         return chunkData.get(chunk.getChunkOrigin().hash64()) == null;
     }
 

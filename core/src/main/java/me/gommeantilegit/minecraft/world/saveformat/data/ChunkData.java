@@ -4,9 +4,8 @@ import me.gommeantilegit.minecraft.block.state.BlockStateBase;
 
 /**
  * Represents the pure data of a chunk.
- * @param <BS> the type of block-state to store
  */
-public class ChunkData<BS extends BlockStateBase> {
+public class ChunkData {
 
     /**
      * The chunk height
@@ -16,11 +15,11 @@ public class ChunkData<BS extends BlockStateBase> {
     /**
      * The three-dimensional blockState array
      */
-    private final BS[][][] blockStates;
+    private final BlockStateBase[][][] blockStates;
 
-    public ChunkData(int height, BS[][][] blockStates) {
+    public ChunkData(int height, BlockStateBase[][][] blockStates) {
         this.height = height;
-        for (BS[][] blockState : blockStates) {
+        for (BlockStateBase[][] blockState : blockStates) {
             assert blockState.length == height;
         }
         this.blockStates = blockStates;
@@ -30,7 +29,7 @@ public class ChunkData<BS extends BlockStateBase> {
         return height;
     }
 
-    public BS[][][] getBlockStates() {
+    public BlockStateBase[][][] getBlockStates() {
         return blockStates;
     }
 }

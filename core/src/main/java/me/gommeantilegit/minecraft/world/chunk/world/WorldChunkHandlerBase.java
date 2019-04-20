@@ -1,9 +1,5 @@
 package me.gommeantilegit.minecraft.world.chunk.world;
 
-import me.gommeantilegit.minecraft.AbstractMinecraft;
-import me.gommeantilegit.minecraft.block.BlockBase;
-import me.gommeantilegit.minecraft.block.Blocks;
-import me.gommeantilegit.minecraft.block.state.BlockStateBase;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
 import me.gommeantilegit.minecraft.utils.collections.LongHashMap;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
@@ -13,35 +9,35 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 
-public class WorldChunkHandlerBase<CB extends ChunkBase, MC extends AbstractMinecraft<BB, MC, BLOCKS, BS>, BB extends BlockBase<MC, BB, BS, BLOCKS>, BLOCKS extends Blocks<BB, MC>, BS extends BlockStateBase<BB>> {
+public class WorldChunkHandlerBase {
 
     /**
      * Stores all currently loaded chunks
      * Only accessible from Minecraft Thread!
      */
     @NotNull
-    private final ArrayList<CB> loadedChunks;
+    private final ArrayList<ChunkBase> loadedChunks;
 
     /**
      * Stores all currently unloaded chunks
      * Only accessible from Minecraft Thread!
      */
     @NotNull
-    private final ArrayList<CB> unloadedChunks;
+    private final ArrayList<ChunkBase> unloadedChunks;
 
     /**
      * List storing all chunks of the world.
      * Only accessible from Minecraft Thread!
      */
     @NotNull
-    private final ArrayList<CB> chunks;
+    private final ArrayList<ChunkBase> chunks;
 
     /**
      * A map containing all registered chunk origins and their parent chunks at that origin.
      * chunkMap.get(originHash) may return null, if the chunk is currently scheduled to be created
      */
     @NotNull
-    private final LongHashMap<CB> chunkMap = new LongHashMap<>();
+    private final LongHashMap<ChunkBase> chunkMap = new LongHashMap<>();
 
     /**
      * Hash set of all chunk origins
@@ -53,7 +49,7 @@ public class WorldChunkHandlerBase<CB extends ChunkBase, MC extends AbstractMine
         this(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
     }
 
-    public WorldChunkHandlerBase(@NotNull ArrayList<CB> chunks, @NotNull ArrayList<CB> unloadedChunks, @NotNull ArrayList<CB> loadedChunks) {
+    public WorldChunkHandlerBase(@NotNull ArrayList<ChunkBase> chunks, @NotNull ArrayList<ChunkBase> unloadedChunks, @NotNull ArrayList<ChunkBase> loadedChunks) {
         this.chunks = chunks;
         this.unloadedChunks = unloadedChunks;
         this.loadedChunks = loadedChunks;
@@ -83,7 +79,7 @@ public class WorldChunkHandlerBase<CB extends ChunkBase, MC extends AbstractMine
      * @return the chunk instance for the specified position
      */
     @Nullable
-    public synchronized CB getChunkAt(int originX, int originZ) {
+    public synchronized ChunkBase getChunkAt(int originX, int originZ) {
         return this.chunkMap.get(Vec2i.hash64(originX, originZ));
     }
 
@@ -92,41 +88,41 @@ public class WorldChunkHandlerBase<CB extends ChunkBase, MC extends AbstractMine
      *
      * @param chunk the new chunk
      */
-    public synchronized void addChunk(@NotNull CB chunk) {
+    public synchronized void addChunk(@NotNull ChunkBase chunk) {
         this.chunks.add(chunk);
         this.chunkMap.put(Vec2i.hash64(chunk.getX(), chunk.getZ()), chunk);
     }
 
     @NotNull
-    public synchronized ArrayList<CB> getChunks() {
+    public synchronized ArrayList<ChunkBase> getChunks() {
         return chunks;
     }
 
     @NotNull
-    public synchronized ArrayList<CB> getUnloadedChunks() {
+    public synchronized ArrayList<ChunkBase> getUnloadedChunks() {
         return unloadedChunks;
     }
 
     @NotNull
-    public synchronized ArrayList<CB> getLoadedChunks() {
+    public synchronized ArrayList<ChunkBase> getLoadedChunks() {
         return loadedChunks;
     }
 
-    public synchronized void addLoadedChunk(@NotNull CB chunk) {
+    public synchronized void addLoadedChunk(@NotNull ChunkBase chunk) {
         if (!loadedChunks.contains(chunk))
             this.loadedChunks.add(chunk);
     }
 
-    public synchronized void addUnloadedChunk(CB chunk) {
+    public synchronized void addUnloadedChunk(ChunkBase chunk) {
         if (!unloadedChunks.contains(chunk))
             this.unloadedChunks.add(chunk);
     }
 
-    public synchronized void removeLoadedChunk(CB chunk) {
+    public synchronized void removeLoadedChunk(ChunkBase chunk) {
         this.loadedChunks.remove(chunk);
     }
 
-    public synchronized void removeUnloadedChunk(@NotNull CB chunk) {
+    public synchronized void removeUnloadedChunk(@NotNull ChunkBase chunk) {
         this.unloadedChunks.remove(chunk);
     }
 }

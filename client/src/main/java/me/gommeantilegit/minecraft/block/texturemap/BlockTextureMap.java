@@ -8,6 +8,10 @@ import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.IOAccess;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
+import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
+import me.gommeantilegit.minecraft.block.Blocks;
+import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.utils.Pointer;
@@ -22,6 +26,12 @@ public class BlockTextureMap {
      * Maximal width of a row in pixel
      */
     private final int maxWidth;
+
+    /**
+     * The Block renderer registry where every block has a parent renderer
+     */
+    @NotNull
+    private final ClientBlockRendererTypeRegistry rendererTypeRegistry;
 
     /**
      * The actual width of the image.
@@ -53,6 +63,9 @@ public class BlockTextureMap {
     @NotNull
     private final Pointer<TextureWrapper> textureWrapper = new Pointer<>();
 
+    /**
+     * List of pairs storing the texture resource paths with their parent uv position in the final texture map image
+     */
     @NotNull
     private final ArrayList<Pair<String, Vector2>> textureResources = new ArrayList<>();
 
@@ -65,9 +78,21 @@ public class BlockTextureMap {
     /**
      * @param maxWidth sets {@link #maxWidth}
      */
-    public BlockTextureMap(int maxWidth, @NotNull ClientMinecraft mc) {
+    public BlockTextureMap(int maxWidth, @NotNull ClientMinecraft mc, @NotNull ClientBlockRendererTypeRegistry rendererTypeRegistry) {
         this.maxWidth = maxWidth;
         this.mc = mc;
+        this.rendererTypeRegistry = rendererTypeRegistry;
+    }
+
+    /**
+     * Sets up the texture map by placing every block texture on the texture map
+     */
+    public void setupTextureMap() {
+        for (BlockTypeRenderer value : rendererTypeRegistry.getRendererRegistry().values()) {
+            for (String textureResource : value.getTextureResources()) {
+                addTexture("textures/blocks/" + textureResource + ".png");
+            }
+        }
     }
 
     private int greatestImageHeightOfRow;

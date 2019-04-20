@@ -5,32 +5,29 @@ import com.badlogic.gdx.math.collision.BoundingBox;
 import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.annotations.Unsafe;
 import me.gommeantilegit.minecraft.block.BlockBase;
-import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.state.BlockStateBase;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
-import me.gommeantilegit.minecraft.utils.collections.ThreadBoundList;
 import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
 import me.gommeantilegit.minecraft.utils.serialization.exception.DeserializationException;
 import me.gommeantilegit.minecraft.world.WorldBase;
-import me.gommeantilegit.minecraft.world.block.change.WorldBlockChangerBase;
-import me.gommeantilegit.minecraft.world.chunk.loader.ChunkLoaderBase;
-import me.gommeantilegit.minecraft.world.chunk.world.WorldChunkHandlerBase;
 import me.gommeantilegit.minecraft.world.saveformat.data.ChunkData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Array;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Random;
 import java.util.function.Predicate;
 
 import static java.lang.Math.max;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
 
-public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBase<CS, CB, CH, BLOCKS, MC, BB, BS, WB, CL>, CH extends WorldChunkHandlerBase<CB, MC, BB, BLOCKS, BS>, BLOCKS extends Blocks<BB, MC>, MC extends AbstractMinecraft<BB, MC, BLOCKS, BS>, BB extends BlockBase<MC, BB, BS, BLOCKS>, BS extends BlockStateBase<BB>, WB extends WorldBase<CL, BLOCKS, MC, WB, BS, CB, CH, BB, ?>, CL extends ChunkLoaderBase<CB, WB>> implements Tickable {
+public class ChunkBase implements Tickable {
 
     /**
      * Width and height of the chunk region starting at {@link #x}, {@link #z}
@@ -51,7 +48,7 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * Parent world instance
      */
     @NotNull
-    protected final WB world;
+    protected final WorldBase world;
 
     /**
      * State if the chunk is currently loaded (tick updated)
@@ -72,7 +69,7 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * Three dimensional array of blockStates storing information about all block states.
      */
     @NotNull
-    public final BS[][][] blockStates;
+    public final BlockStateBase[][][] blockStates;
 
     /**
      * Chunk bounding box for frustum culling
@@ -84,34 +81,38 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * Minecraft instance
      */
     @NotNull
-    public final MC mc;
+    public final AbstractMinecraft mc;
 
     /**
      * Array of chunk sections
      */
     @NotNull
-    private final CS[] chunkSections;
+    private final ChunkSection[] chunkSections;
+
+    /**
+     * 2D array storing a Biome id for a given x and z value.
+     */
+    @NotNull
+    private final byte[][] biome = new byte[CHUNK_SIZE][CHUNK_SIZE];
 
     /**
      * Default constructor of a ChunkBase object
      *
-     * @param height              height of the world -> becomes chunk height
-     * @param x                   startX position where the region managed by the chunk starts
-     * @param z                   startZ position where the region managed by the chunk starts
-     * @param world               the parent world
-     * @param blockStateBaseClass class of blockStateBase type BS
-     * @param chunkSectionsClass  class of chunkSectionBase type CS
+     * @param height height of the world -> becomes chunk height
+     * @param x      startX position where the region managed by the chunk starts
+     * @param z      startZ position where the region managed by the chunk starts
+     * @param world  the parent world
      */
-    public ChunkBase(int height, int x, int z, @NotNull WB world, Class<BS> blockStateBaseClass, @NotNull Class<CS> chunkSectionsClass) {
+    public ChunkBase(int height, int x, int z, @NotNull WorldBase world) {
         this.height = height;
         this.x = x;
         this.z = z;
         this.world = world;
-        this.blockStates = (BS[][][]) Array.newInstance(blockStateBaseClass, CHUNK_SIZE, height, CHUNK_SIZE);
+        this.blockStates = new BlockStateBase[CHUNK_SIZE][height][CHUNK_SIZE];
         this.boundingBox = new BoundingBox(new Vector3(x, 0, z), new Vector3(x + CHUNK_SIZE, height, z + CHUNK_SIZE));
         this.mc = world.mc;
         this.entities = new ArrayList<>();
-        this.chunkSections = (CS[]) Array.newInstance(chunkSectionsClass, height / CHUNK_SECTION_SIZE);
+        this.chunkSections = new ChunkSection[height / CHUNK_SECTION_SIZE];
         for (int i = 0; i < chunkSections.length; i++) {
             chunkSections[i] = getChunkSection(i * CHUNK_SECTION_SIZE);
         }
@@ -122,7 +123,9 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * @return the chunk section instance to be stored in {@link #chunkSections} during object init.
      */
     @NotNull
-    protected abstract CS getChunkSection(int startHeight);
+    protected ChunkSection getChunkSection(int startHeight) {
+        return new ChunkSection(this, startHeight);
+    }
 
     /**
      * Updating the chunks entities.
@@ -228,9 +231,9 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * All this happens asynchronous. Invocation of this method will be quick.
      */
     public synchronized void load() {
-        if(!loaded) {
-            world.getWorldChunkHandler().addLoadedChunk((CB) this);
-            world.getWorldChunkHandler().removeUnloadedChunk((CB) this);
+        if (!loaded) {
+            world.getWorldChunkHandler().addLoadedChunk(this);
+            world.getWorldChunkHandler().removeUnloadedChunk(this);
             setLoaded(true);
         }
     }
@@ -242,30 +245,15 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * All this happens asynchronous. Invocation of this method will be quick.
      */
     public synchronized void unload() {
-        if(loaded) {
-            world.getWorldChunkHandler().removeLoadedChunk((CB) this);
-            world.getWorldChunkHandler().addUnloadedChunk((CB) this);
+        if (loaded) {
+            world.getWorldChunkHandler().removeLoadedChunk(this);
+            world.getWorldChunkHandler().addUnloadedChunk(this);
             setLoaded(false);
         }
     }
 
     /**
-     * Sets the block state for the given world absolute coordinate. (WITHOUT SCHEDULING THE ACTION ON THE {@link WorldBlockChangerBase} INSTANCE)
-     * USAGE IS DANGEROUS.
-     *
-     * @param x          world x position
-     * @param y          world y position
-     * @param z          world z position
-     * @param blockState the new block state
-     * @throws IllegalStateException if the specified coordinates are not managed by the chunk.
-     */
-    @Unsafe
-    public void setBlockWithoutWorldBlockChangerObject(int x, int y, int z, @Nullable BS blockState) {
-        changeBlock(x, y, z, blockState);
-    }
-
-    /**
-     * Sets the block state for the given world absolute coordinate. (Schedules an action on {@link WorldBlockChangerBase} INSTANCE)
+     * Sets the block state for the given world absolute coordinate.
      *
      * @param x             world x position
      * @param y             world y position
@@ -273,8 +261,8 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * @param newBlockState the new block state
      * @throws IllegalStateException if the specified coordinates are not managed by the chunk.
      */
-    public void setBlock(int x, int y, int z, @Nullable BS newBlockState) {
-        world.getBlockChanger().blockChange(x, y, z, newBlockState, (CB) this);
+    public void setBlock(int x, int y, int z, @Nullable BlockStateBase newBlockState) {
+        changeBlock(x, y, z, newBlockState);
     }
 
     /**
@@ -286,25 +274,13 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * @param blockState the new block state
      */
     @Unsafe
-    protected void changeBlock(int x, int y, int z, @Nullable BS blockState) {
+    protected void changeBlock(int x, int y, int z, @Nullable BlockStateBase blockState) {
         int relX = x - this.x;
         int relY = max(0, y);
         int relZ = z - this.z;
         if (!this.contains(x, z))
             throw new IllegalStateException("Couldn't set block state to blockState: " + blockState + ". Coordinates x: " + x + ", y: " + y + ", z: " + z + "; relX: " + relX + ", relY: " + relY + ", relZ: " + relZ + "; are not contained in ChunkBase: [" + this.toString() + "]");
         this.blockStates[relX][relY][relZ] = blockState;
-    }
-
-    /**
-     * Sets the block at a given position to block id
-     *
-     * @param x          x coordinate
-     * @param y          y coordinate
-     * @param z          z coordinate
-     * @param blockState the new block state
-     */
-    public void setBlockNoChange(int x, int y, int z, @Nullable BS blockState) {
-        world.getBlockChanger().blockChange(x, y, z, blockState, (CB) this);
     }
 
     /**
@@ -327,8 +303,8 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * @return the block instance of the block state at the specified coordinate or null if block state is null indicating that the block is air.
      */
     @Nullable
-    public BB getBlockAt(int x, int y, int z) {
-        BS blockState = getBlockState(x, y, z);
+    public BlockBase getBlockAt(int x, int y, int z) {
+        BlockStateBase blockState = getBlockState(x, y, z);
         if (blockState == null)
             return null;
         else return blockState.getBlock();
@@ -341,7 +317,7 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      * @return the block state at the specified coordinate
      */
     @Nullable
-    public BS getBlockState(int x, int y, int z) {
+    public BlockStateBase getBlockState(int x, int y, int z) {
         if (y < 0 || y >= height)
             return null; //Returning air, if the block pos is below the world
         int relX = x - this.x;
@@ -373,7 +349,7 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
         this.clearBlocks();
         BitByteBuffer buf = new BitByteBuffer(bytes, Integer.MAX_VALUE);
         try {
-            ChunkData<BS> chunkData = mc.chunkSerializer.deserialize(buf, height, chunkSectionsSent);
+            ChunkData chunkData = mc.chunkSerializer.deserialize(buf, height, chunkSectionsSent);
             apply(chunkData);
         } catch (DeserializationException e) {
             mc.logger.crash("Cannot deserialize chunk data from byte array!", e);
@@ -385,7 +361,7 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
      *
      * @param chunkData the data object storing the state that should be applied to this chunk
      */
-    private void apply(@NotNull ChunkData<BS> chunkData) {
+    private void apply(@NotNull ChunkData chunkData) {
         for (int x = 0; x < CHUNK_SIZE; x++) {
             for (int y = 0; y < height; y++) {
                 for (int z = 0; z < CHUNK_SIZE; z++) {
@@ -421,7 +397,7 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
     }
 
     @NotNull
-    public WB getWorld() {
+    public WorldBase getWorld() {
         return world;
     }
 
@@ -491,7 +467,7 @@ public abstract class ChunkBase<CS extends ChunkSection<CB>, CB extends ChunkBas
     }
 
     @NotNull
-    public CS[] getChunkSections() {
+    public ChunkSection[] getChunkSections() {
         return chunkSections;
     }
 

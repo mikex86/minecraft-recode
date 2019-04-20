@@ -2,12 +2,8 @@ package me.gommeantilegit.minecraft.world.chunk.world;
 
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
-import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.ClientBlock;
-import me.gommeantilegit.minecraft.block.ClientBlocks;
-import me.gommeantilegit.minecraft.block.state.ClientBlockState;
 import me.gommeantilegit.minecraft.utils.collections.SortedArrayList;
 import me.gommeantilegit.minecraft.world.ClientWorld;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
@@ -19,7 +15,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 
 @SideOnly(side = Side.CLIENT)
-public class ClientWorldChunkHandler extends WorldChunkHandlerBase<ClientChunk, ClientMinecraft, ClientBlock, ClientBlocks, ClientBlockState> {
+public class ClientWorldChunkHandler extends WorldChunkHandlerBase {
 
     @NotNull
     public final ChunkRebuilder chunkRebuilder;
@@ -58,13 +54,7 @@ public class ClientWorldChunkHandler extends WorldChunkHandlerBase<ClientChunk, 
         return nearChunks;
     }
 
-    @NotNull
-    @Override
-    public ArrayList<ClientChunk> getChunks() {
-        return super.getChunks();
-    }
-
-    private static class ChunkSorter implements Comparator<ClientChunk> {
+    private static class ChunkSorter implements Comparator<ChunkBase> {
 
         /**
          * Parent client world instance
@@ -77,7 +67,7 @@ public class ClientWorldChunkHandler extends WorldChunkHandlerBase<ClientChunk, 
         }
 
         @Override
-        public int compare(ClientChunk chunk1, ClientChunk chunk2) {
+        public int compare(ChunkBase chunk1, ChunkBase chunk2) {
             return Double.compare(dst(chunk1), dst(chunk2));
         }
 
@@ -85,7 +75,7 @@ public class ClientWorldChunkHandler extends WorldChunkHandlerBase<ClientChunk, 
          * @param chunk the chunk that the distance should be measured to
          * @return the distance from the viewer viewing the world (as specified in {@link ClientWorld#viewer}) to the given chunk origin in blocks
          */
-        private double dst(ClientChunk chunk) {
+        private double dst(ChunkBase chunk) {
             Vector3 positionVector = world.viewer.getPositionVector();
             Vector2 pos2D = new Vector2(positionVector.x, positionVector.z);
             return pos2D.dst(chunk.getChunkOrigin().asLibGDXVec2D().add(ChunkBase.CHUNK_SIZE / 2f, ChunkBase.CHUNK_SIZE / 2f));

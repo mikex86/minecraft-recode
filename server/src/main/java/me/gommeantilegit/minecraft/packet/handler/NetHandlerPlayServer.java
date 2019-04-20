@@ -12,6 +12,8 @@ import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadingDista
 import me.gommeantilegit.minecraft.packet.packets.client.ClientUserInfoPacket;
 import me.gommeantilegit.minecraft.packet.packets.server.*;
 import me.gommeantilegit.minecraft.server.netty.channel.ChannelData;
+import me.gommeantilegit.minecraft.world.ServerWorld;
+import me.gommeantilegit.minecraft.world.chunk.loader.ServerChunkLoader;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -52,7 +54,7 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
         super(mc.minecraftThread);
         this.mc = mc;
         registerStaticPacketHandlers();
-        this.addListener(mc.theWorld.getChunkLoader());
+        this.addListener(((ServerChunkLoader) mc.theWorld.getChunkLoader()));
     }
 
     @Override
@@ -95,7 +97,7 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
                         ChannelData channelData = getData(channel);
                         channelData.setHasValidSession(true);
 
-                        EntityPlayerMP entityPlayerMP = new EntityPlayerMP(mc.theWorld, 20, packet.getUserName(), packet.getSkin(), channel);
+                        EntityPlayerMP entityPlayerMP = new EntityPlayerMP(mc, mc.theWorld, 20, packet.getUserName(), packet.getSkin(), channel);
                         channelData.setPlayerMP(entityPlayerMP);
                         mc.theWorld.spawnEntityInWorld(entityPlayerMP);
                         mc.theWorld.getChunkCreator().addViewer(entityPlayerMP);

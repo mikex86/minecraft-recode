@@ -17,6 +17,7 @@ import me.gommeantilegit.minecraft.ui.button.GuiButton;
 import me.gommeantilegit.minecraft.ui.screen.GuiScreen;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Objects;
 import java.util.Random;
 
 import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE_2D;
@@ -44,13 +45,22 @@ public class GuiMainMenu extends GuiScreen {
      */
     @NotNull
     private static final String MINECRAFT_LOGO[] = RANDOM.nextInt(1000000000) == 999999999 ?
-            new String[]{
-                    " *   * * **** *  * * *** *** *** *** ***",
-                    " ** ** * *    *  * * *   * * * * *    * ",
-                    " * * * * *    **** * *   **  *** **   * ",
-                    " *   * * *    *  * * *   * * * * *    * ",
-                    " *   * * **** *  * * *** * * * * *    * "
-            }
+            RANDOM.nextInt(1000000000) == 999999999 ?
+                    new String[]{
+                            " *   * * **** *  * * *** *** *** *** ***",
+                            " ** ** * *    *  * * *   * * * * *    * ",
+                            " * * * * *    **** * *   **  *** **   * ",
+                            " *   * * *    *  * * *   * * * * *    * ",
+                            " *   * * **** *  * * *** * * * * *    * "
+                    }
+                    :
+                    new String[]{
+                            " ****  ****** *   * * *** *** *** *** ***",
+                            " *     *    * ** ** * *   * * * * *    * ",
+                            " ****  ****** * * * * *   **  *** **   * ",
+                            "    *  *    * *   * * *   * * * * *    * ",
+                            " ****  *    * *   * * *** * * * * *    * "
+                    }
             :
             new String[]{
                     " *   * * *   * *** *** *** *** *** ***",
@@ -204,10 +214,9 @@ public class GuiMainMenu extends GuiScreen {
             if (stoneBlockMesh == null) {
                 MeshBuilder meshBuilder = new MeshBuilder();
                 meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
-                mc.blocks.stone.render(meshBuilder, 0, 0, 0, 0, 0, 0, null, mc.blocks.stone.getDefaultBlockState(), true);
+                Objects.requireNonNull(mc.blockRendererRegistry.getRenderer(mc.blocks.stone)).render(meshBuilder, 0, 0, 0, 0, 0, 0, null, mc.blocks.stone.getDefaultBlockState(), true);
                 stoneBlockMesh = meshBuilder.end();
             }
-//            FontRenderer fontRenderer = mc.uiManager.fontRenderer;
 
             Gdx.gl20.glEnable(GL20.GL_CULL_FACE);
             Gdx.gl20.glCullFace(GL20.GL_BACK);

@@ -3,13 +3,8 @@ package me.gommeantilegit.minecraft.world;
 import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.ServerMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.ServerBlock;
-import me.gommeantilegit.minecraft.block.ServerBlocks;
-import me.gommeantilegit.minecraft.block.state.ServerBlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
-import me.gommeantilegit.minecraft.world.block.change.ServerWorldBlockChanger;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
-import me.gommeantilegit.minecraft.world.chunk.ServerChunk;
 import me.gommeantilegit.minecraft.world.chunk.creator.OnChunkCreationListener;
 import me.gommeantilegit.minecraft.world.chunk.creator.ServerChunkCreator;
 import me.gommeantilegit.minecraft.world.chunk.loader.ServerChunkLoader;
@@ -24,22 +19,13 @@ import java.util.List;
 import static me.gommeantilegit.minecraft.Side.SERVER;
 
 @SideOnly(side = SERVER)
-public class ServerWorld extends WorldBase<ServerChunkLoader, ServerBlocks, ServerMinecraft, ServerWorld, ServerBlockState, ServerChunk, ServerWorldChunkHandler, ServerBlock, ServerWorldBlockChanger> {
+public class ServerWorld extends WorldBase {
 
     /**
      * ServerWorld Generator
      */
     @NotNull
     private final WorldGenerator worldGenerator;
-
-    /**
-     * Default {@link OnServerChunkCreationListener} invoked on chunk creation.
-     *
-     * @see OnServerChunkCreationListener
-     * @see OnServerChunkCreationListener#onChunkCreated(ChunkBase)
-     */
-    @NotNull
-    private List<OnServerChunkCreationListener> onChunkCreationListeners = new ArrayList<>();
 
     /**
      * The position where players spawn
@@ -51,7 +37,7 @@ public class ServerWorld extends WorldBase<ServerChunkLoader, ServerBlocks, Serv
      * The listener that decides whether terrain generation should be invoked for a specified chunk
      */
     @NotNull
-    private InvokeTerraionGenerationDecider invokeTerraionGenerationDecider = chunk -> true;
+    private InvokeTerrainGenerationDecider invokeTerrainGenerationDecider = chunk -> true;
 
     /**
      * Default world constructor
@@ -66,8 +52,7 @@ public class ServerWorld extends WorldBase<ServerChunkLoader, ServerBlocks, Serv
         this.worldChunkHandler = new ServerWorldChunkHandler(mc);
         this.worldGenerator = worldGenerator;
         this.chunkCreator = new ServerChunkCreator(this);
-        this.blockChanger = new ServerWorldBlockChanger(this);
-        this.chunkLoader = new ServerChunkLoader(this);
+        this.chunkLoader = new ServerChunkLoader(this, mc);
 
         // MUST BE THE LAST THING TO PERFORM IN WORLD CONSTRUCTOR
         this.worldThread.setDaemon(true);
@@ -81,22 +66,6 @@ public class ServerWorld extends WorldBase<ServerChunkLoader, ServerBlocks, Serv
         this(serverMinecraft, worldGenerator, STANDARD_WORLD_HEIGHT);
     }
 
-    /**
-     * ServerWorld onTick update
-     */
-    @Override
-    public void tick(float partialTicks) {
-        if (!isLoaded)
-            return;
-
-        ArrayList<ServerChunk> chunks = this.worldChunkHandler.getLoadedChunks();
-        for (int i = 0; i < chunks.size(); i++) {
-            ServerChunk chunk = chunks.get(i);
-            chunk.tick(partialTicks);
-        }
-        super.tick(partialTicks);
-    }
-
     @Override
     public void spawnEntityInWorld(Entity entity) {
         super.spawnEntityInWorld(entity);
@@ -108,7 +77,6 @@ public class ServerWorld extends WorldBase<ServerChunkLoader, ServerBlocks, Serv
      */
     @Override
     public void onAsyncThread() {
-        this.blockChanger.onAsyncThread();
         this.chunkCreator.onAsyncThread();
         this.chunkLoader.onAsyncThread();
     }
@@ -136,55 +104,29 @@ public class ServerWorld extends WorldBase<ServerChunkLoader, ServerBlocks, Serv
         this.spawnPoint = spawnPoint;
     }
 
-    public interface OnServerChunkCreationListener extends OnChunkCreationListener<ServerChunk> {
-    }
+    public interface InvokeTerrainGenerationDecider {
 
-    public interface InvokeTerraionGenerationDecider {
         /**
          * Method decides whether terrain generation for the given chunk should be invoked or not
          * @param chunk the chunk
          * @return true if terrain generation should be invoked for the chunk
          */
-        boolean invokedTerrainGeneration(@NotNull ServerChunk chunk);
+        boolean invokeTerrainGeneration(@NotNull ChunkBase chunk);
     }
 
-    public ServerWorld addOnChunkCreationListener(@Nullable OnServerChunkCreationListener onChunkCreationListener) {
-        this.onChunkCreationListeners.add(onChunkCreationListener);
-        return this;
+    public void setInvokeTerrainGenerationDecider(@NotNull InvokeTerrainGenerationDecider invokeTerrainGenerationDecider) {
+        this.invokeTerrainGenerationDecider = invokeTerrainGenerationDecider;
     }
 
     @NotNull
-    public ServerWorldBlockChanger getBlockChanger() {
-        return blockChanger;
+    public InvokeTerrainGenerationDecider getInvokeTerrainGenerationDecider() {
+        return invokeTerrainGenerationDecider;
     }
+
 
     @NotNull
     public WorldGenerator getWorldGenerator() {
         return worldGenerator;
-    }
-
-    @NotNull
-    public ServerChunkLoader getChunkLoader() {
-        return chunkLoader;
-    }
-
-    @NotNull
-    public ServerWorldChunkHandler getWorldChunkHandler() {
-        return worldChunkHandler;
-    }
-
-    @NotNull
-    public List<OnServerChunkCreationListener> getOnChunkCreationListeners() {
-        return onChunkCreationListeners;
-    }
-
-    public void setInvokeTerraionGenerationDecider(@NotNull InvokeTerraionGenerationDecider invokeTerraionGenerationDecider) {
-        this.invokeTerraionGenerationDecider = invokeTerraionGenerationDecider;
-    }
-
-    @NotNull
-    public InvokeTerraionGenerationDecider getInvokeTerraionGenerationDecider() {
-        return invokeTerraionGenerationDecider;
     }
 
     @NotNull

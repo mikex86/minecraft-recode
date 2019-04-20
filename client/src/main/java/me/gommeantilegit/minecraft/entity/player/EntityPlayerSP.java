@@ -10,6 +10,7 @@ import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.state.BlockStateBase;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.entity.player.packet.PacketSender;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
@@ -166,7 +167,7 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
         camera.viewportWidth = mc.width;
         camera.viewportHeight = mc.height;
 
-        camera.near = 0.1f;
+        camera.near = 0.01f;
         camera.far = 512f;
         camera.update();
 
@@ -589,12 +590,12 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
         RayTracer.RayTraceResult result = rayTracer.getRayTraceResult();
         assert result != null;
         if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK) {
-
             assert result.getBlockPos() != null;
             int x = result.getBlockPos().getX(), y = result.getBlockPos().getY(), z = result.getBlockPos().getZ();
-            int prevBlockID = world.getBlockID(x, y, z);
+            BlockStateBase prevBlockState = world.getBlockState(x, y, z);
+            assert prevBlockState != null;
             world.setBlock(x, y, z, null);
-            mc.theWorld.particleEngine.spawnBlockBreakingParticles(x, y, z, prevBlockID);
+            mc.theWorld.particleEngine.spawnBlockBreakingParticles(x, y, z, prevBlockState.getBlock());
         }
     }
 

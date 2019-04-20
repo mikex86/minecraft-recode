@@ -6,11 +6,11 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Object representing a listener listening to the creation of new chunks
  */
-public interface OnChunkCreationListener<C extends ChunkBase> {
+public interface OnChunkCreationListener {
     /**
      * Called when a chunks is created and added to the world
      *
      * @param chunk the chunk, that is added
      */
-    void onChunkCreated(@NotNull C chunk);
+    void onChunkCreated(@NotNull ChunkBase chunk);
 }

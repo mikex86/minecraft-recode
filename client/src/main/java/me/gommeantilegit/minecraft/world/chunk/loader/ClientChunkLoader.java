@@ -9,6 +9,7 @@ import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadConfirmP
 import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkUnloadPacket;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientRequestChunkDataPacket;
 import me.gommeantilegit.minecraft.world.ClientWorld;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,7 +18,7 @@ import java.util.*;
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 
 @SideOnly(side = CLIENT)
-public class ClientChunkLoader extends ChunkLoaderBase<ClientChunk, ClientWorld> {
+public class ClientChunkLoader extends ChunkLoaderBase {
 
     /**
      * Client Minecraft instance
@@ -33,14 +34,16 @@ public class ClientChunkLoader extends ChunkLoaderBase<ClientChunk, ClientWorld>
 
     /**
      * @param world sets {@link #world}
+     * @param mc    parent minecraft instance
      */
-    public ClientChunkLoader(@NotNull ClientWorld world) {
+    public ClientChunkLoader(@NotNull ClientWorld world, @NotNull ClientMinecraft mc) {
         super(world);
-        this.mc = world.mc;
+        this.mc = mc;
     }
 
     @Override
     public void onAsyncThread() {
+        ClientWorld world = (ClientWorld) this.world;
         super.onAsyncThread();
         Vector2 playerPosition; //2D vector storing the viewers x and y coordinates
         {
@@ -48,8 +51,9 @@ public class ClientChunkLoader extends ChunkLoaderBase<ClientChunk, ClientWorld>
             playerPosition = new Vector2(viewingPosition.x, viewingPosition.z);
         }
 
-        List<ClientChunk> chunks = this.world.getWorldChunkHandler().getChunks();
-        for (ClientChunk chunk : chunks) {
+        List<ChunkBase> chunks = world.getWorldChunkHandler().getChunks();
+        for (ChunkBase chunkBase : chunks) {
+            ClientChunk chunk = (ClientChunk) chunkBase;
             float distance = chunk.getChunkOrigin().asLibGDXVec2D().dst(playerPosition);
             if (distance < world.getChunkLoadingDistance()) {
 

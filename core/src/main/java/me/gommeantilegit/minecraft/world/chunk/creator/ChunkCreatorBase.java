@@ -18,13 +18,13 @@ import static java.lang.Math.ceil;
 /**
  * Object generating chunks around entities and handling the access to the chunk array lists
  */
-public abstract class ChunkCreatorBase<WB extends WorldBase<?, ?, ?, WB, ?, CB, ?, ?, ?>, CB extends ChunkBase<?, CB, ?, ?, ?, ?, ?, WB, ?>> implements AsyncOperation {
+public abstract class ChunkCreatorBase implements AsyncOperation {
 
     /**
      * The parent world
      */
     @NotNull
-    protected final WB world;
+    protected final WorldBase world;
 
     /**
      * Players viewing the world
@@ -43,7 +43,7 @@ public abstract class ChunkCreatorBase<WB extends WorldBase<?, ?, ?, WB, ?, CB, 
      */
     private boolean entitiesPending = false;
 
-    public ChunkCreatorBase(@NotNull WB world) {
+    public ChunkCreatorBase(@NotNull WorldBase world) {
         this.world = world;
         this.viewers = new ArrayList<>();
     }
@@ -55,7 +55,9 @@ public abstract class ChunkCreatorBase<WB extends WorldBase<?, ?, ?, WB, ?, CB, 
      * @param chunkZ chunk Z origin
      * @param world  the world
      */
-    protected abstract void addChunk(int chunkX, int chunkZ, WB world);
+    protected void addChunk(int chunkX, int chunkZ, WorldBase world){
+        this.addChunk(new ChunkBase(world.height, chunkX, chunkZ, world));
+    }
 
     @Override
     public void onAsyncThread() {
@@ -98,7 +100,7 @@ public abstract class ChunkCreatorBase<WB extends WorldBase<?, ?, ?, WB, ?, CB, 
      * @return true, if the entity was scheduled to be added to the created chunk. False, if the entity is still pending, thus waiting for it's chunks to be created asynchronously.
      */
     private boolean handle(@NotNull Entity entity) {
-        CB chunk = world.getChunkFor(entity);
+        ChunkBase chunk = world.getChunkFor(entity);
         if (chunk != null) {
             chunk.addEntity(entity);
             return true;
@@ -193,7 +195,7 @@ public abstract class ChunkCreatorBase<WB extends WorldBase<?, ?, ?, WB, ?, CB, 
      * @param chunk the chunk to be added
      */
     @Unsafe
-    protected void addChunk(@NotNull CB chunk) {
+    protected void addChunk(@NotNull ChunkBase chunk) {
         this.world.getWorldChunkHandler().addChunk(chunk); // Adding the chunk to the world chunks list
         this.world.getWorldChunkHandler().addUnloadedChunk(chunk); // Adding the chunk to the list of unloaded chunks because the chunk is not loaded by default and therefore unloaded. If it gets loaded later on, it gets removed.
     }

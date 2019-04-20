@@ -17,7 +17,7 @@ public class ServerConfiguration {
     /**
      * The default maximum render distance a player is allowed to have
      */
-    private static final int DEFAULT_MAX_RENDER_DISTANCE = 128;
+    private static final int DEFAULT_MAX_RENDER_DISTANCE = 512;
 
     /**
      * The file that stores the configuration content

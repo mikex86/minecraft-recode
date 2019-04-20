@@ -3,23 +3,20 @@ package me.gommeantilegit.minecraft.world.chunk;
 import com.badlogic.gdx.graphics.Mesh;
 import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import me.gommeantilegit.minecraft.ClientMinecraft;
-import me.gommeantilegit.minecraft.block.ClientBlock;
-import me.gommeantilegit.minecraft.block.ClientBlocks;
-import me.gommeantilegit.minecraft.block.state.ClientBlockState;
+import me.gommeantilegit.minecraft.block.state.BlockStateBase;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.utils.Clock;
 import me.gommeantilegit.minecraft.world.ClientWorld;
-import me.gommeantilegit.minecraft.world.chunk.loader.ClientChunkLoader;
 import me.gommeantilegit.minecraft.world.chunk.world.ClientWorldChunkHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
+import java.util.Objects;
 
 import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
 import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBUTES;
 
-public class ClientChunk extends ChunkBase<ClientChunkSection, ClientChunk, ClientWorldChunkHandler, ClientBlocks, ClientMinecraft, ClientBlock, ClientBlockState, ClientWorld, ClientChunkLoader> {
+public class ClientChunk extends ChunkBase {
 
     /**
      * The mesh of the chunk being rendered.
@@ -31,11 +28,6 @@ public class ClientChunk extends ChunkBase<ClientChunkSection, ClientChunk, Clie
      * State whether the chunk should be rebuilt the next time it is rendered.
      */
     private boolean rebuild = false;
-
-    /**
-     * State whether the upcoming data transmission of the chunks initial data has been confirmed by the server
-     */
-    private boolean requestConfirmed = false;
 
     /**
      * State whether the server has sent the initial data for the given chunk
@@ -58,16 +50,17 @@ public class ClientChunk extends ChunkBase<ClientChunkSection, ClientChunk, Clie
      * @param x      startX position where the region managed by the chunk starts
      * @param z      startZ position where the region managed by the chunk starts
      * @param world  the parent world
+     * @param mc     the parent minecraft instance
      */
-    public ClientChunk(int height, int x, int z, @NotNull ClientWorld world) {
-        super(height, x, z, world, ClientBlockState.class, ClientChunkSection.class);
-        this.mc = world.mc;
+    public ClientChunk(int height, int x, int z, @NotNull ClientWorld world, @NotNull ClientMinecraft mc) {
+        super(height, x, z, world);
+        this.mc = mc;
     }
 
     @Override
-    protected void changeBlock(int x, int y, int z, @Nullable ClientBlockState blockState) {
+    protected void changeBlock(int x, int y, int z, @Nullable BlockStateBase blockState) {
         super.changeBlock(x, y, z, blockState);
-        this.world.rebuildChunksFor(x, z, true);
+        ((ClientWorld) this.world).rebuildChunksFor(x, z, true);
     }
 
     /**
@@ -98,9 +91,9 @@ public class ClientChunk extends ChunkBase<ClientChunkSection, ClientChunk, Clie
         for (int x = this.x; x < this.x + CHUNK_SIZE; x++) {
             for (int y = 0; y < height; y++) {
                 for (int z = this.z; z < this.z + CHUNK_SIZE; z++) {
-                    ClientBlockState blockState = getBlockState(x, y, z);
+                    BlockStateBase blockState = getBlockState(x, y, z);
                     if (blockState != null) {
-                        blockState.getBlock().render(builder, x - this.x, y, z - this.z, x, y, z, world, blockState, false);
+                        Objects.requireNonNull(mc.blockRendererRegistry.getRenderer(blockState.getBlock())).render(builder, x - this.x, y, z - this.z, x, y, z, world, blockState, false);
                     }
                 }
             }
@@ -122,7 +115,7 @@ public class ClientChunk extends ChunkBase<ClientChunkSection, ClientChunk, Clie
     /**
      * Sets the state if the chunk should be rebuilt next time it is rendered.
      *
-     * @param rebuild state if the chunk should be rebuilt.
+     * @param rebuild      state if the chunk should be rebuilt.
      * @param highPriority state whether the chunk should be the first in the rebuild queue
      * @return self instance (Builder function)
      */
@@ -179,17 +172,16 @@ public class ClientChunk extends ChunkBase<ClientChunkSection, ClientChunk, Clie
         this.mesh = null;
     }
 
+    @NotNull
     public ChunkBase setMesh(@Nullable Mesh mesh) {
-
         this.mesh = mesh;
-
         return this;
     }
 
     @NotNull
     @Override
     public ClientWorld getWorld() {
-        return super.getWorld();
+        return (ClientWorld) super.getWorld();
     }
 
     @Nullable
@@ -202,10 +194,6 @@ public class ClientChunk extends ChunkBase<ClientChunkSection, ClientChunk, Clie
         if (mesh == null && dataReceived)
             setNeedsRebuild(true, false);
         super.load();
-    }
-
-    public void setRequestedConfirmed() {
-        this.requestConfirmed = true;
     }
 
     public void setDataRequested() {

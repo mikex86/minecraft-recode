@@ -1,8 +1,6 @@
 package me.gommeantilegit.minecraft;
 
-import me.gommeantilegit.minecraft.block.BlockBase;
 import me.gommeantilegit.minecraft.block.Blocks;
-import me.gommeantilegit.minecraft.block.state.BlockStateBase;
 import me.gommeantilegit.minecraft.logging.LogLevel;
 import me.gommeantilegit.minecraft.logging.Logger;
 import me.gommeantilegit.minecraft.logging.crash.CrashReport;
@@ -20,7 +18,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 
-public abstract class AbstractMinecraft<BB extends BlockBase<MC, BB, BS, BLOCKS>, MC extends AbstractMinecraft, BLOCKS extends Blocks<BB, MC>, BS extends BlockStateBase<BB>> implements Tickable {
+public abstract class AbstractMinecraft implements Tickable {
 
     /**
      * Default server port constant
@@ -45,7 +43,7 @@ public abstract class AbstractMinecraft<BB extends BlockBase<MC, BB, BS, BLOCKS>
     public final long id;
 
     @NotNull
-    public final ChunkSerializer<BB, BS> chunkSerializer;
+    public final ChunkSerializer chunkSerializer;
 
     /**
      * @return the minecraft thread to be used as initial value for {@link #minecraftThread}
@@ -56,7 +54,7 @@ public abstract class AbstractMinecraft<BB extends BlockBase<MC, BB, BS, BLOCKS>
     /**
      * Blocks instance
      */
-    public BLOCKS blocks;
+    public Blocks blocks;
 
     /**
      * Timer instance for timing game logic.
@@ -98,7 +96,7 @@ public abstract class AbstractMinecraft<BB extends BlockBase<MC, BB, BS, BLOCKS>
      */
     public AsyncExecutor asyncExecutor;
 
-    protected AbstractMinecraft(@NotNull Side side, @NotNull Class<BS> blockStateClass) {
+    protected AbstractMinecraft(@NotNull Side side) {
         Hardware.init();
         this.id = MinecraftProvider.createMinecraft(this);
 
@@ -117,7 +115,7 @@ public abstract class AbstractMinecraft<BB extends BlockBase<MC, BB, BS, BLOCKS>
                 logger.info("[STD_OUT]", s, true);
             }
         });
-        chunkSerializer = new ChunkSerializer<>(this, blockStateClass);
+        chunkSerializer = new ChunkSerializer(this);
     }
 
     /**

@@ -17,21 +17,21 @@ import me.gommeantilegit.minecraft.world.WorldBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * @param <MC> Minecraft type
- * @param <BB> BlockBase type that extends this base class
- */
-public abstract class BlockBase<MC extends AbstractMinecraft, BB extends BlockBase<MC, BB, BS, BLOCKS>, BS extends BlockStateBase<BB>, BLOCKS extends Blocks<BB, MC>> {
+public class BlockBase {
 
     /**
      * Universal bounding box min values
      */
-    protected float x0, y0, z0;
+    public float x0;
+    protected float y0;
+    public float z0;
 
     /**
      * Universal bounding box max values
      */
-    protected float x1, y1, z1;
+    public float x1;
+    public float y1;
+    public float z1;
 
     /**
      * Indicates how many hits it takes to break a block.
@@ -79,21 +79,13 @@ public abstract class BlockBase<MC extends AbstractMinecraft, BB extends BlockBa
      */
     private float slipperiness;
 
-    /**
-     * Minecraft instance
-     */
-    @NotNull
-    public final MC mc;
-
-    public BlockBase(@NotNull String name, int id, boolean hasEnumFacing, boolean collidable, @NotNull BLOCKS blocks, @NotNull MC mc) {
+    public BlockBase(@NotNull String name, int id, boolean hasEnumFacing, boolean collidable) {
         this.name = name;
         this.id = id;
         this.hasEnumFacing = hasEnumFacing;
         this.collidable = collidable;
         this.slipperiness = 0.6f;
-        this.mc = mc;
         this.setShape(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-        blocks.registerBlock((BB) this);
     }
 
     /**
@@ -102,7 +94,9 @@ public abstract class BlockBase<MC extends AbstractMinecraft, BB extends BlockBa
      * @return the default block state
      */
     @NotNull
-    public abstract BS getDefaultBlockState();
+    public BlockStateBase getDefaultBlockState() {
+        return new BlockStateBase(this, EnumFacing.defaultFacing());
+    }
 
     /**
      * Setting the shape of the block
@@ -126,9 +120,8 @@ public abstract class BlockBase<MC extends AbstractMinecraft, BB extends BlockBa
     /**
      * @see #transparent
      */
-    public BB setTransparent() {
+    public void setTransparent() {
         transparent = true;
-        return (BB) this;
     }
 
     /**
@@ -143,19 +136,19 @@ public abstract class BlockBase<MC extends AbstractMinecraft, BB extends BlockBa
     /**
      * Sets how many hits it takes to break a block.
      */
-    public BB setHardness(float hardness) {
+    public BlockBase setHardness(float hardness) {
         this.blockHardness = hardness;
         if (this.blockResistance < hardness * 5)
             this.blockResistance = hardness * 5;
-        return (BB) this;
+        return this;
     }
 
     /**
      * Sets the the blockStates resistance to explosions. Returns the object for convenience in constructing.
      */
-    public BB setResistance(float resistance) {
+    public BlockBase setResistance(float resistance) {
         this.blockResistance = resistance * 3f;
-        return (BB) this;
+        return this;
     }
 
     /**
@@ -166,7 +159,9 @@ public abstract class BlockBase<MC extends AbstractMinecraft, BB extends BlockBa
      */
     @Nullable
     public AxisAlignedBB getBoundingBox(@NotNull WorldBase world, @NotNull BlockPos blockPos, @NotNull IBlockState blockState) {
-        return new AxisAlignedBB(blockPos.getX() + this.x0, blockPos.getY() + this.y0, blockPos.getZ() + this.z0, blockPos.getX() + this.x1, blockPos.getY() + this.y1, blockPos.getZ() + this.z1);
+        if (this.collidable)
+            return new AxisAlignedBB(blockPos.getX() + this.x0, blockPos.getY() + this.y0, blockPos.getZ() + this.z0, blockPos.getX() + this.x1, blockPos.getY() + this.y1, blockPos.getZ() + this.z1);
+        else return null;
     }
 
     /**

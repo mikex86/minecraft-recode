@@ -9,9 +9,8 @@ import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.annotations.AndroidOnly;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.ClientBlock;
-import me.gommeantilegit.minecraft.block.ClientBlocks;
-import me.gommeantilegit.minecraft.block.state.ClientBlockState;
+import me.gommeantilegit.minecraft.block.Blocks;
+import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
 import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
@@ -43,7 +42,7 @@ import java.util.concurrent.FutureTask;
 import static java.lang.Integer.min;
 
 @SideOnly(side = Side.CLIENT)
-public abstract class ClientMinecraft extends AbstractMinecraft<ClientBlock, ClientMinecraft, ClientBlocks, ClientBlockState> implements ApplicationListener, OpenGLOperation {
+public abstract class ClientMinecraft extends AbstractMinecraft implements ApplicationListener, OpenGLOperation {
 
     /**
      * Shader manager instance
@@ -158,8 +157,13 @@ public abstract class ClientMinecraft extends AbstractMinecraft<ClientBlock, Cli
     @NotNull
     private final Queue<FutureTask> runnables = new LinkedList<>();
 
+    /**
+     * The registry of block renderers
+     */
+    public ClientBlockRendererTypeRegistry blockRendererRegistry;
+
     public ClientMinecraft() {
-        super(Side.CLIENT, ClientBlockState.class);
+        super(Side.CLIENT);
         renderingThread = Thread.currentThread();
     }
 
@@ -237,6 +241,12 @@ public abstract class ClientMinecraft extends AbstractMinecraft<ClientBlock, Cli
             return null;
         }));
 
+        this.blocks = new Blocks(this);
+        // Initializing Blocks - Must be called before texture manger initialization -> access to textureManager -> building texture atlas
+        this.blocks.init();
+
+        this.blockRendererRegistry = new ClientBlockRendererTypeRegistry(this, blocks); // Needs to be initialized before instantiation of TextureManager
+
         runOnGLContextWait(new FutureTask<Void>(() -> {
             this.startupProfiler.actionStart("Load Textures");
 
@@ -250,19 +260,18 @@ public abstract class ClientMinecraft extends AbstractMinecraft<ClientBlock, Cli
             return null;
         }));
 
+        this.blockRendererRegistry.init(); // must be called before setup of the texture map
+        this.textureManager.blockTextureMap.setupTextureMap();
+
         this.gameSettings = new GameSettings(this);
 
         // Initializing Audio
         this.soundEngine = new SoundEngine();
         SoundResource.init();
 
-        this.blocks = new ClientBlocks(this);
-
-        // Initializing Blocks - Must be called after texture manger initialization -> access to textureManager -> building texture atlas
-        this.blocks.init();
 
         runOnGLContext(new FutureTask<Void>(() -> {
-            this.blocks.buildTextureMap();
+            textureManager.blockTextureMap.build();
             return null;
         }));
 

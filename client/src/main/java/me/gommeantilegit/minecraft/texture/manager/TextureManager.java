@@ -63,7 +63,7 @@ public class TextureManager {
                 new CustomTexture(Gdx.files.classpath("textures/blocks/destroy/destroy_stage_8.png")),
                 new CustomTexture(Gdx.files.classpath("textures/blocks/destroy/destroy_stage_9.png"))
         };
-        blockTextureMap = new BlockTextureMap(256, mc);
+        blockTextureMap = new BlockTextureMap(256, mc, mc.blockRendererRegistry);
         cloudsTexture = new CustomTexture(Gdx.files.classpath("textures/environment/clouds.png"));
         cloudsTexture.setWrap(Texture.TextureWrap.MirroredRepeat, Texture.TextureWrap.MirroredRepeat);
     }

@@ -11,7 +11,7 @@ import me.gommeantilegit.minecraft.nbt.impl.NBTInteger;
 import me.gommeantilegit.minecraft.nbt.impl.NBTLong;
 import me.gommeantilegit.minecraft.nbt.impl.NBTStringMap;
 import me.gommeantilegit.minecraft.world.ServerWorld;
-import me.gommeantilegit.minecraft.world.chunk.ServerChunk;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.generation.generator.api.ChunkGenerator;
 import me.gommeantilegit.minecraft.world.generation.generator.impl.overworld.WorldChunkGenerator;
 import me.gommeantilegit.minecraft.world.generation.generator.impl.superflat.SuperFlatChunkGenerator;
@@ -80,7 +80,7 @@ public class WorldGenerator implements ServerWorld.OnServerChunkCreationListener
     }
 
     @Override
-    public void onChunkCreated(@NotNull ServerChunk chunk) {
+    public void onChunkCreated(@NotNull ChunkBase chunk) {
         this.chunkGenerator.onChunkCreated(chunk);
     }
 

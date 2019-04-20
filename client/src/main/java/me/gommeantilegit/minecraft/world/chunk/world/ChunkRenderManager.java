@@ -3,6 +3,7 @@ package me.gommeantilegit.minecraft.world.chunk.world;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.world.ClientWorld;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
 import org.jetbrains.annotations.NotNull;
 
@@ -25,14 +26,14 @@ public class ChunkRenderManager {
     /**
      * Current chunks of render queue
      */
-    public List<ClientChunk> chunks;
+    public List<ChunkBase> chunks;
 
     public ChunkRenderManager(@NotNull ClientWorld world) {
         this.world = world;
     }
 
     public void startStage(@NotNull RenderStage renderStage) {
-        List<ClientChunk> chunks;
+        List<ChunkBase> chunks;
         switch (renderStage) {
             case CHUNKS:
                 chunks = world.getWorldChunkHandler().getLoadedChunks();
@@ -50,7 +51,7 @@ public class ChunkRenderManager {
 
     public ClientChunk nextChunk() {
         try {
-            return this.chunks.get(iterationIndex++);
+            return (ClientChunk) this.chunks.get(iterationIndex++);
         } catch (IndexOutOfBoundsException e) {
             return null;
         }

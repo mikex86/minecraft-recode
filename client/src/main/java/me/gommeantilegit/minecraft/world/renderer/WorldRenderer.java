@@ -68,10 +68,12 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
 
     /**
      * @param world sets {@link #world}
+     * @param viewer sets {@link #viewer}
+     * @param mc sets {@link #mc}
      */
-    public WorldRenderer(@NotNull ClientWorld world, @NotNull EntityPlayerSP viewer) {
+    public WorldRenderer(@NotNull ClientWorld world, @NotNull EntityPlayerSP viewer, @NotNull ClientMinecraft mc) {
         this.world = world;
-        this.mc = world.mc;
+        this.mc = mc;
         this.viewer = viewer;
         setEnableFog(mc.gameSettings.videoSettings.getEnableFog());
         setRenderClouds(mc.gameSettings.videoSettings.getRenderClouds());

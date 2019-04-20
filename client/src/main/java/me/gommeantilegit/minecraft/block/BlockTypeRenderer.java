@@ -5,17 +5,16 @@ import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.render.BlockRenderer;
-import me.gommeantilegit.minecraft.block.state.ClientBlockState;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
-import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
 import me.gommeantilegit.minecraft.world.ClientWorld;
+import me.gommeantilegit.minecraft.world.WorldBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 
 @SideOnly(side = CLIENT)
-public class ClientBlock extends BlockBase<ClientMinecraft, ClientBlock, ClientBlockState, ClientBlocks> {
+public class BlockTypeRenderer {
 
     /**
      * All block texture files that the block uses.
@@ -29,10 +28,20 @@ public class ClientBlock extends BlockBase<ClientMinecraft, ClientBlock, ClientB
     @NotNull
     protected final Vector2[] textureUVs;
 
-    private BlockRenderer renderer;
+    /**
+     * The parent block renderer for cube rendering
+     */
+    @NotNull
+    private final BlockRenderer renderer;
 
-    public ClientBlock(@NotNull String name, int id, @NotNull String[] textureResources, boolean collidable, @NotNull ClientBlocks blocks, @NotNull ClientMinecraft mc, boolean hasEnumFacing) {
-        super(name, id, hasEnumFacing, collidable, blocks, mc);
+    /**
+     * The block type instance that this object is capable of rendering
+     */
+    @NotNull
+    protected final BlockBase block;
+
+    public BlockTypeRenderer(@NotNull BlockBase blockBase, @NotNull ClientMinecraft mc, @NotNull String... textureResources) {
+        this.renderer = new BlockRenderer(blockBase, mc, this);
         this.textureResources = textureResources;
         this.textureUVs = new Vector2[textureResources.length];
         int i = 0;
@@ -41,20 +50,8 @@ public class ClientBlock extends BlockBase<ClientMinecraft, ClientBlock, ClientB
             textureUVs[i++] = pos;
         }
         this.renderer.setTextureUVs(textureUVs);
-    }
-
-    @NotNull
-    @Override
-    public ClientBlockState getDefaultBlockState() {
-        return new ClientBlockState(this, EnumFacing.defaultFacing());
-    }
-
-    @Override
-    protected void setShape(float x0, float y0, float z0, float x1, float y1, float z1) {
-        super.setShape(x0, y0, z0, x1, y1, z1);
-        if (renderer == null)
-            renderer = new BlockRenderer(this);
-        this.renderer.setShape(x0, y0, z0, x1, y1, z1);
+        this.renderer.setShape(blockBase.x0, blockBase.y0, blockBase.z0, blockBase.x1, blockBase.y1, blockBase.z1);
+        this.block = blockBase;
     }
 
     /**
@@ -84,7 +81,7 @@ public class ClientBlock extends BlockBase<ClientMinecraft, ClientBlock, ClientB
      * @param blockState     the block state
      * @param renderAllFaces state if every face should just be rendered without checking the neighboring blockStates to determine if a face of the block should be rendered.
      */
-    public void render(MeshBuilder builder, int renderX, int renderY, int renderZ, int xCheck, int yCheck, int zCheck, @Nullable ClientWorld world, @NotNull IBlockState blockState, boolean renderAllFaces) {
+    public void render(MeshBuilder builder, int renderX, int renderY, int renderZ, int xCheck, int yCheck, int zCheck, @Nullable WorldBase world, @NotNull IBlockState blockState, boolean renderAllFaces) {
         if (!renderAllFaces && world == null) {
             throw new IllegalStateException("Error while rendering block to MeshBuilder: " +
                     "Specified world parameter is equal to null but state of parameter renderAllFaces is set to false." +
@@ -129,7 +126,7 @@ public class ClientBlock extends BlockBase<ClientMinecraft, ClientBlock, ClientB
      * @return if the given face should be rendered at the specified coordinates considering the blockStates neighbors.
      * The face should only be rendered if it's visible.
      */
-    private boolean shouldRenderFace(@NotNull ClientWorld world, int x, int y, int z, int face) {
+    private boolean shouldRenderFace(@NotNull WorldBase world, int x, int y, int z, int face) {
         switch (face) {
             case 0:
                 return world.canSeeThrough(world.getBlockID(x, y - 1, z));

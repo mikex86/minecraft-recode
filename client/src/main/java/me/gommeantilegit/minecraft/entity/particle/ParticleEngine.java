@@ -3,7 +3,8 @@ package me.gommeantilegit.minecraft.entity.particle;
 import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
-import me.gommeantilegit.minecraft.block.ClientBlock;
+import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
 import me.gommeantilegit.minecraft.timer.api.AbstractAsyncOperation;
@@ -54,18 +55,17 @@ public class ParticleEngine extends AbstractAsyncOperation implements OpenGLOper
     }
 
     /**
-     * Spawns a few particles into the world with the texture of the block with prevBlockID as it's id
+     * Spawns a few particles into the world with the texture of the block with prevBlock as it's id
      *
      * @param blockX      x pos of destroyed block
      * @param blockY      y pos of destroyed block
      * @param blockZ      z pos of destroyed block
-     * @param prevBlockID id of destroyed block
+     * @param prevBlock id of destroyed block
      */
-    public void spawnBlockBreakingParticles(int blockX, int blockY, int blockZ, int prevBlockID) {
-        if (prevBlockID == 0) throw new IllegalStateException("Cannot break air... wtf?");
-        ClientBlock prevBlock = mc.blocks.getBlockByID(prevBlockID);
-        assert prevBlock != null;
-        Vector2 uv = prevBlock.getTextureUVs()[0];
+    public void spawnBlockBreakingParticles(int blockX, int blockY, int blockZ, @NotNull BlockBase prevBlock) {
+        BlockTypeRenderer typeRenderer = mc.blockRendererRegistry.getRenderer(prevBlock);
+        assert typeRenderer != null;
+        Vector2 uv = typeRenderer.getTextureUVs()[0];
         int SD = 4;
         int xx = 0;
         while (xx < SD) {

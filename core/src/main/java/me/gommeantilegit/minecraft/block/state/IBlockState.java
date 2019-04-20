@@ -5,13 +5,13 @@ import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public interface IBlockState<T extends BlockBase> {
+public interface IBlockState{
 
     /**
      * @return the block of the state
      */
     @NotNull
-    T getBlock();
+    BlockBase getBlock();
 
     /**
      * @return the block facing of the state
@@ -20,14 +20,14 @@ public interface IBlockState<T extends BlockBase> {
     EnumFacing getFacing();
 
     /**
-     * Setting the facing of the state
+     * Sets the facing of the state
      */
     void setFacing(@NotNull EnumFacing facing);
 
-    /*+
-     * Setting the block of the state
+    /**
+     * Sets the block of the state
      */
-    void setBlock(@NotNull T block);
+    void setBlock(@NotNull BlockBase block);
 
     @Override
     String toString();

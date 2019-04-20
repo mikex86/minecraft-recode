@@ -18,23 +18,16 @@ import java.lang.reflect.InvocationTargetException;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkBase.CHUNK_SIZE;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
-public class ChunkSerializer<BB extends BlockBase<?, BB, BS, ?>, BS extends BlockStateBase<BB>> implements Serializer<ChunkBase> {
+public class ChunkSerializer implements Serializer<ChunkBase> {
 
     /**
      * Minecraft instance
      */
     @NotNull
-    private final AbstractMinecraft<BB, ?, ?, BS> mc;
+    private final AbstractMinecraft mc;
 
-    /**
-     * Class of type BS
-     */
-    @NotNull
-    private final Class<BS> blockStateClass;
-
-    public ChunkSerializer(@NotNull AbstractMinecraft<BB, ?, ?, BS> mc, @NotNull Class<BS> blockStateClass) {
+    public ChunkSerializer(@NotNull AbstractMinecraft mc) {
         this.mc = mc;
-        this.blockStateClass = blockStateClass;
     }
 
     /**
@@ -78,33 +71,29 @@ public class ChunkSerializer<BB extends BlockBase<?, BB, BS, ?>, BS extends Bloc
      * @throws DeserializationException if de-serialization fails
      */
     @NotNull
-    public ChunkData<BS> deserialize(@NotNull BitByteBuffer buffer, int worldHeight, boolean[] chunkSectionsSent) throws DeserializationException {
+    public ChunkData deserialize(@NotNull BitByteBuffer buffer, int worldHeight, boolean[] chunkSectionsSent) throws DeserializationException {
         buffer.useBytes();
         assert worldHeight % CHUNK_SECTION_SIZE == 0;
         assert chunkSectionsSent.length == worldHeight / CHUNK_SECTION_SIZE;
-        BS[][][] blockStates = (BS[][][]) Array.newInstance(blockStateClass, CHUNK_SIZE, worldHeight, CHUNK_SIZE);
-        ChunkData<BS> chunkData = new ChunkData<>(worldHeight, blockStates);
+        BlockStateBase[][][] blockStates = new BlockStateBase[CHUNK_SIZE][worldHeight][CHUNK_SIZE];
+        ChunkData chunkData = new ChunkData(worldHeight, blockStates);
         for (int i = 0; i < chunkSectionsSent.length; i++) {
             if (chunkSectionsSent[i]) {
                 for (int xo = 0; xo < CHUNK_SECTION_SIZE; xo++) {
                     for (int yo = 0; yo < CHUNK_SECTION_SIZE; yo++) {
                         for (int zo = 0; zo < CHUNK_SECTION_SIZE; zo++) {
-                            int x = xo, y = (CHUNK_SECTION_SIZE * i) + yo, z = zo;
+                            int y = (CHUNK_SECTION_SIZE * i) + yo;
                             int blockID = buffer.readUnsignedShort();
-                            BB block = mc.blocks.getBlockByID(blockID);
+                            BlockBase block = mc.blocks.getBlockByID(blockID);
                             EnumFacing facing = EnumFacing.defaultFacing();
                             if (block != null && block.hasEnumFacing()) {
                                 facing = EnumFacing.values()[buffer.readByte()];
                             }
-                            BS blockState;
-                            try {
-                                if (block != null)
-                                    blockState = (BS) blockStateClass.getConstructors()[0].newInstance(block, facing);
-                                else blockState = null;
-                            } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-                                throw new DeserializationException("Cannot create blockState instance via reflections!", e);
-                            }
-                            blockStates[x][y][z] = blockState;
+                            BlockStateBase blockState;
+                            if (block != null)
+                                blockState = new BlockStateBase(block, facing);
+                            else blockState = null;
+                            blockStates[xo][y][zo] = blockState;
                         }
                     }
                 }

@@ -1,25 +1,26 @@
 package me.gommeantilegit.minecraft.world.chunk.creator;
 
+import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.world.ClientWorld;
+import me.gommeantilegit.minecraft.world.WorldBase;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
 import org.jetbrains.annotations.NotNull;
 
-public class ClientChunkCreator extends ChunkCreatorBase<ClientWorld, ClientChunk> {
+public class ClientChunkCreator extends ChunkCreatorBase {
 
-    public ClientChunkCreator(@NotNull ClientWorld world) {
+    @NotNull
+    private final ClientMinecraft mc;
+
+    public ClientChunkCreator(@NotNull ClientMinecraft mc, @NotNull ClientWorld world) {
         super(world);
+        this.mc = mc;
     }
 
     @Override
-    protected void addChunk(int chunkX, int chunkZ, ClientWorld world) {
-        addChunk(new ClientChunk(world.height, chunkX, chunkZ, world));
-    }
-
-
-    @Override
-    protected void addChunk(@NotNull ClientChunk chunk) {
-        super.addChunk(chunk);
+    protected void addChunk(int chunkX, int chunkZ, WorldBase world) {
+        addChunk(new ClientChunk(world.height, chunkX, chunkZ, (ClientWorld) world, mc));
     }
 
     @Override

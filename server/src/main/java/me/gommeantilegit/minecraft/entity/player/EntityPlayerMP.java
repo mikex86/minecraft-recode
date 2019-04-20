@@ -3,6 +3,7 @@ package me.gommeantilegit.minecraft.entity.player;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import io.netty.channel.Channel;
+import me.gommeantilegit.minecraft.ServerMinecraft;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.entity.player.base.skin.SkinBase;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientMovePacket;
@@ -10,6 +11,7 @@ import me.gommeantilegit.minecraft.packet.packets.server.ServerPositionSetPacket
 import me.gommeantilegit.minecraft.server.netty.channel.ChannelData;
 import me.gommeantilegit.minecraft.world.ServerWorld;
 import me.gommeantilegit.minecraft.world.WorldBase;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,15 +39,16 @@ public class EntityPlayerMP extends PlayerBase<SkinBase> {
     private boolean movePacketsToProcess = false;
 
     /**
+     * @param mc        the parent server minecraft instance
      * @param world     sets {@link #world}
      * @param maxHealth sets {@link #maxHealth}
      * @param username  sets {@link #userName}
      * @param skin      sets {@link #skin}
      * @param channel   the parent channel that controls this player
      */
-    public EntityPlayerMP(@NotNull ServerWorld world, int maxHealth, @NotNull String username, @NotNull SkinBase skin, @NotNull Channel channel) {
+    public EntityPlayerMP(@NotNull ServerMinecraft mc, @NotNull ServerWorld world, int maxHealth, @NotNull String username, @NotNull SkinBase skin, @NotNull Channel channel) {
         super(world, maxHealth, username, skin);
-        this.channelData = world.mc.nettyServer.netHandlerPlayServer.getData(channel);
+        this.channelData = mc.nettyServer.netHandlerPlayServer.getData(channel);
     }
 
     /*
@@ -151,5 +154,10 @@ public class EntityPlayerMP extends PlayerBase<SkinBase> {
             this.movePackets.add(movePacket);
             this.movePacketsToProcess = true;
         }
+    }
+
+    @Override
+    public boolean allowChunkUnload(ChunkBase chunk) {
+        return super.allowChunkUnload(chunk);
     }
 }

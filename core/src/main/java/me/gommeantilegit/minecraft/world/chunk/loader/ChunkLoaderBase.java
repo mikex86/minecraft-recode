@@ -10,17 +10,17 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 
-public class ChunkLoaderBase<CB extends ChunkBase<?, CB, ?, ?, ?, ?, ?, WB, ?>, WB extends WorldBase<?, ?, ?, WB, ?, CB, ?, ?, ?>> implements AsyncOperation {
+public class ChunkLoaderBase implements AsyncOperation {
 
     /**
      * Parent world object
      */
     @NotNull
-    protected final WB world;
+    protected final WorldBase world;
     /**
      * @param world sets {@link #world}
      */
-    public ChunkLoaderBase(@NotNull WB world) {
+    public ChunkLoaderBase(@NotNull WorldBase world) {
         this.world = world;
     }
 

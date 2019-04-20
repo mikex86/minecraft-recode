@@ -4,7 +4,6 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.collision.Ray;
 import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.block.BlockBase;
-import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.state.BlockStateBase;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
@@ -15,10 +14,10 @@ import me.gommeantilegit.minecraft.timer.api.AsyncOperation;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
 import me.gommeantilegit.minecraft.util.block.position.BlockPos;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
-import me.gommeantilegit.minecraft.world.block.change.WorldBlockChangerBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkSection;
 import me.gommeantilegit.minecraft.world.chunk.creator.ChunkCreatorBase;
+import me.gommeantilegit.minecraft.world.chunk.creator.OnChunkCreationListener;
 import me.gommeantilegit.minecraft.world.chunk.loader.ChunkLoaderBase;
 import me.gommeantilegit.minecraft.world.chunk.world.WorldChunkHandlerBase;
 import org.jetbrains.annotations.NotNull;
@@ -32,7 +31,7 @@ import static java.lang.Math.*;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkBase.CHUNK_SIZE;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
-public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS extends Blocks<BB, MC>, MC extends AbstractMinecraft<BB, MC, BLOCKS, BS>, WB extends WorldBase<CL, BLOCKS, MC, WB, BS, CB, CH, BB, WBCB>, BS extends BlockStateBase<BB>, CB extends ChunkBase<?, CB, CH, BLOCKS, MC, BB, BS, WB, CL>, CH extends WorldChunkHandlerBase<CB, MC, BB, BLOCKS, BS>, BB extends BlockBase<MC, BB, BS, BLOCKS>, WBCB extends WorldBlockChangerBase<WB, ?, BS, CB>> implements Tickable, Runnable, AsyncOperation {
+public abstract class WorldBase implements Tickable, Runnable, AsyncOperation {
 
     /**
      * Standard world height
@@ -42,33 +41,27 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
     /**
      * WorldChunkHandlerBase Object storing world chunk lists
      */
-    protected CH worldChunkHandler;
-
-    /**
-     * Object handling block state changes
-     */
-    protected WBCB blockChanger;
+    protected WorldChunkHandlerBase worldChunkHandler;
 
     /**
      * Object capable of loading and unloading chunks
      */
-    protected CL chunkLoader;
+    protected ChunkLoaderBase chunkLoader;
 
     /**
      * State if the world is fully operational
      */
     public boolean isLoaded = false;
+
     /**
      * The world's thread for async operations.
      */
-    @NotNull
     public Thread worldThread;
 
     /**
      * Object capable of creating the chunks to be later loaded and built
      */
-    @NotNull
-    protected ChunkCreatorBase<WB, CB> chunkCreator;
+    protected ChunkCreatorBase chunkCreator;
 
     /**
      * Player's distance to chunk in order to be loaded.
@@ -92,14 +85,23 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * Minecraft instance
      */
     @NotNull
-    public final MC mc;
+    public final AbstractMinecraft mc;
 
     /**
      * The world time in ticks
      */
     public long worldTime = 0;
 
-    protected WorldBase(@NotNull MC mc) {
+    /**
+     * Default {@link OnServerChunkCreationListener} invoked on chunk creation.
+     *
+     * @see OnServerChunkCreationListener
+     * @see OnServerChunkCreationListener#onChunkCreated(ChunkBase)
+     */
+    @NotNull
+    private List<OnServerChunkCreationListener> onChunkCreationListeners = new ArrayList<>();
+
+    protected WorldBase(@NotNull AbstractMinecraft mc) {
         this(mc, 256);
     }
 
@@ -107,7 +109,7 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * @param mc     sets {@link #mc}
      * @param height sets {@link #height}
      */
-    protected WorldBase(@NotNull MC mc, int height) {
+    protected WorldBase(@NotNull AbstractMinecraft mc, int height) {
         assert height % CHUNK_SECTION_SIZE == 0;
         this.mc = mc;
         this.height = height;
@@ -135,6 +137,13 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
 
     @Override
     public void tick(float partialTicks) {
+        if (!isLoaded)
+            return;
+        ArrayList<ChunkBase> loadedChunks = this.worldChunkHandler.getLoadedChunks();
+        for (int i = 0; i < loadedChunks.size(); i++) {
+            ChunkBase chunk = loadedChunks.get(i);
+            chunk.tick(partialTicks);
+        }
         worldTime++;
     }
 
@@ -152,7 +161,7 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * @return if an entity is in the given bounding box
      */
     public boolean isFree(AxisAlignedBB axisAlignedBB) {
-        List<CB> chunks = getChunksInBoundingBox(axisAlignedBB);
+        List<ChunkBase> chunks = getChunksInBoundingBox(axisAlignedBB);
         for (ChunkBase chunk : chunks) {
             if (!chunk.isFree(axisAlignedBB))
                 return false;
@@ -168,22 +177,22 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * @param z             z position
      * @param newBlockState the new block state
      */
-    public void setBlock(int x, int y, int z, @Nullable BS newBlockState) {
-        CB chunk = getChunkForPosition(x, z);
+    public void setBlock(int x, int y, int z, @Nullable BlockStateBase newBlockState) {
+        ChunkBase chunk = getChunkForPosition(x, z);
         if (chunk == null)
             throw new IllegalStateException("Couldn't set block state of coordinates [x: " + x + ", y:" + y + ", " + z + "] to blockID: " + newBlockState + ". No ChunkBase containing coordinates.");
         chunk.setBlock(x, y, z, newBlockState);
     }
 
     @Nullable
-    public BS getBlockState(int x, int y, int z) {
-        CB chunk = this.getChunkForPosition(x, z);
+    public BlockStateBase getBlockState(int x, int y, int z) {
+        ChunkBase chunk = this.getChunkForPosition(x, z);
         if (chunk == null) return null;
         else return chunk.getBlockState(x, y, z);
     }
 
     @Nullable
-    public BS getBlockState(@NotNull BlockPos blockPos) {
+    public BlockStateBase getBlockState(@NotNull BlockPos blockPos) {
         return getBlockState(blockPos.getX(), blockPos.getY(), blockPos.getZ());
     }
 
@@ -257,31 +266,31 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * @return chunks managing parts of the region.
      */
     @NotNull
-    private List<CB> getChunksInBoundingBox(@NotNull AxisAlignedBB axisAlignedBB) {
-        List<CB> chunks = new ArrayList<>(4);
+    private List<ChunkBase> getChunksInBoundingBox(@NotNull AxisAlignedBB axisAlignedBB) {
+        List<ChunkBase> chunks = new ArrayList<>(4);
         float x0 = axisAlignedBB.x0;
         float z0 = axisAlignedBB.z0;
         float x1 = axisAlignedBB.x1;
         float z1 = axisAlignedBB.z1;
         {
-            CB chunk = getChunkForPosition((int) x0, round(z0));
+            ChunkBase chunk = getChunkForPosition((int) x0, round(z0));
             assert chunk != null;
             chunks.add(chunk);
         }
         {
-            CB chunk = getChunkForPosition((int) x0, round(z1));
+            ChunkBase chunk = getChunkForPosition((int) x0, round(z1));
             assert chunk != null;
             if (!chunks.contains(chunk))
                 chunks.add(chunk);
         }
         {
-            CB chunk = getChunkForPosition((int) x1, (int) z1);
+            ChunkBase chunk = getChunkForPosition((int) x1, (int) z1);
             assert chunk != null;
             if (!chunks.contains(chunk))
                 chunks.add(chunk);
         }
         {
-            CB chunk = getChunkForPosition((int) x1, (int) z0);
+            ChunkBase chunk = getChunkForPosition((int) x1, (int) z0);
             assert chunk != null;
             if (!chunks.contains(chunk))
                 chunks.add(chunk);
@@ -313,7 +322,7 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      */
     private void onBlockCollision(Entity entity, AxisAlignedBB axisAlignedBB) {
         int x = (int) axisAlignedBB.x0 + 1, y = (int) axisAlignedBB.y0 + 1, z = (int) axisAlignedBB.z0 + 1;
-        BB block = mc.blocks.getBlockByID(getBlockID(x, y, z));
+        BlockBase block = mc.blocks.getBlockByID(getBlockID(x, y, z));
         assert block != null;
         block.onEntityCollide(entity, axisAlignedBB);
     }
@@ -355,12 +364,12 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * @return the block instance at the specified coordinates.
      */
     @Nullable
-    private BB getBlock(int x, int y, int z) {
+    private BlockBase getBlock(int x, int y, int z) {
         return mc.blocks.getBlockByID(getBlockID(x, y, z));
     }
 
     @Nullable
-    public BB getBlock(@NotNull BlockPos blockPos) {
+    public BlockBase getBlock(@NotNull BlockPos blockPos) {
         return mc.blocks.getBlockByID(getBlockID(blockPos.getX(), blockPos.getY(), blockPos.getZ()));
     }
 
@@ -368,7 +377,7 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * @param entity the given entity
      * @return the chunk that contains the entity
      */
-    public CB getChunkFor(@NotNull Entity entity) {
+    public ChunkBase getChunkFor(@NotNull Entity entity) {
         Vec2i chunkPos = getChunkOrigin(entity.posX, entity.posZ);
         return getChunkAtOrigin(chunkPos.getX(), chunkPos.getY());
     }
@@ -378,7 +387,7 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * @param z y component of the position vector
      * @return the chunk that handles the square coordinate range of CHUNK_SIZE by CHUNK_SIZE that contains the given coordinate vector
      */
-    public CB getChunkForPosition(float x, float z) {
+    public ChunkBase getChunkForPosition(float x, float z) {
         Vec2i chunkPos = getChunkOrigin(x, z);
         return getChunkAtOrigin(chunkPos.getX(), chunkPos.getY());
     }
@@ -389,12 +398,12 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
      * @return the parent chunk of the given position.
      */
     @Nullable
-    public CB getChunkAtOrigin(int originX, int originZ) {
+    public ChunkBase getChunkAtOrigin(int originX, int originZ) {
         return this.worldChunkHandler.getChunkAt(originX, originZ);
     }
 
     @NotNull
-    public CH getWorldChunkHandler() {
+    public WorldChunkHandlerBase getWorldChunkHandler() {
         return worldChunkHandler;
     }
 
@@ -415,17 +424,12 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
         this.worldThread.interrupt();
     }
 
-    @NotNull
-    public WBCB getBlockChanger() {
-        return blockChanger;
-    }
-
-    public CL getChunkLoader() {
+    public ChunkLoaderBase getChunkLoader() {
         return chunkLoader;
     }
 
     @NotNull
-    public ChunkCreatorBase<WB, CB> getChunkCreator() {
+    public ChunkCreatorBase getChunkCreator() {
         return chunkCreator;
     }
 
@@ -435,5 +439,18 @@ public abstract class WorldBase<CL extends ChunkLoaderBase<CB, WB>, BLOCKS exten
 
     public void setChunkLoadingDistance(int chunkLoadingDistance) {
         this.chunkLoadingDistance = chunkLoadingDistance;
+    }
+
+    public interface OnServerChunkCreationListener extends OnChunkCreationListener {
+    }
+
+    public WorldBase addOnChunkCreationListener(@Nullable OnServerChunkCreationListener onChunkCreationListener) {
+        this.onChunkCreationListeners.add(onChunkCreationListener);
+        return this;
+    }
+
+    @NotNull
+    public List<OnServerChunkCreationListener> getOnChunkCreationListeners() {
+        return onChunkCreationListeners;
     }
 }

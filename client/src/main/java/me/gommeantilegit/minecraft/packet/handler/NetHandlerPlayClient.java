@@ -136,7 +136,6 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
 //            if (msg instanceof ServerSessionValidationConfirmationPacket) {
 //                System.out.println("ServerSessionValidationConfirmationPacket");
 //            }
-            System.out.println(msg.getClass());
             if ((isSessionEstablished() && isWorldSetup()) || !msg.isGamePacket())
                 super.messageReceived(ctx, msg);
             else System.out.println("Ignored packet: " + msg);

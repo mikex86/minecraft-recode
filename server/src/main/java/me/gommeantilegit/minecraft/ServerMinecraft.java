@@ -1,9 +1,7 @@
 package me.gommeantilegit.minecraft;
 
 import com.badlogic.gdx.math.Vector3;
-import me.gommeantilegit.minecraft.block.ServerBlock;
-import me.gommeantilegit.minecraft.block.ServerBlocks;
-import me.gommeantilegit.minecraft.block.state.ServerBlockState;
+import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.server.config.ServerConfiguration;
 import me.gommeantilegit.minecraft.server.console.ConsoleReader;
 import me.gommeantilegit.minecraft.server.netty.NettyServer;
@@ -19,12 +17,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.util.Random;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import static me.gommeantilegit.minecraft.Side.SERVER;
 
-public class ServerMinecraft extends AbstractMinecraft<ServerBlock, ServerMinecraft, ServerBlocks, ServerBlockState> {
+public class ServerMinecraft extends AbstractMinecraft {
 
     /**
      * Name of the server world
@@ -65,7 +62,7 @@ public class ServerMinecraft extends AbstractMinecraft<ServerBlock, ServerMinecr
     private final File worldsDirectory = new File("./worlds/");
 
     public ServerMinecraft() {
-        super(SERVER, ServerBlockState.class);
+        super(SERVER);
         // Shutdown hook for unplanned exits
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (!ServerMinecraft.this.isShutdownPlanned()) {
@@ -139,14 +136,14 @@ public class ServerMinecraft extends AbstractMinecraft<ServerBlock, ServerMinecr
         }
 
         // Blocks init
-        this.blocks = new ServerBlocks(this);
+        this.blocks = new Blocks(this);
         this.blocks.init();
 
         {
             File worldFile = new File(this.worldsDirectory, SERVER_WORLD_NAME + WORLD_FILE_EXT);
             if (!worldFile.exists()) {
                 this.logger.info("Creating world...");
-                WorldGenerator worldGenerator = new WorldGenerator(new Random().nextLong(), WorldGenerator.WorldType.OVERWORLD, this, new WorldGenerationOptions(false));
+                WorldGenerator worldGenerator = new WorldGenerator(new Random().nextLong(), WorldGenerator.WorldType.SUPER_FLAT, this, new WorldGenerationOptions(false));
                 this.theWorld = new ServerWorld(this, worldGenerator);
                 this.theWorld.setChunkLoadingDistance(configuration.getMaxChunkLoadingDistance() + 16); // Setting chunk loading distance to configuration max + 16 blocks
                 this.logger.info("Preparing spawn area...");
