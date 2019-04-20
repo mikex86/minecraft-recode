@@ -13,15 +13,8 @@ repositories {
 }
 
 dependencies {
+    compile(project(":logging"))
     compile(kotlin("stdlib-jdk8"))
+    compile("org.eclipse.collections:eclipse-collections:10.0.0.M2")
     testCompile("junit", "junit", "4.12")
-
-    if (rootProject.name == "MinecraftLibGDX") {
-        //LibGDX
-        compile("com.badlogicgames.gdx:gdx-platform:1.9.8")
-        compile("com.badlogicgames.gdx:gdx-backend-android:1.9.8")
-        compile("com.badlogicgames.gdx:gdx:1.9.8")
-        compile("com.badlogicgames.gdx:gdx-freetype:1.9.8")
-        compile("com.badlogicgames.gdx:gdx-backend-android:1.9.8")
-    }
 }

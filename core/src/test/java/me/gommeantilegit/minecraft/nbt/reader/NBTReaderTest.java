@@ -11,12 +11,12 @@ import org.junit.Test;
 import java.io.*;
 import java.util.Objects;
 
-import static me.gommeantilegit.minecraft.util.MathHelper.humanReadableByteCount;
+import static me.gommeantilegit.minecraft.utils.MathHelper.humanReadableByteCount;
 
 public class NBTReaderTest {
 
     private int x = 10, y = 2;
-    private String string = "Hello World!";
+    private String string = "Hello ServerWorld!";
     private String string2 = "Now, this is epic";
     private long long1 = 1337;
     private float float1 = 3.1415f;

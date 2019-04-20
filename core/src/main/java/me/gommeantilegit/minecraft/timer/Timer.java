@@ -2,18 +2,62 @@ package me.gommeantilegit.minecraft.timer;
 
 import me.gommeantilegit.minecraft.timer.api.Tickable;
 
+/**
+ * Object for timing the minecraft tick
+ */
 public class Timer implements Tickable {
 
-//    private static final long NS_PER_SECOND = 1000000000L;
-//    private static final long MAX_NS_PER_UPDATE = 1000000000L;
-//    private static final int MAX_TICKS_PER_UPDATE = 100;
-    private float ticksPerSecond;
+    /**
+     * Ticks per second / TPS rate (eg. 20TPS = invoking game tick 20 times per seconds)
+     */
+    private final float ticksPerSecond;
     private long lastTime;
+
+    /**
+     * Amount of ticks to perform
+     */
     public int ticks;
+
+    /**
+     * Amount of ticks already performed
+     */
     public long performedTicks;
+    /**
+     * Relative time between ticks
+     */
     public float partialTicks;
-    public float timeScale = 1.0f;
-    public float passedTime = 0.0f;
+
+    /**
+     * Timer speed value to relatively change the TPS rate
+     * timerSpeed 1 is normal speed -> 20TPS
+     */
+    private float timerSpeed = 1.0f;
+
+    /**
+     * Current amount of TPS (Ticks per second)
+     */
+    private float currentTicksPerSecond;
+
+    /**
+     * Ticks performed in the current second
+     */
+    private int secondTicks = 0;
+
+    /**
+     * MS resolution timestamp to compiute {@link #currentTicksPerSecond}
+     */
+    private long secondTimer = System.currentTimeMillis();
+
+    /**
+     * Pre value of {@link #ticks}
+     * {@link #ticks} cannot be greater than 100. If the game runs to slowly, the ticks that need to be performed
+     * because of the lag are sometimes greater than 100 meaning the lag took longer than 5 seconds assuming {@link #ticksPerSecond} is
+     * at its default rate 20 TPS
+     * The ticks that thus need to be performed afterwards are stored in this variable
+     * As only 100 ticks per call of {@link #advanceTime()} can be scheduled on the minecraft instance, this variable is decrementing
+     * as they are performed
+     */
+    private float ticksLeft = 0.0f;
 
     public Timer(float ticksPerSecond) {
         this.ticksPerSecond = ticksPerSecond;
@@ -30,17 +74,30 @@ public class Timer implements Tickable {
         if (passedNs > 1000000000L) {
             passedNs = 1000000000L;
         }
-        this.passedTime += (float) passedNs * this.timeScale * this.ticksPerSecond / 1.0E9f;
-        this.ticks = (int) this.passedTime;
+        this.ticksLeft += (float) passedNs * this.timerSpeed * this.ticksPerSecond / 1.0E9f;
+        this.ticks = (int) this.ticksLeft;
         if (this.ticks > 100) {
             this.ticks = 100;
         }
-        this.passedTime -= (float) this.ticks;
-        this.partialTicks = this.passedTime;
+        this.ticksLeft -= (float) this.ticks;
+        this.partialTicks = this.ticksLeft;
     }
 
     public void tick(float partialTicks) {
         performedTicks++;
+        secondTicks++;
+        long now = System.currentTimeMillis();
+        if (now - secondTimer > 1000) {
+            currentTicksPerSecond = secondTicks / ((now - secondTimer) / 1000.0f);
+            if (currentTicksPerSecond < ticksPerSecond - 1)
+                System.out.println("TPS dropped to " + currentTicksPerSecond + "!");
+            secondTicks = 0;
+            secondTimer = now;
+        }
+    }
+
+    public float getCurrentTicksPerSecond() {
+        return currentTicksPerSecond;
     }
 }
 

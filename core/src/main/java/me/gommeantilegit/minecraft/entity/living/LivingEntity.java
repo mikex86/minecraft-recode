@@ -2,9 +2,10 @@ package me.gommeantilegit.minecraft.entity.living;
 
 import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
-import me.gommeantilegit.minecraft.util.Clock;
-import me.gommeantilegit.minecraft.util.MathHelper;
-import me.gommeantilegit.minecraft.world.World;
+import me.gommeantilegit.minecraft.utils.Clock;
+import me.gommeantilegit.minecraft.utils.MathHelper;
+import me.gommeantilegit.minecraft.world.WorldBase;
+import org.jetbrains.annotations.Nullable;
 
 import static java.lang.Math.*;
 import static java.lang.StrictMath.max;
@@ -113,7 +114,7 @@ public class LivingEntity extends Entity {
      * @param world     sets {@link #world}
      * @param maxHealth sets {@link #maxHealth}
      */
-    public LivingEntity(World world, int maxHealth) {
+    public LivingEntity(@Nullable WorldBase world, int maxHealth) {
         super(world);
         this.maxHealth = maxHealth;
         this.health = this.maxHealth;
@@ -399,6 +400,13 @@ public class LivingEntity extends Entity {
         this.motionY *= 0.9800000190734863D;
         this.motionX *= friction;
         this.motionZ *= friction;
+    }
+
+    /**
+     * @return true if the entity should be rendered
+     */
+    public boolean isVisible(){
+        return true;
     }
 
     public void setJumping(boolean jumping) {

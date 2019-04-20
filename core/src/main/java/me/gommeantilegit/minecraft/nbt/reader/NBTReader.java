@@ -9,6 +9,8 @@ import org.jetbrains.annotations.Nullable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Optional;
@@ -122,11 +124,9 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
         @Override
         public NBTString read(@NotNull DataInputStream dataInputStream) throws IOException, NBTCorruptionException {
             int length = dataInputStream.readInt();
-            char[] chars = new char[length];
-            for (int i = 0; i < length; i++) {
-                char character = dataInputStream.readChar();
-                chars[i] = character;
-            }
+            byte[] bytes = new byte[length];
+
+            dataInputStream.read(bytes);
 
             byte endByte = dataInputStream.readByte();
 
@@ -134,19 +134,17 @@ public abstract class NBTReader<T extends NBTObject<?>> implements INBTReader<T>
                 throw new NBTCorruptionException("Cannot read String!");
             }
 
-            return new NBTString(new String(chars));
+            return new NBTString(new String(bytes));
         }
 
         @Override
         public void write(@NotNull DataOutputStream dataOutputStream, @NotNull NBTString object) throws IOException {
             dataOutputStream.writeByte(id);
             String value = object.getValue();
-            int length = value.length();
-            char[] chars = value.toCharArray();
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            int length = bytes.length;
             dataOutputStream.writeInt(length);
-            for (char character : chars) {
-                dataOutputStream.writeChar(character);
-            }
+            dataOutputStream.write(bytes);
             dataOutputStream.writeByte(-1);
         }
 

@@ -26,7 +26,7 @@ public class AngleUtils {
         double yDif = to.y - from.y;
         double zDif = to.z - from.z;
         double distance = from.dst(to);
-        return new Angle(Math.toDegrees(Math.atan2(zDif, xDif)) - 90, -Math.toDegrees(Math.atan2(yDif, distance)));
+        return new Angle(Math.toDegrees(Math.atan2(zDif, xDif)), Math.toDegrees(Math.atan2(yDif, distance)));
     }
 
 }

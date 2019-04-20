@@ -7,4 +7,9 @@ public interface AsyncOperation {
      */
     void onAsyncThread();
 
+    /**
+     * Stops all asynchronous work performed by the object
+     */
+    default void stopAsyncWork() {
+    }
 }

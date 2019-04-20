@@ -9,11 +9,10 @@ package me.gommeantilegit.minecraft.profiler;
 //import javafx.scene.layout.StackPane;
 //import javafx.stage.Stage;
 
-import me.gommeantilegit.minecraft.util.Clock;
+import me.gommeantilegit.minecraft.utils.Clock;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 /**

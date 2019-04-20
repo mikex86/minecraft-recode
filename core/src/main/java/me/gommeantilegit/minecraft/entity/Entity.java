@@ -1,12 +1,14 @@
 package me.gommeantilegit.minecraft.entity;
 
 import com.badlogic.gdx.math.Vector3;
+import me.gommeantilegit.minecraft.Side;
+import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
-import me.gommeantilegit.minecraft.util.Clock;
-import me.gommeantilegit.minecraft.world.World;
-import me.gommeantilegit.minecraft.world.chunk.Chunk;
+import me.gommeantilegit.minecraft.world.WorldBase;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 
@@ -32,12 +34,24 @@ public class Entity {
     /**
      * Amount of ticks the entity has existed
      */
-    public int ticksExisted;
+    public long ticksExisted;
 
     /**
-     * World that the entity is in.
+     * ServerWorld that the entity is in.
      */
-    protected World world;
+    public WorldBase world;
+
+    /**
+     * The chunk that the entity is currently in.
+     */
+    protected ChunkBase currentChunk;
+
+    /**
+     * Object for making sure that the entity render position and the camera position are synced as the tick happens asynchronous
+     */
+    @NotNull
+    @SideOnly(side = Side.CLIENT)
+    protected final EntityRenderPosition entityRenderPosition = new EntityRenderPosition();
 
     /**
      * Position components of the entity's position of last tick.
@@ -101,30 +115,23 @@ public class Entity {
     public long lastUpdated;
 
     /**
-     * State if the entity can be collided with.
+     * State whether the entity can be collided with.
      */
     private boolean collidable = false;
 
     /**
-     * @param world     sets {@link #world}
+     * State whether has just changed the chunk. State set to false again when entity is first updated in the new chunk.
      */
-    public Entity(World world) {
-        this.world = world;
-        this.resetPos();
-    }
+    public boolean chunkChanged = false;
 
     /**
-     * Sets the entity's position randomly.
+     * @param world sets {@link #world}
      */
-    public void resetPos() {
-        if (world != null) {
-            float x = 0;
-            float y = 40;
-            float z = 0;
-            setPosition(x, y, z);
-        } else {
-            setPosition(0, 0, 0);
-        }
+    public Entity(@Nullable WorldBase world) {
+        this.world = world;
+        float w = this.bbWidth / 2.0f;
+        float h = this.bbHeight / 2.0f;
+        this.boundingBox = new AxisAlignedBB(posX - w, posY - h, posZ - w, posX + w, posY + h, posZ + w);
     }
 
     /**
@@ -166,17 +173,18 @@ public class Entity {
         this.posZ = z;
         float w = this.bbWidth / 2.0f;
         float h = this.bbHeight / 2.0f;
-        this.boundingBox = new AxisAlignedBB(x - w, y - h, z - w, x + w, y + h, z + w);
+        this.boundingBox.set(x - w, y - h, z - w, x + w, y + h, z + w);
     }
 
     /**
      * Called when the entity has moved to another chunk. Called before the switch is performed.
      *
      * @param newChunk the new chunk
-     * @param oldChunk the old chunk
+     * @param oldChunk the old chunk. Can be null on spawn.
      */
-    public void onChunkChanged(@NotNull Chunk newChunk, @NotNull Chunk oldChunk) {
-
+    public void onChunkChanged(@NotNull ChunkBase newChunk, @Nullable ChunkBase oldChunk) {
+        this.chunkChanged = true;
+        this.setCurrentChunk(newChunk);
     }
 
     /**
@@ -219,10 +227,24 @@ public class Entity {
         lastMotionY = motionY;
         lastMotionZ = motionZ;
 
+        setEntityRenderPosition();
+
         //TODO: FIX
 //        ArrayList<AxisAlignedBB> boundingBoxes = this.world.getBoundingBoxes(this.boundingBox.expand(-0.05f, -0.05f, -0.05f));
 //        for (AxisAlignedBB abb : boundingBoxes)
 //            this.world.collision(boundingBoxes, this, abb);
+    }
+
+    /**
+     * Called to adjust {@link #entityRenderPosition}
+     */
+    @SideOnly(side = Side.CLIENT)
+    protected void setEntityRenderPosition() {
+        this.entityRenderPosition.set(
+                lastPosX, lastPosY, lastPosZ,
+                posX, posY, posZ
+        );
+
     }
 
     public boolean isFree(float xa, float ya, float za) {
@@ -232,8 +254,8 @@ public class Entity {
     }
 
     /**
-     * Applies player physics to the motion of the player (gravity and collision checks)
-     * and applies the motion to the player by altering it's position accordingly
+     * Applies physics to the motion of the entity (gravity and collision checks)
+     * and applies the motion to the entity by altering it's position accordingly
      *
      * @param motionX motionX of the entity
      * @param motionY motionY of the entity
@@ -246,7 +268,7 @@ public class Entity {
 
         // SNEAKING (SAFEWALK)
         {
-            boolean flag = this.onGround && this instanceof PlayerBase && ((PlayerBase)this).isSneaking();
+            boolean flag = this.onGround && this instanceof PlayerBase && ((PlayerBase) this).isSneaking();
 
             if (flag) {
                 double d6;
@@ -344,7 +366,7 @@ public class Entity {
 //    }
 
     /**
-     * Updates the players motion components
+     * Updates the entities motion components
      *
      * @param forward the new forward movement value
      * @param strafe  the new strafing movement value
@@ -373,6 +395,16 @@ public class Entity {
     }
 
     /**
+     * Sets the rotation yaw and pitch of the entity
+     * @param yaw the new yaw
+     * @param pitch the new pitch
+     */
+    public void setRotation(float yaw, float pitch) {
+        this.rotationYaw = yaw;
+        this.rotationPitch = pitch;
+    }
+
+    /**
      * @return true if the entity is swimming in a fluid
      */
     protected boolean isInFluid() {
@@ -381,26 +413,18 @@ public class Entity {
     }
 
     /**
-     * Renders the given Entity
-     *
-     * @param partialTicks ticks performed this frame
-     */
-    public void render(float partialTicks) {
-    }
-
-    /**
      * @param chunk the given chunk
      * @return the state if the entity is in the given chunk.
      */
-    public boolean isInChunk(@NotNull Chunk chunk) {
+    public boolean isInChunk(@NotNull ChunkBase chunk) {
         return chunk.contains((int) posX, (int) posZ);
     }
 
-    public World getWorld() {
+    public WorldBase getWorld() {
         return world;
     }
 
-    public void setWorld(World world) {
+    public void setWorld(WorldBase world) {
         this.world = world;
     }
 
@@ -409,7 +433,7 @@ public class Entity {
      *
      * @param chunk the chunk that the entity is in.
      */
-    public boolean allowChunkUnload(Chunk chunk) {
+    public boolean allowChunkUnload(ChunkBase chunk) {
         return true;
     }
 
@@ -427,5 +451,36 @@ public class Entity {
 
     public void setCollidable(boolean collidable) {
         this.collidable = collidable;
+    }
+
+    @SideOnly(side = Side.CLIENT)
+    public EntityRenderPosition getEntityRenderPosition() {
+        return entityRenderPosition;
+    }
+
+    /**
+     * Object representing the render position of the entity by combining last and current position in one object
+     */
+    public class EntityRenderPosition {
+
+        public float lastPosX, lastPosY, lastPosZ;
+        public float posX, posY, posZ;
+
+        public void set(float lastPosX, float lastPosY, float lastPosZ, float posX, float posY, float posZ) {
+            this.lastPosX = lastPosX;
+            this.lastPosY = lastPosY;
+            this.lastPosZ = lastPosZ;
+            this.posX = posX;
+            this.posY = posY;
+            this.posZ = posZ;
+        }
+    }
+
+    public void setCurrentChunk(ChunkBase currentChunk) {
+        this.currentChunk = currentChunk;
+    }
+
+    public ChunkBase getCurrentChunk() {
+        return currentChunk;
     }
 }

@@ -43,6 +43,7 @@ public class BlockPos {
     }
 
     public BlockPos(@NotNull Vector3 vector) {
+        //noinspection SuspiciousNameCombination (IntelliJ thinks it's smart when it really isn't (yes "y" should be passed as "x". floor( >> "x" << ) is not a coord. component IntelliJ...))
         this(floor(vector.x), floor(vector.y), floor(vector.z));
     }
 

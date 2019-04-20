@@ -1,17 +1,17 @@
 package me.gommeantilegit.minecraft.block.state;
 
-import me.gommeantilegit.minecraft.block.Block;
+import me.gommeantilegit.minecraft.block.BlockBase;
 import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public interface IBlockState {
+public interface IBlockState<T extends BlockBase> {
 
     /**
      * @return the block of the state
      */
-    @Nullable
-    Block getBlock();
+    @NotNull
+    T getBlock();
 
     /**
      * @return the block facing of the state
@@ -27,7 +27,7 @@ public interface IBlockState {
     /*+
      * Setting the block of the state
      */
-    void setBlock(@NotNull Block block);
+    void setBlock(@NotNull T block);
 
     @Override
     String toString();

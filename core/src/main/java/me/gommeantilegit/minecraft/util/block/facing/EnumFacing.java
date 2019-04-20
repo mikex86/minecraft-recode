@@ -3,10 +3,12 @@ package me.gommeantilegit.minecraft.util.block.facing;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec3i;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Serializable;
+
 import static java.lang.Math.abs;
 import static java.lang.Math.floor;
 
-public enum EnumFacing {
+public enum EnumFacing implements Serializable {
 
     DOWN(new Vec3i(0, -1, 0)),
     UP(new Vec3i(0, 1, 0)),
@@ -56,6 +58,14 @@ public enum EnumFacing {
      */
     public static EnumFacing getHorizontal(int index) {
         return HORIZONTALS[abs(index % HORIZONTALS.length)];
+    }
+
+    /**
+     * @return the default EnumFacing for all non facing blocks
+     */
+    @NotNull
+    public static EnumFacing defaultFacing() {
+        return EnumFacing.UP;
     }
 
     public Vec3i getOffset() {

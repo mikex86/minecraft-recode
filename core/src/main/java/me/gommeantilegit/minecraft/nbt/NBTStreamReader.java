@@ -1,12 +1,10 @@
 package me.gommeantilegit.minecraft.nbt;
 
 import me.gommeantilegit.minecraft.nbt.reader.NBTReader;
-
 import org.jetbrains.annotations.NotNull;
 
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 
 public class NBTStreamReader {
 
@@ -25,7 +23,7 @@ public class NBTStreamReader {
     }
 
     @NotNull
-    public InputStream getInputStream() {
+    public DataInputStream getInputStream() {
         return inputStream;
     }
 }

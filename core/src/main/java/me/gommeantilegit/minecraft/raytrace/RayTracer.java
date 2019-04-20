@@ -1,70 +1,50 @@
 package me.gommeantilegit.minecraft.raytrace;
 
-import com.badlogic.gdx.graphics.Mesh;
-import com.badlogic.gdx.graphics.PerspectiveCamera;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector3;
-import me.gommeantilegit.minecraft.Minecraft;
-import me.gommeantilegit.minecraft.entity.Entity;
-import me.gommeantilegit.minecraft.entity.player.Player;
-import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
-import me.gommeantilegit.minecraft.raytrace.render.BlockHighlighter;
-import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
-import me.gommeantilegit.minecraft.util.block.position.BlockPos;
+import me.gommeantilegit.minecraft.AbstractMinecraft;
+import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import javax.xml.ws.soap.MTOM;
-import java.util.ArrayList;
-import java.util.Collection;
-
-import static com.badlogic.gdx.graphics.GL20.GL_LINES;
-import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
+import static java.lang.Math.cos;
 import static java.lang.Math.toRadians;
+import static java.lang.StrictMath.sin;
 
-public class RayTracer {
+public class RayTracer implements IRayTracer {
 
     public static final float RAY_TRACE_RANGE = 4.5f;
 
     /**
      * The parent player to be analyzed for moving object position calculation.
      */
-    private final Player player;
-
-    /**
-     * The player's view camera
-     */
-    private final PerspectiveCamera camera;
+    @NotNull
+    private final PlayerBase player;
 
     /**
      * Ray-trace result
      */
-    public RayTraceResult rayTraceResult;
+    private RayTraceResult rayTraceResult;
 
     /**
-     * The rendering util used to highlight the block ray-traced by the players viewport.
+     * Minecraft instance
      */
     @NotNull
-    private final BlockHighlighter blockHighlighter;
+    private final AbstractMinecraft mc;
 
     /**
      * @param player sets {@link #player}
+     * @param mc     sets {@link #mc}
      */
-    public RayTracer(Player player) {
+    public RayTracer(@NotNull PlayerBase player, @NotNull AbstractMinecraft mc) {
         this.player = player;
-        this.camera = player.camera;
-        this.blockHighlighter = new BlockHighlighter(player);
+        this.mc = mc;
     }
 
     /**
      * Called to update the utility.
      */
     public void update() {
-        rayTraceResult = getMouseOver(Minecraft.mc.timer.partialTicks);
+        rayTraceResult = getMouseOver(mc.getTimer().partialTicks);
         rayTraceResult.valid = true;
-        render();
     }
 
     /**
@@ -76,10 +56,10 @@ public class RayTracer {
     @NotNull
     public Vector3 getPositionEyes(float partialTicks) {
         if (partialTicks == 1.0F) {
-            return new Vector3(this.player.posX, this.player.posY + Player.EYE_HEIGHT, this.player.posZ);
+            return new Vector3(this.player.posX, this.player.posY + PlayerBase.EYE_HEIGHT, this.player.posZ);
         } else {
             float xInterpolated = this.player.lastPosX + (this.player.posX - this.player.lastPosX) * partialTicks;
-            float yInterpolated = this.player.lastPosY + (this.player.posY - this.player.lastPosY) * partialTicks + Player.EYE_HEIGHT;
+            float yInterpolated = this.player.lastPosY + (this.player.posY - this.player.lastPosY) * partialTicks + PlayerBase.EYE_HEIGHT;
             float zInterpolated = this.player.lastPosZ + (this.player.posZ - this.player.lastPosZ) * partialTicks;
             return new Vector3(xInterpolated, yInterpolated, zInterpolated);
         }
@@ -91,23 +71,16 @@ public class RayTracer {
     @NotNull
     public RayTraceResult getMouseOver(float partialTicks) {
         Vector3 positionEyes = this.getPositionEyes(partialTicks);
-        Vector3 directionVector = this.camera.direction;
+        Vector3 directionVector = getLookDirection();
         return this.player.getWorld().rayTraceBlocks(positionEyes, directionVector, RAY_TRACE_RANGE);
     }
 
     /**
-     * @param partialTicks timer partial ticks
-     * @return the direction vector the interpolated look vector
+     * @return the direction vector that the player is facing in
      */
     @NotNull
-    public Vector3 getLook(float partialTicks) {
-        if (partialTicks == 1.0F) {
-            return this.getVectorForRotation(this.player.rotationPitch, this.player.rotationYaw);
-        } else {
-            float pitch = this.player.lastRotationPitch + (this.player.rotationPitch - this.player.lastRotationPitch) * partialTicks;
-            float yaw = this.player.lastRotationYaw + (this.player.rotationYaw - this.player.lastRotationYaw) * partialTicks;
-            return this.getVectorForRotation(pitch, yaw);
-        }
+    public Vector3 getLookDirection() {
+        return this.getVectorForRotation(this.player.rotationPitch, this.player.rotationYaw);
     }
 
     /**
@@ -115,111 +88,14 @@ public class RayTracer {
      */
     @NotNull
     private Vector3 getVectorForRotation(float pitch, float yaw) {
-        float z = (float) Math.cos(toRadians(-yaw) - (float) Math.PI);
-        float x = (float) Math.sin(toRadians(-yaw) - (float) Math.PI);
-        float rpo = (float) -Math.cos(toRadians(-pitch));
-        float y = (float) Math.sin(toRadians(-pitch));
-        return new Vector3(x * rpo, y, z * rpo);
+        double xyl = cos(toRadians(pitch));
+        double y = -sin(toRadians(pitch));
+        double x = -cos(toRadians(yaw - 90)) * xyl;
+        double z = sin(toRadians(yaw - 90)) * xyl;
+        return new Vector3((float) x, (float) y, (float) z);
     }
 
-    /**
-     * Highlights the ray traced block
-     */
-    public void render() {
-        if (rayTraceResult == null) return;
-        if (rayTraceResult.type == RayTraceResult.EnumResultType.BLOCK) {
-            assert rayTraceResult.blockPos != null;
-            this.blockHighlighter.setBlockPos(rayTraceResult.blockPos.getX(), rayTraceResult.blockPos.getY(), rayTraceResult.blockPos.getZ());
-        }
-        if (rayTraceResult.type != RayTraceResult.EnumResultType.MISS) {
-            this.blockHighlighter.render();
-        }
-    }
-
-    public static class RayTraceResult {
-
-        /**
-         * The position where the rayCast hit an object
-         */
-        public final Vector3 hitVec;
-
-        /**
-         * The faced block aligned position. Nullable
-         */
-        @Nullable
-        private final BlockPos blockPos;
-
-        /**
-         * Represents the type of result. eg. if a block is faced or if its a miss. Later on an entity can be also faced at.
-         */
-        public enum EnumResultType {
-            BLOCK, MISS, ENTITY
-        }
-
-        /**
-         * The type of the result.
-         *
-         * @see EnumResultType
-         */
-        @NotNull
-        public final EnumResultType type;
-
-        /**
-         * State if the moving object position is final and will not be changed this frame.
-         */
-        public boolean valid;
-
-        /**
-         * Facing, how the player is facing the block
-         */
-        @Nullable
-        public final EnumFacing hitSide;
-
-        /**
-         * Entity faced. Null, if type is {@link RayTraceResult.EnumResultType#MISS} or {@link RayTraceResult.EnumResultType#BLOCK}
-         */
-        @Nullable
-        private final Entity entity;
-
-        /**
-         * @param hitVec   sets {@link #hitVec}
-         * @param blockPos sets {@link #blockPos}
-         * @param type     sets {@link #type}
-         */
-        public RayTraceResult(@Nullable Vector3 hitVec, @Nullable BlockPos blockPos, @NotNull EnumResultType type, @Nullable EnumFacing hitSide) {
-            this.hitVec = hitVec;
-            this.blockPos = blockPos;
-            this.type = type;
-            this.hitSide = hitSide;
-            this.entity = null;
-        }
-
-        public RayTraceResult(@Nullable Entity entityHitIn, @Nullable Vector3 hitVecIn) {
-            this.type = EnumResultType.ENTITY;
-            this.entity = entityHitIn;
-            this.hitVec = hitVecIn;
-            this.hitSide = null;
-            this.blockPos = new BlockPos(hitVec);
-        }
-
-        @Nullable
-        public BlockPos getBlockPos() {
-            return blockPos;
-        }
-
-        @Nullable
-        public Entity getEntity() {
-            return entity;
-        }
-
-        @Nullable
-        public EnumFacing getHitSide() {
-            return hitSide;
-        }
-
-        @NotNull
-        public EnumResultType getType() {
-            return type;
-        }
+    public RayTraceResult getRayTraceResult() {
+        return rayTraceResult;
     }
 }

@@ -1,34 +1,63 @@
 package me.gommeantilegit.minecraft.timer.tick;
 
-import me.gommeantilegit.minecraft.Minecraft;
+import me.gommeantilegit.minecraft.AbstractMinecraft;
+import me.gommeantilegit.minecraft.utils.async.SchedulableThread;
 import org.jetbrains.annotations.NotNull;
 
-public class MinecraftThread extends Thread {
+public class MinecraftThread extends SchedulableThread {
 
+    /**
+     * Parent minecraft instance
+     */
     @NotNull
-    private final Minecraft mc;
+    private final AbstractMinecraft mc;
 
-    public MinecraftThread(@NotNull Minecraft mc) {
+    /**
+     * State whether or not the game ticks should be performed
+     */
+    private boolean enableMinecraftTick = false;
+
+    public MinecraftThread(@NotNull AbstractMinecraft mc) {
         super("Minecraft-Thread");
         this.mc = mc;
+        this.setDaemon(true);
     }
 
     @Override
     public void run() {
         try {
             while (mc.isRunning()) {
-                //Updating timer and ticks
-                {
-                    mc.timer.advanceTime();
-                    for (int i = 0; i < mc.timer.ticks; i++) {
-                        mc.tick(mc.timer.partialTicks);
-                        mc.timer.tick(mc.timer.partialTicks);
-                    }
-                }
+                onUpdate();
                 Thread.sleep(10);
             }
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            onInterrupted();
         }
+    }
+
+    protected void onInterrupted() {
+
+    }
+
+    /**
+     * Called to update the game logic
+     */
+    protected void onUpdate() {
+        updateTasks();
+        //Updating timer and ticks
+        if (enableMinecraftTick) {
+            mc.getTimer().advanceTime();
+            for (int i = 0; i < mc.getTimer().ticks; i++) {
+                mc.tick(mc.getTimer().partialTicks);
+                mc.getTimer().tick(mc.getTimer().partialTicks);
+            }
+        }
+    }
+
+    /**
+     * Activates the repeating tick of the game
+     */
+    public void startMinecraftGameLogic() {
+        this.enableMinecraftTick = true;
     }
 }

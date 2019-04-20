@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
     java
     kotlin("jvm")
@@ -16,5 +14,5 @@ dependencies {
     compile("com.badlogicgames.gdx:gdx-platform:1.9.8")
     compile("com.badlogicgames.gdx:gdx-backend-lwjgl3:1.9.8")
     compile(files("lib/natives.jar"))
-    compile(project(":core"))
+    compile(project(":client"))
 }

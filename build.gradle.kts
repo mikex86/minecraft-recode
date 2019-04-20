@@ -1,6 +1,3 @@
-import org.gradle.internal.impldep.org.codehaus.plexus.component.configurator.converters.basic.UriConverter
-import org.gradle.internal.remote.internal.Connection
-import org.gradle.wrapper.Download
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -22,11 +19,8 @@ allprojects {
     }
 
     dependencies {
-        compile("com.badlogicgames.gdx:gdx:1.9.8")
-        compile("com.badlogicgames.gdx:gdx-freetype:1.9.8")
-        compile("com.badlogicgames.gdx:gdx-backend-android:1.9.8")
         testCompile("junit", "junit", "4.12")
-        compile(kotlin("stdlib-jdk8"))
+//        compile(kotlin("stdlib-jdk8"))
     }
 
 }

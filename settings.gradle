@@ -1,4 +1,9 @@
 rootProject.name = 'libgdxtest2'
 include 'core'
 include 'desktop'
+include 'client'
+include 'server'
+include 'networking'
+include 'logging'
+include 'utils'
 

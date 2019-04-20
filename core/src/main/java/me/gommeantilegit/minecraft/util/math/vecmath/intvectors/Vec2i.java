@@ -1,6 +1,7 @@
 package me.gommeantilegit.minecraft.util.math.vecmath.intvectors;
 
 import com.badlogic.gdx.math.Vector2;
+import me.gommeantilegit.minecraft.utils.collections.LongHashable;
 import org.jetbrains.annotations.NotNull;
 
 import static java.lang.Math.atan2;
@@ -10,7 +11,7 @@ import static java.lang.Math.toDegrees;
 /**
  * Object for representing two dimensional positional data
  */
-public class Vec2i {
+public class Vec2i implements LongHashable {
 
     /**
      * Two dimensional position values
@@ -20,6 +21,19 @@ public class Vec2i {
     public Vec2i(int x, int y) {
         this.x = x;
         this.y = y;
+    }
+
+    /**
+     * Casts down the float x, y component of the specified float vector to the next integer (floor)
+     *
+     * @param vector the specified vector
+     */
+    public Vec2i(@NotNull Vector2 vector) {
+        this((int) vector.x, (int) vector.y);
+    }
+
+    public static long hash64(int x, int y) {
+        return ((long) (x) & 0xffffffffL) | (((long) y & 0xffffffffL) << 32);
     }
 
     public int getX() {
@@ -42,6 +56,13 @@ public class Vec2i {
         return hypot(point.x - x, point.y - y);
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof Vec2i)
+            return ((Vec2i) obj).x == x && ((Vec2i) obj).y == y;
+        else return false;
+    }
+
     /**
      * @param vec2i the given point.
      * @return the angle to the given point.
@@ -56,5 +77,15 @@ public class Vec2i {
     @NotNull
     public Vector2 asLibGDXVec2D() {
         return new Vector2(x, y);
+    }
+
+    @Override
+    public long hash64() {
+        return hash64(x, y);
+    }
+
+    @Override
+    public int hashCode() {
+        return Long.hashCode(hash64());
     }
 }
