@@ -1,6 +1,8 @@
 package me.gommeantilegit.minecraft.block.state;
 
 import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.state.property.BlockStatePropertyMap;
+import me.gommeantilegit.minecraft.block.state.property.impl.EnumBlockStateProperty;
 import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
 import org.jetbrains.annotations.NotNull;
 
@@ -10,19 +12,32 @@ import org.jetbrains.annotations.NotNull;
 public class BlockStateBase implements IBlockState {
 
     /**
+     * The enum facing block state property that stores the facing direction of the block
+     */
+    @NotNull
+    public static final EnumBlockStateProperty<EnumFacing> ENUM_FACING = new EnumBlockStateProperty<>("enum_facing", EnumFacing.class);
+
+    /**
      * The block instance
      */
     private BlockBase block;
 
     /**
-     * Facing direction of the block
+     * The property map connecting properties with their parent values
      */
     @NotNull
-    private EnumFacing facing;
+    private final BlockStatePropertyMap propertyMap;
 
     public BlockStateBase(@NotNull BlockBase block, @NotNull EnumFacing facing) {
         this.block = block;
-        this.facing = facing;
+        BlockStatePropertyMap.Builder builder = new BlockStatePropertyMap.Builder();
+        builder.withProperty(ENUM_FACING, facing);
+        this.propertyMap = builder.build();
+    }
+
+    private BlockStateBase(@NotNull BlockBase block, @NotNull BlockStatePropertyMap propertyMap) {
+        this.block = block;
+        this.propertyMap = propertyMap;
     }
 
     @Override
@@ -34,12 +49,12 @@ public class BlockStateBase implements IBlockState {
     @NotNull
     @Override
     public EnumFacing getFacing() {
-        return facing;
+        return this.propertyMap.getPropertyValue(ENUM_FACING).getValue();
     }
 
     @Override
     public void setFacing(@NotNull EnumFacing facing) {
-        this.facing = facing;
+        this.propertyMap.setPropertyValue(ENUM_FACING, facing);
     }
 
     @Override
@@ -49,11 +64,14 @@ public class BlockStateBase implements IBlockState {
 
     @Override
     public String toString() {
-        return "BlockState{blockName: " + block.getName() + ", id: " + block.getId() + ", Facing: " + facing.name() + "}";
+        return "BlockState{blockName: " + block.getName() + ", id: " + block.getId() + ", Facing: " + getFacing().name() + "}";
     }
 
-    @Override
-    public BlockStateBase clone() {
-        return new BlockStateBase(block, facing);
+    /**
+     * @return a new BlockState instance with the same block type and an equal property map (new instance of the property map but same values and keys).
+     */
+    @NotNull
+    public BlockStateBase copySelf() {
+        return new BlockStateBase(this.block, this.propertyMap.copySelf());
     }
 }
