@@ -19,6 +19,7 @@ import me.gommeantilegit.minecraft.hud.IngameHud;
 import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.input.GameInput;
 import me.gommeantilegit.minecraft.input.InputHandler;
+import me.gommeantilegit.minecraft.music.MusicTicker;
 import me.gommeantilegit.minecraft.netty.NettyClient;
 import me.gommeantilegit.minecraft.profiler.Profiler;
 import me.gommeantilegit.minecraft.shader.ShaderManager;
@@ -53,12 +54,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      * Handler object for handling input listeners.
      */
     public InputHandler inputHandler;
-
-    /**
-     * Direction of ambient light
-     */
-    @NotNull
-    public Vector3 ambientLightDirection = new Vector3(1, 5, 5).nor();
 
     /**
      * The current world instance.
@@ -161,6 +156,11 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      * The registry of block renderers
      */
     public ClientBlockRendererTypeRegistry blockRendererRegistry;
+
+    /**
+     * Object deciding what music to play when
+     */
+    private MusicTicker musicTicker;
 
     public ClientMinecraft() {
         super(Side.CLIENT);
@@ -269,6 +269,8 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
         this.soundEngine = new SoundEngine();
         SoundResource.init();
 
+        // Initializing music ticker
+        this.musicTicker = new MusicTicker(this);
 
         runOnGLContext(new FutureTask<Void>(() -> {
             textureManager.blockTextureMap.build();
@@ -380,6 +382,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      */
     @Override
     public void tick(float partialTicks) {
+        this.musicTicker.tick(partialTicks);
         this.uiManager.tick(partialTicks);
         if (theWorld != null) {
             try {
@@ -418,8 +421,8 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 if (!runnables.isEmpty()) {
                     runnables.remove().run();
                 }
+                tasksToRun = !runnables.isEmpty();
             }
-            tasksToRun = !runnables.isEmpty();
         }
         if (this.startUpThread == null || this.startUpThread.isAlive())
             return;

@@ -72,29 +72,31 @@ public class WorldSaver {
 
         ServerChunkDataPacket.Encoder packetEncoder = new ServerChunkDataPacket.Encoder();
 
-        this.world.getWorldChunkHandler().getChunks().forEach(c -> {
-            try {
-                outputStream.putNextEntry(new ZipEntry("chunk_" + c.getX() + "_" + c.getZ()));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            ServerChunkDataPacket packet = new ServerChunkDataPacket(null, c.getChunkOrigin().asLibGDXVec2D(), c);
-            BitByteBuffer tempBuffer = new BitByteBuffer();
-            tempBuffer.useBytes();
-            packetEncoder.serialize(
-                    packet, tempBuffer
-            );
-            try {
-                outputStream.write(tempBuffer.retrieveBytes());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            try {
-                outputStream.closeEntry();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
+        synchronized (world.getWorldChunkHandler().getChunks()) {
+            this.world.getWorldChunkHandler().getChunks().forEach(c -> {
+                try {
+                    outputStream.putNextEntry(new ZipEntry("chunk_" + c.getX() + "_" + c.getZ()));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                ServerChunkDataPacket packet = new ServerChunkDataPacket(null, c.getChunkOrigin().asLibGDXVec2D(), c);
+                BitByteBuffer tempBuffer = new BitByteBuffer();
+                tempBuffer.useBytes();
+                packetEncoder.serialize(
+                        packet, tempBuffer
+                );
+                try {
+                    outputStream.write(tempBuffer.retrieveBytes());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                try {
+                    outputStream.closeEntry();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
         outputStream.close();
         return this;
     }
