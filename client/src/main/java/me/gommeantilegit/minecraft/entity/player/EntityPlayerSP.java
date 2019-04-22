@@ -9,20 +9,19 @@ import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.BlockBase;
-import me.gommeantilegit.minecraft.block.state.BlockStateBase;
+import me.gommeantilegit.minecraft.block.Block;
+import me.gommeantilegit.minecraft.block.state.BlockState;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
+import me.gommeantilegit.minecraft.entity.player.base.skin.SkinBase;
 import me.gommeantilegit.minecraft.entity.player.packet.PacketSender;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
 import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.raytrace.RayTracer;
 import me.gommeantilegit.minecraft.raytrace.RenderingRayTracer;
-import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.ui.button.Button;
 import me.gommeantilegit.minecraft.ui.button.TexturedButton;
 import me.gommeantilegit.minecraft.ui.render.Overlay2D;
 import me.gommeantilegit.minecraft.ui.screen.impl.GuiIngamePause;
-import me.gommeantilegit.minecraft.ui.screen.impl.GuiOptions;
 import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
 import me.gommeantilegit.minecraft.util.block.position.BlockPos;
 import me.gommeantilegit.minecraft.utils.Clock;
@@ -36,12 +35,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.FutureTask;
 
-import static java.lang.Math.hypot;
+import static java.lang.Math.*;
 import static java.lang.StrictMath.max;
 import static java.lang.StrictMath.min;
 
 @SideOnly(side = Side.CLIENT)
-public class EntityPlayerSP extends PlayerBase<ClientSkin> {
+public class EntityPlayerSP extends PlayerBase {
 
     /*
      * MOVE KEY CONSTANTS
@@ -75,6 +74,12 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
      * State whether the player has spawned in the world
      */
     public boolean spawned = false;
+
+    /**
+     * A 3D vector instance which values are updated to the player's {@link #posX}, {@link #posY} and {@link #posZ} every tick
+     */
+    @NotNull
+    private Vector3 updatedPositionVector = new Vector3();
 
     /**
      * Enum representing all camera modes
@@ -167,11 +172,11 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
         camera.viewportWidth = mc.width;
         camera.viewportHeight = mc.height;
 
-        camera.near = 0.01f;
+        camera.near = 0.05f;
         camera.far = 512f;
         camera.update();
 
-        playerController = new PlayerController(this);
+        playerController = new PlayerController(this, mc);
         if (mc.isCallingFromOpenGLThread())
             mc.shaderManager.stdShader.setCamera(camera);
         else
@@ -206,12 +211,27 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
             playerController.onPlayerBlockDamage();
             this.packetSender.sendMovePackets();
         }
+        updatedPositionVector.set(posX, posY, posZ);
     }
 
     @Override
     public void setPosition(float x, float y, float z) {
         super.setPosition(x, y, z);
+        updatedPositionVector.set(x, y, z);
         posPacketReceieved = true;
+    }
+
+    @Override
+    public void setRotation(float yaw, float pitch) {
+        super.setRotation(yaw, pitch);
+        //TODO: FIX CAMERA BUG ON SERVER REJOIN
+//        yaw = (float) toRadians(yaw);
+//        pitch = (float) toRadians(-pitch);
+//        float xzLen = (float) cos(pitch);
+//        float x = (float) (xzLen * cos(yaw));
+//        float y = (float) sin(pitch);
+//        float z = (float) (xzLen * sin(-yaw));
+//        camera.direction.set(x, y, z);
     }
 
     /**
@@ -323,6 +343,11 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
         this.mc.shaderManager.stdShader.setCamera(camera);
     }
 
+    @NotNull
+    public Vector3 getUpdatedPositionVector() {
+        return this.updatedPositionVector;
+    }
+
     public void renderCamControllerOverlay() {
         camController.render();
     }
@@ -335,7 +360,7 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
      * @param facingDirection rayTraceResult side hit direction.
      * @see me.gommeantilegit.minecraft.raytrace.RayTracer.RayTraceResult#hitSide
      */
-    void onBlockBroken(@NotNull BlockBase block, @NotNull BlockPos pos, @NotNull EnumFacing facingDirection) {
+    void onBlockBroken(@NotNull Block block, @NotNull BlockPos pos, @NotNull EnumFacing facingDirection) {
         this.breakMouseOver();
     }
 
@@ -592,7 +617,7 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
         if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK) {
             assert result.getBlockPos() != null;
             int x = result.getBlockPos().getX(), y = result.getBlockPos().getY(), z = result.getBlockPos().getZ();
-            BlockStateBase prevBlockState = world.getBlockState(x, y, z);
+            BlockState prevBlockState = world.getBlockState(x, y, z);
             assert prevBlockState != null;
             world.setBlock(x, y, z, null);
             mc.theWorld.particleEngine.spawnBlockBreakingParticles(x, y, z, prevBlockState.getBlock());
@@ -986,4 +1011,9 @@ public class EntityPlayerSP extends PlayerBase<ClientSkin> {
         return cameraMode != EntityPlayerSP.CameraMode.FIRST_PERSON;
     }
 
+    @NotNull
+    @Override
+    public ClientSkin getSkin() {
+        return (ClientSkin) super.getSkin();
+    }
 }

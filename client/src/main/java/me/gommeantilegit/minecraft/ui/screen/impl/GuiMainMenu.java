@@ -230,11 +230,11 @@ public class GuiMainMenu extends GuiScreen {
             StdShader stdShader = mc.shaderManager.stdShader;
             stdShader.begin();
             stdShader.setUniformf("lightDirection", lightDir);
+            stdShader.setMinDiffusedLighting(0f);
             stdShader.setVirtualCameraPos(0, 0, 0);
             cam.update();
             stdShader.setCamera(cam);
             stdShader.renderStart();
-            stdShader.disableLighting();
             stdShader.enableLighting();
             stdShader.translate(0.0F, 1.1F, -13F);
             stdShader.scale(1.0F, -1F, 1.0F);

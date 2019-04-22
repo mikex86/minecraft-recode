@@ -8,6 +8,8 @@ import me.gommeantilegit.minecraft.utils.Pointer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Random;
+
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 import static me.gommeantilegit.minecraft.util.RenderUtils.rect;
 
@@ -21,7 +23,7 @@ public class BoxRenderer {
 
     /**
      * Pointer to the texture that will be used for rendering the created mesh later.
-     * If the pointer points to null, the uv values of the mesh will be incorrect (they will all be (0,0)), but that will not matter, if you don't plan
+     * If the pointer points to null, the uv SOUND_RESOURCES of the mesh will be incorrect (they will all be (0,0)), but that will not matter, if you don't plan
      * to use any texture
      */
     @NotNull
@@ -82,6 +84,8 @@ public class BoxRenderer {
     public Vector2 getUV(int face) {
         return this.textureUVs[0];
     }
+
+    private static final Random random = new Random();
 
     public void renderFace(@NotNull MeshBuilder builder, int x, int y, int z, @NotNull Vector2 uv, int face) {
         float u0 = uv.x;

@@ -35,7 +35,7 @@ public class ClientChunkDataHandler extends PacketHandler<ServerChunkDataPacket>
                 try {
                     chunk.setChunkData(decompress(packet.getChunkData()), packet.getChunkSectionsSent());
                     chunk.nullifyMesh();
-                    chunk.dataReceived = true;
+                    chunk.setDataReceived();
                     chunk.load();
                     context.channel().writeAndFlush(new ClientChunkLoadConfirmPacket(null, origin));
                 } catch (Exception e) {

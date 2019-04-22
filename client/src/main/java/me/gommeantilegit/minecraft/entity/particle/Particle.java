@@ -84,7 +84,7 @@ public class Particle extends Entity implements MeshBuilding {
         this.texture = texture;
         this.textureRegion = textureRegion;
 
-        //Initializing particle values
+        //Initializing particle SOUND_RESOURCES
         {
             this.setSize(0.2f, 0.2f);
             this.heightOffset = this.bbHeight / 2.0f;
@@ -106,7 +106,7 @@ public class Particle extends Entity implements MeshBuilding {
     @Override
     public MeshBuilder buildMesh() {
         /*
-         * Randomly generated values used as u and v offset to the textureRegion, whose size is reduced when rendering the particle. The those values
+         * Randomly generated SOUND_RESOURCES used as u and v offset to the textureRegion, whose size is reduced when rendering the particle. The those SOUND_RESOURCES
          * are a random offset moving the actually rendered region around inside of the specified region textureRegion
          */
         float uOffset = (float) Math.random() * 3.0f, vOffset = (float) Math.random() * 3.0f;

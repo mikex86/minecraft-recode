@@ -3,7 +3,7 @@ package me.gommeantilegit.minecraft.entity.particle;
 import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
-import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
@@ -62,7 +62,7 @@ public class ParticleEngine extends AbstractAsyncOperation implements OpenGLOper
      * @param blockZ      z pos of destroyed block
      * @param prevBlock id of destroyed block
      */
-    public void spawnBlockBreakingParticles(int blockX, int blockY, int blockZ, @NotNull BlockBase prevBlock) {
+    public void spawnBlockBreakingParticles(int blockX, int blockY, int blockZ, @NotNull Block prevBlock) {
         BlockTypeRenderer typeRenderer = mc.blockRendererRegistry.getRenderer(prevBlock);
         assert typeRenderer != null;
         Vector2 uv = typeRenderer.getTextureUVs()[0];

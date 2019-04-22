@@ -3,8 +3,8 @@ package me.gommeantilegit.minecraft.world;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.collision.Ray;
 import me.gommeantilegit.minecraft.AbstractMinecraft;
-import me.gommeantilegit.minecraft.block.BlockBase;
-import me.gommeantilegit.minecraft.block.state.BlockStateBase;
+import me.gommeantilegit.minecraft.block.Block;
+import me.gommeantilegit.minecraft.block.state.BlockState;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
@@ -177,7 +177,7 @@ public abstract class WorldBase implements Tickable, Runnable, AsyncOperation {
      * @param z             z position
      * @param newBlockState the new block state
      */
-    public void setBlock(int x, int y, int z, @Nullable BlockStateBase newBlockState) {
+    public void setBlock(int x, int y, int z, @Nullable BlockState newBlockState) {
         ChunkBase chunk = getChunkForPosition(x, z);
         if (chunk == null)
             throw new IllegalStateException("Couldn't set block state of coordinates [x: " + x + ", y:" + y + ", " + z + "] to blockID: " + newBlockState + ". No ChunkBase containing coordinates.");
@@ -185,14 +185,14 @@ public abstract class WorldBase implements Tickable, Runnable, AsyncOperation {
     }
 
     @Nullable
-    public BlockStateBase getBlockState(int x, int y, int z) {
+    public BlockState getBlockState(int x, int y, int z) {
         ChunkBase chunk = this.getChunkForPosition(x, z);
         if (chunk == null) return null;
         else return chunk.getBlockState(x, y, z);
     }
 
     @Nullable
-    public BlockStateBase getBlockState(@NotNull BlockPos blockPos) {
+    public BlockState getBlockState(@NotNull BlockPos blockPos) {
         return getBlockState(blockPos.getX(), blockPos.getY(), blockPos.getZ());
     }
 
@@ -227,7 +227,7 @@ public abstract class WorldBase implements Tickable, Runnable, AsyncOperation {
 
                 float smallestDst2 = -1.0f;
                 for (BlockPos pos : neighbors) {
-                    BlockBase block = this.getBlock(pos);
+                    Block block = this.getBlock(pos);
                     if (block != null) {
                         RayTracer.RayTraceResult result = block.collisionRayTrace(pos, rayStart, direction, range);
                         if (result.type != RayTracer.RayTraceResult.EnumResultType.MISS) {
@@ -322,7 +322,7 @@ public abstract class WorldBase implements Tickable, Runnable, AsyncOperation {
      */
     private void onBlockCollision(Entity entity, AxisAlignedBB axisAlignedBB) {
         int x = (int) axisAlignedBB.x0 + 1, y = (int) axisAlignedBB.y0 + 1, z = (int) axisAlignedBB.z0 + 1;
-        BlockBase block = mc.blocks.getBlockByID(getBlockID(x, y, z));
+        Block block = mc.blocks.getBlockByID(getBlockID(x, y, z));
         assert block != null;
         block.onEntityCollide(entity, axisAlignedBB);
     }
@@ -346,7 +346,7 @@ public abstract class WorldBase implements Tickable, Runnable, AsyncOperation {
                     BlockPos bp = new BlockPos(x, y, z);
                     IBlockState state = getBlockState(bp);
                     if (state != null) {
-                        BlockBase block = state.getBlock();
+                        Block block = state.getBlock();
                         if ((axisAlignedBB2 = block.getBoundingBox(this, bp, state)) != null) {
                             boxes.add(axisAlignedBB2);
                         }
@@ -364,12 +364,12 @@ public abstract class WorldBase implements Tickable, Runnable, AsyncOperation {
      * @return the block instance at the specified coordinates.
      */
     @Nullable
-    private BlockBase getBlock(int x, int y, int z) {
+    private Block getBlock(int x, int y, int z) {
         return mc.blocks.getBlockByID(getBlockID(x, y, z));
     }
 
     @Nullable
-    public BlockBase getBlock(@NotNull BlockPos blockPos) {
+    public Block getBlock(@NotNull BlockPos blockPos) {
         return mc.blocks.getBlockByID(getBlockID(blockPos.getX(), blockPos.getY(), blockPos.getZ()));
     }
 
@@ -412,7 +412,7 @@ public abstract class WorldBase implements Tickable, Runnable, AsyncOperation {
      * @return true if the block with the given id is has transparency or is air.
      */
     public boolean canSeeThrough(int blockID) {
-        BlockBase block = mc.blocks.getBlockByID(blockID);
+        Block block = mc.blocks.getBlockByID(blockID);
         return block == null || block.transparent;
     }
 

@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Stores Properties with their parent values.
@@ -22,19 +23,12 @@ public class BlockStatePropertyMap {
 
     /**
      * The parent values of the properties.
+     * No value of this array should ever be null!
      * <p>
      * valueFor(properties[x]) = values[x]
      */
     @NotNull
     private final Object[] values;
-
-    /**
-     * @param properties the properties that the map should assign to variables
-     */
-    private BlockStatePropertyMap(@NotNull BlockStateProperty[] properties) {
-        this.properties = Arrays.asList(properties);
-        this.values = new Object[properties.length];
-    }
 
     /**
      * @param properties the properties that the map should assign to variables
@@ -49,15 +43,15 @@ public class BlockStatePropertyMap {
     /**
      * @param property the given property instance
      * @param <T>      the value type of the property instance
-     * @return an optional that has a nullable value. Returns an empty Optional if the property was not found in the map. Else the function returns an optional storing the value of the specified property, which can also be null.
+     * @return an optional that has a nullable value. Returns an empty Optional if the property was not found in the map. Else the function returns an optional storing the value of the specified property, which cannot be null!
      */
     @NotNull
-    public <T> NullableOptional<T> getPropertyValue(@NotNull BlockStateProperty<T> property) {
+    public <T> Optional<T> getPropertyValue(@NotNull BlockStateProperty<T> property) {
         int index = properties.indexOf(property);
         if (index == -1)
-            return NullableOptional.empty();
+            return Optional.empty();
         assert index < values.length;
-        return NullableOptional.of((T) this.values[index]);
+        return Optional.of((T) this.values[index]);
     }
 
     /**
@@ -66,11 +60,12 @@ public class BlockStatePropertyMap {
      * @param property the specified property
      * @param value    the new value for the specified property
      * @param <T>      the type of value that is stored in the specified property
-     * @return the true if the value was successfully changed and false if the property was not found in the property map.
+     * @return the true if the value was successfully changed and false if the property was not found in the property map or if the specified value is not an allowed value of the property
      */
-    public <T> boolean setPropertyValue(@NotNull BlockStateProperty<T> property, @Nullable T value) {
+    public <T> boolean setPropertyValue(@NotNull BlockStateProperty<T> property, @NotNull T value) {
         int index = properties.indexOf(property);
-        if (index == -1)
+        assert properties.get(index).getValueClass().equals(property.getValueClass()); // This is always true
+        if (index == -1 || !((BlockStateProperty<T>) properties.get(index)).isValidValue(value))
             return false;
         assert index < values.length;
         values[index] = value;
@@ -83,6 +78,13 @@ public class BlockStatePropertyMap {
     @NotNull
     public BlockStatePropertyMap copySelf() {
         return new BlockStatePropertyMap(properties.toArray(new BlockStateProperty[0]), values);
+    }
+
+    /**
+     * @return true if the property map does not contain any properties
+     */
+    public boolean isEmpty() {
+        return this.properties.isEmpty();
     }
 
     /**
@@ -111,7 +113,7 @@ public class BlockStatePropertyMap {
          * @return self instance for method call chaining
          */
         @NotNull
-        public <T> Builder withProperty(@NotNull BlockStateProperty<T> property, @Nullable T initialValue) {
+        public <T> Builder withProperty(@NotNull BlockStateProperty<T> property, @NotNull T initialValue) {
             synchronized (this) {
                 this.properties.add(property);
                 this.values.add(initialValue);

@@ -6,7 +6,6 @@ import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.render.BlockRenderer;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
-import me.gommeantilegit.minecraft.world.ClientWorld;
 import me.gommeantilegit.minecraft.world.WorldBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -38,10 +37,10 @@ public class BlockTypeRenderer {
      * The block type instance that this object is capable of rendering
      */
     @NotNull
-    protected final BlockBase block;
+    protected final Block block;
 
-    public BlockTypeRenderer(@NotNull BlockBase blockBase, @NotNull ClientMinecraft mc, @NotNull String... textureResources) {
-        this.renderer = new BlockRenderer(blockBase, mc, this);
+    public BlockTypeRenderer(@NotNull Block block, @NotNull ClientMinecraft mc, @NotNull String... textureResources) {
+        this.renderer = new BlockRenderer(block, mc, this);
         this.textureResources = textureResources;
         this.textureUVs = new Vector2[textureResources.length];
         int i = 0;
@@ -50,8 +49,8 @@ public class BlockTypeRenderer {
             textureUVs[i++] = pos;
         }
         this.renderer.setTextureUVs(textureUVs);
-        this.renderer.setShape(blockBase.x0, blockBase.y0, blockBase.z0, blockBase.x1, blockBase.y1, blockBase.z1);
-        this.block = blockBase;
+        this.renderer.setShape(block.x0, block.y0, block.z0, block.x1, block.y1, block.z1);
+        this.block = block;
     }
 
     /**
@@ -81,13 +80,12 @@ public class BlockTypeRenderer {
      * @param blockState     the block state
      * @param renderAllFaces state if every face should just be rendered without checking the neighboring blockStates to determine if a face of the block should be rendered.
      */
-    public void render(MeshBuilder builder, int renderX, int renderY, int renderZ, int xCheck, int yCheck, int zCheck, @Nullable WorldBase world, @NotNull IBlockState blockState, boolean renderAllFaces) {
+    public void render(@NotNull MeshBuilder builder, int renderX, int renderY, int renderZ, int xCheck, int yCheck, int zCheck, @Nullable WorldBase world, @NotNull IBlockState blockState, boolean renderAllFaces) {
         if (!renderAllFaces && world == null) {
             throw new IllegalStateException("Error while rendering block to MeshBuilder: " +
                     "Specified world parameter is equal to null but state of parameter renderAllFaces is set to false." +
                     " Parameter world is only nullable, if renderAllFaces is set to true.");
         }
-        //TODO FACING ROTATION
         if (renderAllFaces || shouldRenderFace(world, xCheck, yCheck, zCheck, 0))
             renderFace(builder, renderX, renderY, renderZ, 0);
         if (renderAllFaces || shouldRenderFace(world, xCheck, yCheck, zCheck, 1))

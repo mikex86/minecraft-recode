@@ -5,10 +5,8 @@ import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
-import me.gommeantilegit.minecraft.block.Blocks;
-import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.block.texturemap.BlockTextureMap;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,7 +33,7 @@ public class GrassBlockTypeRenderer extends BlockTypeRenderer {
 //    @NotNull
 //    private static final Color COLOR = new Color(getGrassColor(0.45, 0.15));
 
-    public GrassBlockTypeRenderer(@NotNull BlockBase grassBlock, @NotNull ClientMinecraft mc) {
+    public GrassBlockTypeRenderer(@NotNull Block grassBlock, @NotNull ClientMinecraft mc) {
         super(grassBlock, mc,
                 "dirt",
                 "grass_side",

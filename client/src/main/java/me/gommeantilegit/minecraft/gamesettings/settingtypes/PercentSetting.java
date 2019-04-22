@@ -10,14 +10,14 @@ import java.util.HashMap;
 public class PercentSetting extends LimitedNumberSetting {
 
     /**
-     * Value replacement map for percent values.
+     * Value replacement map for percent SOUND_RESOURCES.
      * Setting displayer needs to replace the value with the parent string
      */
     @NotNull
     private final HashMap<Double, String> valueStringReplacementMap = new HashMap<>();
 
     /**
-     * Constructor constructs a setting instance that can store values from 0 to 100
+     * Constructor constructs a setting instance that can store SOUND_RESOURCES from 0 to 100
      *
      * @param name sets {@link #name}
      */
@@ -29,7 +29,7 @@ public class PercentSetting extends LimitedNumberSetting {
      * Constructor constructs a setting instance that can store contained in the specified interval
      *
      * @param name     sets {@link #name}
-     * @param interval the given value interval of allowed percent values
+     * @param interval the given value interval of allowed percent SOUND_RESOURCES
      */
     public PercentSetting(@NotNull String name, @NotNull Interval interval) {
         super(name, true, interval);

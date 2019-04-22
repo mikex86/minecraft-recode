@@ -1,19 +1,19 @@
 package me.gommeantilegit.minecraft.world.chunk;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Mesh;
 import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import me.gommeantilegit.minecraft.ClientMinecraft;
-import me.gommeantilegit.minecraft.block.state.BlockStateBase;
+import me.gommeantilegit.minecraft.block.state.BlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.utils.Clock;
 import me.gommeantilegit.minecraft.world.ClientWorld;
-import me.gommeantilegit.minecraft.world.chunk.world.ClientWorldChunkHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
-import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
+import static com.badlogic.gdx.graphics.GL20.*;
 import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBUTES;
 
 public class ClientChunk extends ChunkBase {
@@ -34,12 +34,6 @@ public class ClientChunk extends ChunkBase {
      */
     public boolean dataReceived = false;
 
-    /**
-     * Clock instance to time how long a chunk's data has been requested
-     */
-    @NotNull
-    private final Clock dataRequestedTimer = new Clock(false);
-
     @NotNull
     private final ClientMinecraft mc;
 
@@ -58,7 +52,7 @@ public class ClientChunk extends ChunkBase {
     }
 
     @Override
-    protected void changeBlock(int x, int y, int z, @Nullable BlockStateBase blockState) {
+    protected void changeBlock(int x, int y, int z, @Nullable BlockState blockState) {
         super.changeBlock(x, y, z, blockState);
         ((ClientWorld) this.world).rebuildChunksFor(x, z, true);
     }
@@ -91,7 +85,7 @@ public class ClientChunk extends ChunkBase {
         for (int x = this.x; x < this.x + CHUNK_SIZE; x++) {
             for (int y = 0; y < height; y++) {
                 for (int z = this.z; z < this.z + CHUNK_SIZE; z++) {
-                    BlockStateBase blockState = getBlockState(x, y, z);
+                    BlockState blockState = getBlockState(x, y, z);
                     if (blockState != null) {
                         Objects.requireNonNull(mc.blockRendererRegistry.getRenderer(blockState.getBlock())).render(builder, x - this.x, y, z - this.z, x, y, z, world, blockState, false);
                     }
@@ -132,12 +126,14 @@ public class ClientChunk extends ChunkBase {
      * @param partialTicks delta time
      */
     public void render(float partialTicks) {
+        Gdx.gl.glLineWidth(3f);
         mc.shaderManager.stdShader.pushMatrix();
         mc.shaderManager.stdShader.translate(x, 0, z);
         if (mesh != null)
             this.mesh.render(mc.shaderManager.stdShader, GL_TRIANGLES);
         mc.shaderManager.stdShader.popMatrix();
         this.renderEntities(partialTicks);
+        Gdx.gl.glLineWidth(1f);
     }
 
     /**
@@ -196,16 +192,23 @@ public class ClientChunk extends ChunkBase {
         super.load();
     }
 
-    public void setDataRequested() {
-        this.dataRequestedTimer.reset();
+    public void setDataReceived() {
+        this.dataReceived = true;
+        rebuildNeighbors(); // Rebuilding neighbors to optimize mesh performance as the mesh is rendered as if this chunk instance was fully air.
     }
 
-    @NotNull
-    public Clock getDataRequestedTimer() {
-        return dataRequestedTimer;
-    }
-
-    public boolean isRequestConfirmed() {
-        return rebuild;
+    private void rebuildNeighbors() {
+        ClientChunk c1 = (ClientChunk) world.getChunkAtOrigin(x + CHUNK_SIZE, z);
+        ClientChunk c2 = (ClientChunk) world.getChunkAtOrigin(x - CHUNK_SIZE, z);
+        ClientChunk c3 = (ClientChunk) world.getChunkAtOrigin(x, z + CHUNK_SIZE);
+        ClientChunk c4 = (ClientChunk) world.getChunkAtOrigin(x, z - CHUNK_SIZE);
+        if (c1 != null)
+            c1.setNeedsRebuild(true, false);
+        if (c2 != null)
+            c2.setNeedsRebuild(true, false);
+        if (c3 != null)
+            c3.setNeedsRebuild(true, false);
+        if (c4 != null)
+            c4.setNeedsRebuild(true, false);
     }
 }

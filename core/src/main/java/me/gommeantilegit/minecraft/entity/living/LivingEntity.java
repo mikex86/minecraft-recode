@@ -276,9 +276,9 @@ public class LivingEntity extends Entity {
      */
     public void jump() {
         //TODO: FINISH JUMP METHOD
-        // if (this.isInFluid()) {
-        // FLUID MODIFIED MOTION Y VALUE (for lava: 0.03999999910593033f)
-        // } else {
+        //if (this.isInFluid()) {
+        //FLUID MODIFIED MOTION Y VALUE (for lava: 0.03999999910593033f)
+        //} else {
         this.motionY = this.getJumpUpwardsMotion();
 
         if (this.isSprinting()) {

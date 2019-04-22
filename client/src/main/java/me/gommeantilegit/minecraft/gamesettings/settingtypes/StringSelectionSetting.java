@@ -5,12 +5,12 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 
 /**
- * A string setting that stores a string value of a given pre defined collection of possible string values.
+ * A string setting that stores a string value of a given pre defined collection of possible string SOUND_RESOURCES.
  */
 public class StringSelectionSetting extends StringSetting {
 
     /**
-     * Stores the possible values of {@link #value}
+     * Stores the possible SOUND_RESOURCES of {@link #value}
      */
     @NotNull
     private final String[] possibleValues;

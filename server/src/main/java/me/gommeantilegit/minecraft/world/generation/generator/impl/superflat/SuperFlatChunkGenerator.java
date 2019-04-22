@@ -1,7 +1,7 @@
 package me.gommeantilegit.minecraft.world.generation.generator.impl.superflat;
 
 import me.gommeantilegit.minecraft.ServerMinecraft;
-import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
 import me.gommeantilegit.minecraft.world.generation.generator.api.ChunkGenerator;
@@ -24,7 +24,7 @@ public class SuperFlatChunkGenerator extends ChunkGenerator {
                 for (int zo = 0; zo < ChunkBase.CHUNK_SIZE; zo++) {
                     int x = chunk.getX() + xo;
                     int z = chunk.getZ() + zo;
-                    BlockBase block;
+                    Block block;
                     switch (y) {
                         case 0:
                             block = mc.blocks.bedrock;

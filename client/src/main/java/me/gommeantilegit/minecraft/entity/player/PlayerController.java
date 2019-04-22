@@ -1,16 +1,20 @@
 package me.gommeantilegit.minecraft.entity.player;
 
+import me.gommeantilegit.minecraft.ClientMinecraft;
+import me.gommeantilegit.minecraft.block.sound.BlockSoundType;
 import org.jetbrains.annotations.NotNull;
 
-import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.raytrace.RayTracer;
 import me.gommeantilegit.minecraft.util.block.position.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
+
 public class PlayerController {
 
     /**
-     * BlockBase damage.
+     * Block damage.
      */
     public float currentBlockDamage = 0f;
 
@@ -30,8 +34,15 @@ public class PlayerController {
      */
     private int blockHitDelay;
 
-    public PlayerController(@NotNull EntityPlayerSP player) {
+    /**
+     * Parent client minecraft instance
+     */
+    @NotNull
+    private final ClientMinecraft mc;
+
+    public PlayerController(@NotNull EntityPlayerSP player, @NotNull ClientMinecraft mc) {
         this.player = player;
+        this.mc = mc;
     }
 
     /**
@@ -60,14 +71,19 @@ public class PlayerController {
                 if (result.type != RayTracer.RayTraceResult.EnumResultType.BLOCK) {
                     return;
                 }
-                BlockBase block = player.getWorld().getBlock(pos);
+                Block block = player.getWorld().getBlock(pos);
                 if (block != null) {
                     this.currentBlockDamage += block.getPlayerRelativeBlockHardness(player, player.getWorld(), pos);
                     if (this.stepSoundTickCounter % 4.0F == 0.0F) {
-                        //TODO: IMPLEMENT PLAY DIG SOUND
+                        BlockSoundType soundType = mc.blockSounds.getSoundType(block);
+                        // Playing block breaking sound
+//                        soundType.getStepSound().play((soundType.getVolume() + 1) / 8.0f, soundType.pitch * 0.5f);
+                        soundType.getStepSound().playRelative((soundType.getVolume() + 1) / 8.0f, soundType.pitch * 0.5f, Objects.requireNonNull(result.hitVec), mc.thePlayer.getUpdatedPositionVector(), mc.thePlayer.camera.direction);
                     }
                     this.stepSoundTickCounter++;
                     if (currentBlockDamage >= 1f) {
+                        BlockSoundType soundType = mc.blockSounds.getSoundType(block);
+                        soundType.getStepSound().playRelative((soundType.getVolume() + 1.0F) / 2.0F, soundType.getPitch() * 0.8F, Objects.requireNonNull(result.hitVec), mc.thePlayer.getUpdatedPositionVector(), mc.thePlayer.camera.direction);
                         player.onBlockBroken(block, pos, result.hitSide);
                         currentBlockDamage = 0f;
                         stepSoundTickCounter = 0f;

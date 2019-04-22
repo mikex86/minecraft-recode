@@ -8,6 +8,9 @@ import java.io.Serializable;
 import static java.lang.Math.abs;
 import static java.lang.Math.floor;
 
+/**
+ * Represents an axis direction in 3D space. Often in particular block facing direction.
+ */
 public enum EnumFacing implements Serializable {
 
     DOWN(new Vec3i(0, -1, 0)),

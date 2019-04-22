@@ -14,7 +14,7 @@ public class HudTextures extends TextureWrapper {
     };
 
     /**
-     * Sizes values of the selection cross [width, height]
+     * Sizes SOUND_RESOURCES of the selection cross [width, height]
      */
     private final int[] selectionCrossSizes = new int[]{
             15, 15
@@ -49,7 +49,7 @@ public class HudTextures extends TextureWrapper {
     };
 
     /**
-     * Sizes values a heart [width, height]
+     * Sizes SOUND_RESOURCES a heart [width, height]
      */
     private final int[] heartSizes = new int[]{
             9, 9

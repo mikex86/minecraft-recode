@@ -4,8 +4,8 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.collision.BoundingBox;
 import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.annotations.Unsafe;
-import me.gommeantilegit.minecraft.block.BlockBase;
-import me.gommeantilegit.minecraft.block.state.BlockStateBase;
+import me.gommeantilegit.minecraft.block.Block;
+import me.gommeantilegit.minecraft.block.state.BlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
@@ -69,7 +69,7 @@ public class ChunkBase implements Tickable {
      * Three dimensional array of blockStates storing information about all block states.
      */
     @NotNull
-    public final BlockStateBase[][][] blockStates;
+    public final BlockState[][][] blockStates;
 
     /**
      * Chunk bounding box for frustum culling
@@ -108,7 +108,7 @@ public class ChunkBase implements Tickable {
         this.x = x;
         this.z = z;
         this.world = world;
-        this.blockStates = new BlockStateBase[CHUNK_SIZE][height][CHUNK_SIZE];
+        this.blockStates = new BlockState[CHUNK_SIZE][height][CHUNK_SIZE];
         this.boundingBox = new BoundingBox(new Vector3(x, 0, z), new Vector3(x + CHUNK_SIZE, height, z + CHUNK_SIZE));
         this.mc = world.mc;
         this.entities = new ArrayList<>();
@@ -261,7 +261,7 @@ public class ChunkBase implements Tickable {
      * @param newBlockState the new block state
      * @throws IllegalStateException if the specified coordinates are not managed by the chunk.
      */
-    public void setBlock(int x, int y, int z, @Nullable BlockStateBase newBlockState) {
+    public void setBlock(int x, int y, int z, @Nullable BlockState newBlockState) {
         changeBlock(x, y, z, newBlockState);
     }
 
@@ -274,7 +274,7 @@ public class ChunkBase implements Tickable {
      * @param blockState the new block state
      */
     @Unsafe
-    protected void changeBlock(int x, int y, int z, @Nullable BlockStateBase blockState) {
+    protected void changeBlock(int x, int y, int z, @Nullable BlockState blockState) {
         int relX = x - this.x;
         int relY = max(0, y);
         int relZ = z - this.z;
@@ -291,7 +291,7 @@ public class ChunkBase implements Tickable {
      * @throws IllegalStateException if the specified coordinates are not managed by the chunk.
      */
     public int getBlockIDAt(int x, int y, int z) {
-        BlockBase block = getBlockAt(x, y, z);
+        Block block = getBlockAt(x, y, z);
         if (block == null) return 0;
         else return block.getId();
     }
@@ -303,8 +303,8 @@ public class ChunkBase implements Tickable {
      * @return the block instance of the block state at the specified coordinate or null if block state is null indicating that the block is air.
      */
     @Nullable
-    public BlockBase getBlockAt(int x, int y, int z) {
-        BlockStateBase blockState = getBlockState(x, y, z);
+    public Block getBlockAt(int x, int y, int z) {
+        BlockState blockState = getBlockState(x, y, z);
         if (blockState == null)
             return null;
         else return blockState.getBlock();
@@ -317,7 +317,7 @@ public class ChunkBase implements Tickable {
      * @return the block state at the specified coordinate
      */
     @Nullable
-    public BlockStateBase getBlockState(int x, int y, int z) {
+    public BlockState getBlockState(int x, int y, int z) {
         if (y < 0 || y >= height)
             return null; //Returning air, if the block pos is below the world
         int relX = x - this.x;

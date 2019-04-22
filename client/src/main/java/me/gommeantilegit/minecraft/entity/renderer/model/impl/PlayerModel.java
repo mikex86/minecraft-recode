@@ -185,7 +185,7 @@ public class PlayerModel implements IEntityModel<PlayerBase, StdShader> {
 //            this.arm0.yRot -= this.body.yRot * 4.0F;
             this.arm0.zRot += toDegrees(sin(swingProgress * (float) Math.PI)) * -0.4F * 1.0f;
 
-            //Negate values
+            //Negate SOUND_RESOURCES
             {
                 this.arm0.xRot = -arm0.xRot;
                 this.arm0.yRot = -arm0.yRot;

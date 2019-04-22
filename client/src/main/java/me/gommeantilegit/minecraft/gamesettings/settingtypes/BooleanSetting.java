@@ -3,7 +3,7 @@ package me.gommeantilegit.minecraft.gamesettings.settingtypes;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Represents a setting that can store boolean values. Eg. whether something is enabled or not.
+ * Represents a setting that can store boolean SOUND_RESOURCES. Eg. whether something is enabled or not.
  */
 public class BooleanSetting extends Setting<Boolean> {
     /**

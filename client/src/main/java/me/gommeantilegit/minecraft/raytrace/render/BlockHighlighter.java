@@ -30,7 +30,7 @@ public class BlockHighlighter {
     private int blockX, blockY, blockZ;
 
     /**
-     * BlockBase mesh
+     * Block mesh
      */
     @NotNull
     private final Mesh linesMesh;
@@ -57,12 +57,12 @@ public class BlockHighlighter {
         //Lines mesh
         {
             MeshBuilder meshBuilder = new MeshBuilder();
-            meshBuilder.setColor(1, 0, 0, 1);
+            meshBuilder.setColor(1, 0, 0, 1); // White color
             meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL20.GL_LINES);
             {
                 float xo = 0.5f, yo = 0.5f, zo = 0.5f;
-                float tolerance = 0f;
-                meshBuilder.box(xo, yo, zo, 1 + tolerance, 1 + tolerance, 1 + tolerance);
+                float offset = 2.0E-03f;
+                meshBuilder.box(xo + offset, yo + offset, zo + offset, 1 + 2 * offset, 1 + 2 * offset, 1 + 2 * offset);
             }
             this.linesMesh = meshBuilder.end();
         }
@@ -105,25 +105,25 @@ public class BlockHighlighter {
      */
     public void render() {
         Gdx.gl.glBindTexture(GL20.GL_TEXTURE_2D, 0);
-        Gdx.gl.glEnable(GL_POLYGON_OFFSET_FILL);
-        Gdx.gl.glPolygonOffset(-3, -3);
         StdShader shader = mc.shaderManager.stdShader;
         shader.pushMatrix();
         shader.translate(blockX, blockY, blockZ);
         {
 
-            Gdx.gl.glLineWidth(3);
-            shader.forceColor(0f, 0f, 0f, 0.3f);
+            Gdx.gl.glLineWidth(2);
+            shader.forceColor(0f, 0f, 0f, 0.4f);
             this.linesMesh.render(shader, GL20.GL_LINES);
             shader.resetForcedColor();
             Gdx.gl.glLineWidth(1);
 
+            Gdx.gl.glEnable(GL_POLYGON_OFFSET_FILL);
+            Gdx.gl.glPolygonOffset(-3, -3);
             if (player.playerController.currentBlockDamage > 0) {
                 this.renderBlockBreakingDamage();
             }
+            Gdx.gl.glDisable(GL_POLYGON_OFFSET_FILL);
         }
         shader.popMatrix();
-        Gdx.gl.glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
     /**
@@ -131,7 +131,6 @@ public class BlockHighlighter {
      */
     private void renderBlockBreakingDamage() {
         StdShader shader = mc.shaderManager.stdShader;
-        Gdx.gl.glEnable(GL_BLEND);
         Gdx.gl.glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR);
         float blockDamage = min(mc.thePlayer.playerController.currentBlockDamage, 0.999999f);
         mc.textureManager.blockDestroyStages[(int) (blockDamage * 10f)].bind();
@@ -139,7 +138,7 @@ public class BlockHighlighter {
         this.trianglesMesh.render(shader, GL20.GL_TRIANGLES);
         shader.enableLighting();
         shader.setColor(1, 1, 1, 1);
-        Gdx.gl.glDisable(GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
     }
 
 }

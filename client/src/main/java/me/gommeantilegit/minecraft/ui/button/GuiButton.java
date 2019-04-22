@@ -91,7 +91,7 @@ public class GuiButton extends TexturedButton implements Tickable {
 
     @Override
     protected void onMouseDown() {
-        SoundResource.GUI_BUTTON_CLICK.play(0.5f, 1);
+        SoundResource.getSound("sound/random/click").play(0.5f, 1);
     }
 
     @NotNull

@@ -73,7 +73,7 @@ public abstract class GuiScreen extends Overlay2D implements Tickable {
 
 
     /**
-     * Adds option buttons that allow the user to change the game-settings values
+     * Adds option buttons that allow the user to change the game-settings SOUND_RESOURCES
      *
      * @param scaledWidth  the scaled width
      * @param scaledHeight the scaled height

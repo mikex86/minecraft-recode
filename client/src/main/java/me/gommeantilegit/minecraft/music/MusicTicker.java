@@ -3,6 +3,7 @@ package me.gommeantilegit.minecraft.music;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.files.FileHandle;
+import com.badlogic.gdx.utils.GdxRuntimeException;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
 import org.jetbrains.annotations.NotNull;
@@ -63,33 +64,22 @@ public class MusicTicker implements Tickable {
     @Override
     public void tick(float partialTicks) {
         if (playingMusic != null && playingMusic.isPlaying() && !fadingOut && !fadingIn) {
-            mc.runOnGLContext(new FutureTask<>((Callable<Void>) () -> {
-                playingMusic.setVolume((float) mc.gameSettings.generalSettings.music.getRelativeValue());
-                return null;
-            }));
+            playingMusic.setVolume((float) mc.gameSettings.generalSettings.music.getRelativeValue());
         }
         if (playingMusic != null && playingMusic.isPlaying() && fadingIn) {
-            mc.runOnGLContext(new FutureTask<>((Callable<Void>) () -> {
-                if (playingMusic.getVolume() < mc.gameSettings.generalSettings.music.getRelativeValue()) {
-                    this.playingMusic.setVolume(min(1f, this.playingMusic.getVolume() + 0.01f));
-                } else {
-                    this.playingMusic.setVolume(max(0f, this.playingMusic.getVolume() - 0.01f));
-                }
-                if (abs(playingMusic.getVolume() - mc.gameSettings.generalSettings.music.getRelativeValue()) < 0.01f) {
-                    this.fadingIn = false;
-                }
-                return null;
-            }));
+            if (playingMusic.getVolume() < mc.gameSettings.generalSettings.music.getRelativeValue()) {
+                this.playingMusic.setVolume(min(1f, this.playingMusic.getVolume() + 0.01f));
+            } else {
+                this.playingMusic.setVolume(max(0f, this.playingMusic.getVolume() - 0.01f));
+            }
+            if (abs(playingMusic.getVolume() - mc.gameSettings.generalSettings.music.getRelativeValue()) < 0.01f) {
+                this.fadingIn = false;
+            }
         }
 
         MusicType currentAmbientMusicType = getAmbientMusicType();
         if (this.currentlyPlayingMusicType != null) {
 
-            // Ambient music type changed
-            if (currentlyPlayingMusicType != currentAmbientMusicType && currentAmbientMusicType != null && playingMusic.isPlaying()) {
-                fadeOutPlayingMusic();
-                this.timeUntilNextMusic = this.random.nextInt(currentAmbientMusicType.getMinDelay() / 2 + 1);
-            }
 
             // Music stopped
             if (playingMusic != null && !playingMusic.isPlaying() && currentAmbientMusicType != null) {
@@ -97,18 +87,32 @@ public class MusicTicker implements Tickable {
                 this.currentlyPlayingMusicType = null;
                 this.timeUntilNextMusic = Math.min(currentAmbientMusicType.getMinDelay() + this.random.nextInt(currentAmbientMusicType.getMaxDelay()) + 1, this.timeUntilNextMusic);
             }
+
+            // Ambient music type changed
+            if (currentlyPlayingMusicType != null && currentlyPlayingMusicType != currentAmbientMusicType && currentAmbientMusicType != null && playingMusic != null && playingMusic.isPlaying()) {
+                fadeOutPlayingMusic();
+                this.timeUntilNextMusic = this.random.nextInt(currentAmbientMusicType.getMinDelay() / 2 + 1);
+            }
+
+            if (playingMusic == null && currentAmbientMusicType != null) {
+                this.currentlyPlayingMusicType = null;
+            }
         }
 
         if (this.currentlyPlayingMusicType == null && this.timeUntilNextMusic-- <= 0 && currentAmbientMusicType != null) {
             if (this.playingMusic != null && this.playingMusic.isPlaying()) {
-                mc.runOnGLContext(new FutureTask<>((Callable<Void>) () -> {
+                mc.runOnGLContextWait(new FutureTask<>((Callable<Void>) () -> {
                     this.playingMusic.stop();
                     return null;
                 }));
-                System.out.println("Stopped previously playing music to start new one.");
+                System.out.println("Stopped previously playing music to start new one. In general this should never happen!");
             }
-            mc.runOnGLContext(new FutureTask<>((Callable<Void>) () -> {
-                this.startPlayMusic(currentAmbientMusicType);
+            mc.runOnGLContextWait(new FutureTask<>((Callable<Void>) () -> {
+                try {
+                    this.startPlayMusic(currentAmbientMusicType);
+                } catch (GdxRuntimeException e) {
+                    System.out.println("Failed to start music! Ignoring because LibGDX is causing this problem and in general the music should start playing on next try.");
+                }
                 return null;
             }));
         }
@@ -118,15 +122,11 @@ public class MusicTicker implements Tickable {
      * Fades out the currently playing music until it is silenced to be finally stopped and nullified.
      */
     private void fadeOutPlayingMusic() {
-        if (!fadingOut) {
-            System.out.println("Fading out music...");
-        }
         this.fadingIn = false;
         this.fadingOut = true;
         if (this.playingMusic != null) {
             this.playingMusic.setVolume(max(0f, this.playingMusic.getVolume() - 0.01f));
             if (playingMusic.getVolume() == 0) {
-                System.out.println("Faded out music.");
                 mc.runOnGLContext(new FutureTask<>((Callable<Void>) () -> {
                     playingMusic.stop();
                     return null;
@@ -135,6 +135,7 @@ public class MusicTicker implements Tickable {
                 currentlyPlayingMusicType = null;
                 this.fadingOut = false;
             }
+
         }
     }
 
@@ -152,6 +153,7 @@ public class MusicTicker implements Tickable {
         randomMusic.setVolume(0.1f);
         this.playingMusic = randomMusic;
         this.fadingIn = true;
+        this.timeUntilNextMusic = Integer.MAX_VALUE;
     }
 
     /**
@@ -173,13 +175,13 @@ public class MusicTicker implements Tickable {
      */
     public enum MusicType {
 
-        MENU("sound/music/menu", 20, 600),
-        GAME("sound/music/game", 12000, 24000),
-        CREATIVE("sound/music/creative", 1200, 3600),
-        CREDITS("sound/music/credits", Integer.MAX_VALUE, Integer.MAX_VALUE),
-        NETHER("sound/music/nether", 1200, 3600),
-        END_BOSS("sound/music/end_boss", 0, 0),
-        END("sound/music/end", 6000, 24000);
+        MENU("music/menu", 20, 600),
+        GAME("music/game", 12000, 24000),
+        CREATIVE("music/creative", 1200, 3600),
+        CREDITS("music/credits", Integer.MAX_VALUE, Integer.MAX_VALUE),
+        NETHER("music/nether", 1200, 3600),
+        END_BOSS("music/end_boss", 0, 0),
+        END("music/end", 6000, 24000);
 
         /**
          * Minimum and maximum delay between music in ticks

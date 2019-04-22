@@ -31,7 +31,7 @@ public enum FontColor {
     private final int colorCode;
 
     /**
-     * Normalized (0..1) R, G, B values
+     * Normalized (0..1) R, G, B SOUND_RESOURCES
      */
     private final float r, g, b;
 

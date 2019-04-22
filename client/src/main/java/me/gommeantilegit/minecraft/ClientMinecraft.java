@@ -3,14 +3,15 @@ package me.gommeantilegit.minecraft;
 import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.GL30;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.annotations.AndroidOnly;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
+import me.gommeantilegit.minecraft.block.sound.BlockSounds;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
 import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
@@ -19,11 +20,11 @@ import me.gommeantilegit.minecraft.hud.IngameHud;
 import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.input.GameInput;
 import me.gommeantilegit.minecraft.input.InputHandler;
+import me.gommeantilegit.minecraft.localization.StringTranslate;
 import me.gommeantilegit.minecraft.music.MusicTicker;
 import me.gommeantilegit.minecraft.netty.NettyClient;
 import me.gommeantilegit.minecraft.profiler.Profiler;
 import me.gommeantilegit.minecraft.shader.ShaderManager;
-import me.gommeantilegit.minecraft.sound.SoundEngine;
 import me.gommeantilegit.minecraft.sound.SoundResource;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.texture.manager.TextureManager;
@@ -32,6 +33,7 @@ import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
 import me.gommeantilegit.minecraft.timer.tick.MinecraftThread;
 import me.gommeantilegit.minecraft.ui.UIManager;
 import me.gommeantilegit.minecraft.ui.screen.impl.GuiMainMenu;
+import me.gommeantilegit.minecraft.utils.OpenGLUtils;
 import me.gommeantilegit.minecraft.world.ClientWorld;
 import org.jetbrains.annotations.NotNull;
 
@@ -40,6 +42,7 @@ import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
+import static com.badlogic.gdx.graphics.GL20.GL_NO_ERROR;
 import static java.lang.Integer.min;
 
 @SideOnly(side = Side.CLIENT)
@@ -117,11 +120,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
     public NettyClient nettyClient;
 
     /**
-     * The 3D Sound engine instance
-     */
-    public SoundEngine soundEngine;
-
-    /**
      * Manger object for handling GuiScreens
      */
     public UIManager uiManager;
@@ -156,6 +154,16 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      * The registry of block renderers
      */
     public ClientBlockRendererTypeRegistry blockRendererRegistry;
+
+    /**
+     * Object storing block instances with their parent sound types
+     */
+    public BlockSounds blockSounds;
+
+    /**
+     * Minecraft string translate instance
+     */
+    public StringTranslate stringTranslate;
 
     /**
      * Object deciding what music to play when
@@ -204,123 +212,106 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      * Loads the game.
      */
     protected void loadGame() {
-        this.startupProfiler = new Profiler("Game-startup", false); // Initializing start-up profiler
+        try {
+            this.startupProfiler = new Profiler("Game-startup", false); // Initializing start-up profiler
+            super.loadGame();
+            Runtime.getRuntime().addShutdownHook(new Thread(this::onGameClosed));
 
-        super.loadGame();
-        Runtime.getRuntime().addShutdownHook(new Thread(this::onGameClosed));
+            this.stringTranslate = new StringTranslate(); // Initializing string translator
 
-        this.inputHandler = new InputHandler(); // Initializing input handler
-        Gdx.input.setInputProcessor(inputHandler);
+            this.inputHandler = new InputHandler(); // Initializing input handler
+            Gdx.input.setInputProcessor(inputHandler);
 
-        // Initializing sprite batch for 2D rendering
-        runOnGLContextWait(new FutureTask<Void>(() -> {
-            {
-                this.shapeRenderer = new ShapeRenderer(); // Initializing 2D Shape renderer
-                this.shapeRenderer.getProjectionMatrix().setToOrtho(0, DPI.scaledWidthi, DPI.scaledHeighti, 0, 0, 1);
-                this.shapeRenderer.updateMatrices();
-            }
-            if (spriteBatch == null) {
-                this.spriteBatch = new SpriteBatch(); // Initializing 2D Sprite batch texture renderer
-                this.spriteBatch.getProjectionMatrix().setToOrtho(0, DPI.scaledWidthi, DPI.scaledHeighti, 0, 0, 1);
-            }
-            return null;
-        }));
+            // Initializing sprite batch for 2D rendering
+            runOnGLContextWait(new FutureTask<Void>(() -> {
+                {
+                    this.shapeRenderer = new ShapeRenderer(); // Initializing 2D Shape renderer
+                    this.shapeRenderer.getProjectionMatrix().setToOrtho(0, DPI.scaledWidthi, DPI.scaledHeighti, 0, 0, 1);
+                    this.shapeRenderer.updateMatrices();
+                }
+                if (spriteBatch == null) {
+                    this.spriteBatch = new SpriteBatch(); // Initializing 2D Sprite batch texture renderer
+                    this.spriteBatch.getProjectionMatrix().setToOrtho(0, DPI.scaledWidthi, DPI.scaledHeighti, 0, 0, 1);
+                }
+                return null;
+            }));
 
-        runOnGLContextWait(new FutureTask<Void>(() -> {
-            this.startupProfiler.actionStart();
-            this.startupProfiler.actionStart("Compile shaders");
-            this.shaderManager = new ShaderManager();
-            this.shaderManager.compileShaders();
-            this.startupProfiler.actionEnd("Compile shaders");
-            return null;
-        }));
+            runOnGLContextWait(new FutureTask<Void>(() -> {
+                this.startupProfiler.actionStart();
+                this.startupProfiler.actionStart("Compile shaders");
+                this.shaderManager = new ShaderManager();
+                this.shaderManager.compileShaders();
+                this.startupProfiler.actionEnd("Compile shaders");
+                return null;
+            }));
 
-        runOnGLContextWait(new FutureTask<Void>(() -> {
-            // Initializing UiManager for GuiScreen handling
-            this.uiManager = new UIManager(spriteBatch, this);
-            return null;
-        }));
+            runOnGLContextWait(new FutureTask<Void>(() -> {
+                // Initializing UiManager for GuiScreen handling
+                this.uiManager = new UIManager(spriteBatch, this);
+                return null;
+            }));
 
-        this.blocks = new Blocks(this);
-        // Initializing Blocks - Must be called before texture manger initialization -> access to textureManager -> building texture atlas
-        this.blocks.init();
+            this.blocks = new Blocks(this);
+            // Initializing Blocks - Must be called before texture manger initialization -> access to textureManager -> building texture atlas
+            this.blocks.init();
 
-        this.blockRendererRegistry = new ClientBlockRendererTypeRegistry(this, blocks); // Needs to be initialized before instantiation of TextureManager
+            this.blockSounds = new BlockSounds(); // Initializing block sounds
+            this.blockSounds.init(blocks);
+            this.blockRendererRegistry = new ClientBlockRendererTypeRegistry(this, blocks); // Needs to be initialized before instantiation of TextureManager
 
-        runOnGLContextWait(new FutureTask<Void>(() -> {
-            this.startupProfiler.actionStart("Load Textures");
+            runOnGLContextWait(new FutureTask<Void>(() -> {
+                this.startupProfiler.actionStart("Load Textures");
 
-            //Initializing textures
-            this.textureManager = new TextureManager(this, spriteBatch);
+                //Initializing textures
+                this.textureManager = new TextureManager(this, spriteBatch);
 
-            this.startupProfiler.actionEnd("Load Textures");
+                this.startupProfiler.actionEnd("Load Textures");
 
-            // Initializing entity renderer
-            this.entityRenderer = new EntityRenderer();
-            return null;
-        }));
+                // Initializing entity renderer
+                this.entityRenderer = new EntityRenderer();
+                return null;
+            }));
 
-        this.blockRendererRegistry.init(); // must be called before setup of the texture map
-        this.textureManager.blockTextureMap.setupTextureMap();
+            this.blockRendererRegistry.init(); // must be called before setup of the texture map
+            this.textureManager.blockTextureMap.setupTextureMap();
 
-        this.gameSettings = new GameSettings(this);
+            this.gameSettings = new GameSettings(this);
 
-        // Initializing Audio
-        this.soundEngine = new SoundEngine();
-        SoundResource.init();
+            // Initializing Audio
+            SoundResource.initSounds();
 
-        // Initializing music ticker
-        this.musicTicker = new MusicTicker(this);
+            // Initializing music ticker
+            this.musicTicker = new MusicTicker(this);
 
-        runOnGLContext(new FutureTask<Void>(() -> {
-            textureManager.blockTextureMap.build();
-            return null;
-        }));
+            runOnGLContext(new FutureTask<Void>(() -> {
+                textureManager.blockTextureMap.build();
+                return null;
+            }));
 
-        this.ingameHud = new IngameHud(spriteBatch, this);
+            this.ingameHud = new IngameHud(spriteBatch, this);
 
-        runOnGLContextWait(new FutureTask<Void>(() -> {
-            this.thePlayer = new EntityPlayerSP(null, this, "Steve", new ClientSkin(Gdx.files.classpath("textures/entities/steve.png")));
-            return null;
-        }));
+            runOnGLContextWait(new FutureTask<Void>(() -> {
+                this.thePlayer = new EntityPlayerSP(null, this, "Steve", new ClientSkin(Gdx.files.classpath("textures/entities/steve.png")));
+                return null;
+            }));
 
-        this.inputHandler.registerInputProcessor(new GameInput());
+            this.inputHandler.registerInputProcessor(new GameInput());
 
-        this.startupProfiler.actionEnd();
-        this.startupProfiler.printResults();
-        this.loaded = true;
+            this.startupProfiler.actionEnd();
+            this.startupProfiler.printResults();
+            this.loaded = true;
 
-        runOnGLContext(new FutureTask<Void>(() -> {
-            System.out.println("Renderer: " + Gdx.gl.glGetString(GL20.GL_RENDERER));
-            return null;
-        }));
+            runOnGLContext(new FutureTask<Void>(() -> {
+                System.out.println("Renderer: " + Gdx.gl.glGetString(GL20.GL_RENDERER));
+                return null;
+            }));
 
-        this.uiManager.displayGuiScreen(new GuiMainMenu());
-
-        //Initializing muttiplayer netty client
-//        this.nettyClient = new NettyClient("localhost", 25565, this);
-
-//        this.nettyClient.start();
-//
-        this.minecraftThread.start(); //Starting Tick Thread.
-//
-//        while (!nettyClient.netHandlerPlayClient.isSessionEstablished()) { //TODO: LOADING SCREEN AND STUFF
-//            try {
-//                Thread.sleep(100);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//
-//        while (!nettyClient.netHandlerPlayClient.isWorldSetup()) {
-//            try {
-//                Thread.sleep(100);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//
-        this.minecraftThread.startMinecraftGameLogic();
+            this.uiManager.displayGuiScreen(new GuiMainMenu());
+            this.minecraftThread.start(); //Starting Tick Thread.
+            this.minecraftThread.startMinecraftGameLogic();
+        } catch (Throwable e) {
+            this.logger.crash("Fatal crash!!! Failed to start Minecraft!", e);
+        }
     }
 
     /**
@@ -382,6 +373,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      */
     @Override
     public void tick(float partialTicks) {
+
         this.musicTicker.tick(partialTicks);
         this.uiManager.tick(partialTicks);
         if (theWorld != null) {
@@ -434,12 +426,11 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
         try {
             //Game Rendering
             {
-
                 Gdx.gl20.glEnable(GL20.GL_DEPTH_TEST);
-                Gdx.gl20.glDepthFunc(GL20.GL_LEQUAL);
+                Gdx.gl20.glDepthFunc(GL20.GL_LESS);
 
                 Gdx.gl20.glViewport(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-                Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
+                Gdx.gl20.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 
                 Gdx.gl.glEnable(GL20.GL_BLEND);
                 Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -447,10 +438,10 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 if (this.thePlayer != null && this.theWorld != null && thePlayer.getWorld() == theWorld) {
                     float partialTicks = timer.partialTicks;
 
+                    shaderManager.stdShader.begin();
                     this.thePlayer.updateCameraController(partialTicks);
                     this.thePlayer.updateCamera();
 
-                    shaderManager.stdShader.begin();
                     shaderManager.stdShader.enableLighting();
 
                     this.shaderManager.stdShader.renderStart();
@@ -465,6 +456,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                     shaderManager.stdShader.end();
                 }
 
+                Gdx.gl20.glDepthFunc(GL20.GL_LEQUAL);
                 Gdx.gl.glDisable(GL20.GL_CULL_FACE);
                 Gdx.gl.glDepthMask(false);
 
@@ -481,6 +473,11 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 for (int i = 0; i < openGLOperationsTimer.ticks; i++) {
                     onOpenGLContext(openGLOperationsTimer.partialTicks);
                 }
+            }
+
+            int error;
+            if ((error = Gdx.gl.glGetError()) != GL_NO_ERROR) {
+                System.out.println("OpenGL error: " + OpenGLUtils.getGLErrorName(error));
             }
         } catch (Throwable t) {
             this.logger.crash("Failed to render game!", t);
@@ -504,7 +501,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      */
     private boolean drawMojangLogo() {
         Gdx.gl20.glEnable(GL20.GL_DEPTH_TEST);
-        Gdx.gl20.glDepthFunc(GL20.GL_LEQUAL);
+        Gdx.gl20.glDepthFunc(GL20.GL_LESS);
 
         Gdx.gl20.glViewport(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);

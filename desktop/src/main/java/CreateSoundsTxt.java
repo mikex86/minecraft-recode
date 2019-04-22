@@ -35,6 +35,8 @@ public class CreateSoundsTxt {
                             files.remove(i--);
                             continue;
                         }
+                    }
+                    for (File file : files) {
                         if (file.getName().endsWith(".ogg")) {
                             OpenALSound sound = (OpenALSound) Gdx.audio.newSound(new FileHandle(file));
                             float duration = sound.duration();

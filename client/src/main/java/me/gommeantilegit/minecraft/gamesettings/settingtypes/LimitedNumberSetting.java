@@ -3,7 +3,7 @@ package me.gommeantilegit.minecraft.gamesettings.settingtypes;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Represents a setting that can have numeric values in a given predefined interval
+ * Represents a setting that can have numeric SOUND_RESOURCES in a given predefined interval
  */
 public class LimitedNumberSetting extends NumberSetting {
 
@@ -47,7 +47,7 @@ public class LimitedNumberSetting extends NumberSetting {
     public static class Interval {
 
         /**
-         * Minimum and maximum values of the interval
+         * Minimum and maximum SOUND_RESOURCES of the interval
          */
         private final double min, max;
 

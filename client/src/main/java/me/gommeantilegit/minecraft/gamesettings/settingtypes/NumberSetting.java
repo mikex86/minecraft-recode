@@ -8,7 +8,7 @@ import org.jetbrains.annotations.NotNull;
 public class NumberSetting extends Setting<Double> {
 
     /**
-     * State whether the setting only accepts integer values
+     * State whether the setting only accepts integer SOUND_RESOURCES
      */
     private final boolean integerValuesOnly;
 

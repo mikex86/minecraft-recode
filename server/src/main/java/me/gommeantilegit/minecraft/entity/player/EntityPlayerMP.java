@@ -19,7 +19,7 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 
-public class EntityPlayerMP extends PlayerBase<SkinBase> {
+public class EntityPlayerMP extends PlayerBase {
 
     /**
      * Move packets received from the client that need to be processed

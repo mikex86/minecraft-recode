@@ -1,13 +1,13 @@
 package me.gommeantilegit.minecraft.entity.player.base;
 
-import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.entity.living.LivingEntity;
 import me.gommeantilegit.minecraft.entity.player.base.skin.SkinBase;
 import me.gommeantilegit.minecraft.world.WorldBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class PlayerBase<S extends SkinBase> extends LivingEntity {
+public class PlayerBase extends LivingEntity {
 
     /**
      * Height of eyes above posY
@@ -30,7 +30,7 @@ public class PlayerBase<S extends SkinBase> extends LivingEntity {
      * The players skin
      */
     @NotNull
-    private final S skin;
+    private final SkinBase skin;
 
     /**
      * @param world     sets {@link #world}
@@ -38,7 +38,7 @@ public class PlayerBase<S extends SkinBase> extends LivingEntity {
      * @param username  sets {@link #userName}
      * @param skin      sets {@link #skin}
      */
-    public PlayerBase(@Nullable WorldBase world, int maxHealth, @NotNull String username, @NotNull S skin) {
+    public PlayerBase(@Nullable WorldBase world, int maxHealth, @NotNull String username, @NotNull SkinBase skin) {
         super(world, maxHealth);
         this.userName = username;
         this.skin = skin;
@@ -52,15 +52,15 @@ public class PlayerBase<S extends SkinBase> extends LivingEntity {
     /**
      * Checks if the player has the ability to harvest a block (checks current inventory item for a tool if necessary)
      */
-    public boolean canHarvestBlock(BlockBase blockToHarvest) {
+    public boolean canHarvestBlock(Block blockToHarvest) {
         //TODO: IMPLEMENT WHEN INVENTORY IS ADDED
         return true;
     }
 
     /**
-     * BlockBase hardness will be further counted in {@link BlockBase#getPlayerRelativeBlockHardness}
+     * Block hardness will be further counted in {@link Block#getPlayerRelativeBlockHardness}
      */
-    public float getToolDigEfficiency(BlockBase blockToHarvest) {
+    public float getToolDigEfficiency(Block blockToHarvest) {
         //TODO: IMPLEMENT WHEN INVENTORY IS ADDED
         return 1;
     }
@@ -75,7 +75,7 @@ public class PlayerBase<S extends SkinBase> extends LivingEntity {
     }
 
     @NotNull
-    public S getSkin() {
+    public SkinBase getSkin() {
         return skin;
     }
 }

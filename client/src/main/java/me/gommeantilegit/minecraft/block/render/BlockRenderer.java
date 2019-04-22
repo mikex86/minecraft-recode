@@ -3,7 +3,7 @@ package me.gommeantilegit.minecraft.block.render;
 import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.BlockBase;
+import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
 import me.gommeantilegit.minecraft.util.renderer.BoxRenderer;
 import org.jetbrains.annotations.NotNull;
@@ -17,7 +17,7 @@ public class BlockRenderer extends BoxRenderer {
      * The client side asserted block type to render
      */
     @NotNull
-    private final BlockBase block;
+    private final Block block;
 
     /**
      * The block type specific render object
@@ -25,7 +25,7 @@ public class BlockRenderer extends BoxRenderer {
     @NotNull
     private final BlockTypeRenderer blockTypeRenderer;
 
-    public BlockRenderer(@NotNull BlockBase block, @NotNull ClientMinecraft mc, @NotNull BlockTypeRenderer blockTypeRenderer) {
+    public BlockRenderer(@NotNull Block block, @NotNull ClientMinecraft mc, @NotNull BlockTypeRenderer blockTypeRenderer) {
         super(null, mc.textureManager.blockTextureMap.getTexturePointer());
         this.block = block;
         this.blockTypeRenderer = blockTypeRenderer;

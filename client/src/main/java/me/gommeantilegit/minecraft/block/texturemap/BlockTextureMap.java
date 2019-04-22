@@ -2,15 +2,14 @@ package me.gommeantilegit.minecraft.block.texturemap;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import kotlin.Pair;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.IOAccess;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.BlockBase;
 import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
-import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
@@ -44,7 +43,7 @@ public class BlockTextureMap {
     private int height;
 
     /**
-     * Counter UV values
+     * Counter UV SOUND_RESOURCES
      *
      * @see #addTexture(String)
      */
@@ -126,6 +125,7 @@ public class BlockTextureMap {
         this.width = img.getWidth();
         this.height = img.getHeight();
         this.texturePointer.value = new CustomTexture(img);
+        this.texturePointer.value.setWrap(Texture.TextureWrap.MirroredRepeat, Texture.TextureWrap.MirroredRepeat); // Repeating texture mirrored to prevent texture floating point rounding errors leading to white pixels
         this.textureWrapper.value = new TextureWrapper(this.texturePointer.value, this.mc.spriteBatch);
     }
 

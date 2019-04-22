@@ -22,6 +22,7 @@ import static com.badlogic.gdx.graphics.Color.argb8888ToColor;
 import static com.badlogic.gdx.graphics.GL20.GL_CULL_FACE;
 import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE_2D;
 import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
+import static com.badlogic.gdx.math.MathUtils.clamp;
 import static java.lang.Math.*;
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBUTES;
@@ -85,8 +86,8 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
      * @param partialTicks timer partial ticks
      */
     public void render(float partialTicks) {
+        Gdx.gl20.glDisable(GL_CULL_FACE); // Face culling
         long worldTime = world.worldTime;
-        Gdx.gl20.glEnable(GL_CULL_FACE); // Face culling
         StdShader shader = mc.shaderManager.stdShader;
         shader.enableFog(enableFog);
         updateFogColor(worldTime, partialTicks);
@@ -98,6 +99,7 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
             renderBlueSky(worldTime, partialTicks);
         }
 
+        Gdx.gl20.glEnable(GL_CULL_FACE); // Face culling
         Gdx.gl20.glCullFace(GL20.GL_FRONT);
         setupWorldLighting(worldTime, partialTicks);
         {
@@ -140,12 +142,7 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
     public void setupWorldLighting(long worldTime, float partialTicks) {
         float celestialAngle = calculateCelestialAngle(worldTime, partialTicks);
         float brightness = (float) (cos(celestialAngle * 3.141593F * 2.0F) * 2.0F + 0.5F);
-        if (brightness < 0.0F) {
-            brightness = 0.0F;
-        }
-        if (brightness > 1.0F) {
-            brightness = 1.0F;
-        }
+        brightness = clamp(brightness, 0, 1);
         double angle = 2 * PI * celestialAngle;
         Vector3 lightDir = new Vector3((float) cos(angle), (float) sin(angle), 0);
         mc.shaderManager.stdShader.setUniformf("lightDirection", lightDir);

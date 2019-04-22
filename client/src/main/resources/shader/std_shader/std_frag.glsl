@@ -1,4 +1,4 @@
-#version 310 es
+#version 320 es
 
 /* Default precisions */
 precision mediump int;
@@ -57,7 +57,7 @@ void main() {
     if(!texture_mapping_bool) {
         texColor = texture(boundTexture, fragTextureCoords);
     } else {
-        lowp ivec2 texSize = textureSize(boundTexture, 0);
+        highp ivec2 texSize = textureSize(boundTexture, 0);
 
         highp float texture_u0 = float(texture_pix_u0) / float(texSize.x);
         highp float texture_v0 = float(texture_pix_v0) / float(texSize.y);
@@ -70,7 +70,7 @@ void main() {
         highp float uo = fragTextureCoords.x * dif_u;
         highp float vo = fragTextureCoords.y * dif_v;
 
-        mediump vec2 calculatedCoords = vec2(texture_u0 + uo, texture_v0 + vo);
+        highp vec2 calculatedCoords = vec2(texture_u0 + uo, texture_v0 + vo);
 
         texColor = texture(boundTexture, calculatedCoords);
     }

@@ -1,4 +1,4 @@
-#version 310 es
+#version 320 es
 
 /* Default precisions */
 precision highp float;
@@ -29,9 +29,9 @@ uniform bool enableFog;
 uniform highp float fogStart;
 uniform highp float fogEnd;
 
-out vec3 lightingColor;
-out vec4 fragColorAttr;
-out vec2 fragTextureCoords;
+out highp vec3 lightingColor;
+out highp vec4 fragColorAttr;
+out highp vec2 fragTextureCoords;
 out highp float fogVisibility;
 
 /*
