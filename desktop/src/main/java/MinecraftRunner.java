@@ -39,7 +39,7 @@ public class MinecraftRunner {
                 config.setTitle("Minecraft " + MINECRAFT_VERSION_PREFIX_CHAR + MINECRAFT_VERSION_STRING);
                 config.setIdleFPS(30);
                 config.setWindowedMode(854, 480);
-                config.setBackBufferConfig(8, 8, 8, 8, 32, 0, 0);
+                config.setBackBufferConfig(8, 8, 8, 8, 16, 0, 0);
                 new MinecraftApp(config);
             }
         };

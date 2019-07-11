@@ -42,6 +42,7 @@ import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
+import static com.badlogic.gdx.graphics.GL20.GL_LEQUAL;
 import static com.badlogic.gdx.graphics.GL20.GL_NO_ERROR;
 import static java.lang.Integer.min;
 
@@ -427,8 +428,8 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             //Game Rendering
             {
                 Gdx.gl20.glEnable(GL20.GL_DEPTH_TEST);
-                Gdx.gl20.glDepthFunc(GL20.GL_LESS);
-
+                Gdx.gl20.glDepthFunc(GL20.GL_LEQUAL);
+                
                 Gdx.gl20.glViewport(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
                 Gdx.gl20.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 

@@ -19,9 +19,7 @@ import me.gommeantilegit.minecraft.world.chunk.world.ChunkRenderManager;
 import org.jetbrains.annotations.NotNull;
 
 import static com.badlogic.gdx.graphics.Color.argb8888ToColor;
-import static com.badlogic.gdx.graphics.GL20.GL_CULL_FACE;
-import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE_2D;
-import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
+import static com.badlogic.gdx.graphics.GL20.*;
 import static com.badlogic.gdx.math.MathUtils.clamp;
 import static java.lang.Math.*;
 import static me.gommeantilegit.minecraft.Side.CLIENT;
@@ -86,7 +84,7 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
      * @param partialTicks timer partial ticks
      */
     public void render(float partialTicks) {
-        Gdx.gl20.glDisable(GL_CULL_FACE); // Face culling
+        Gdx.gl20.glDisable(GL_CULL_FACE); // Disable Face culling!!! (Or else white artifacts at T-Junctions will appear)
         long worldTime = world.worldTime;
         StdShader shader = mc.shaderManager.stdShader;
         shader.enableFog(enableFog);
@@ -99,8 +97,6 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
             renderBlueSky(worldTime, partialTicks);
         }
 
-        Gdx.gl20.glEnable(GL_CULL_FACE); // Face culling
-        Gdx.gl20.glCullFace(GL20.GL_FRONT);
         setupWorldLighting(worldTime, partialTicks);
         {
             // Rendering Blocks
@@ -131,6 +127,8 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
         }
 
         shader.enableFog(false);
+        Gdx.gl.glEnable(GL_CULL_FACE);
+        Gdx.gl.glCullFace(GL_FRONT); // Resetting culled face to Front face
     }
 
     /**

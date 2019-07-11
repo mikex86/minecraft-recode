@@ -6,14 +6,14 @@ import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.block.state.BlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
-import me.gommeantilegit.minecraft.utils.Clock;
 import me.gommeantilegit.minecraft.world.ClientWorld;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
-import static com.badlogic.gdx.graphics.GL20.*;
+import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE_2D;
+import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
 import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBUTES;
 
 public class ClientChunk extends ChunkBase {
@@ -126,14 +126,12 @@ public class ClientChunk extends ChunkBase {
      * @param partialTicks delta time
      */
     public void render(float partialTicks) {
-        Gdx.gl.glLineWidth(3f);
         mc.shaderManager.stdShader.pushMatrix();
         mc.shaderManager.stdShader.translate(x, 0, z);
         if (mesh != null)
             this.mesh.render(mc.shaderManager.stdShader, GL_TRIANGLES);
         mc.shaderManager.stdShader.popMatrix();
         this.renderEntities(partialTicks);
-        Gdx.gl.glLineWidth(1f);
     }
 
     /**
