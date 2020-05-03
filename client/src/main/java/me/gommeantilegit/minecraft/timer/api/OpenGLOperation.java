@@ -5,6 +5,7 @@ import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 /**
  * Interface for Objects performing operations on the OpenGL Context
  */
+//TODO: REMOVE
 public interface OpenGLOperation {
 
     /**

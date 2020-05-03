@@ -1,5 +1,6 @@
 package me.gommeantilegit.minecraft.ui.screen.impl;
 
+import com.badlogic.gdx.Input;
 import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.ui.button.GuiButton;
 import me.gommeantilegit.minecraft.ui.screen.GuiScreen;
@@ -32,9 +33,12 @@ public class GuiOptions extends GuiScreen {
     public void initGui(int scaledWidth, int scaledHeight) {
         super.initGui(scaledWidth, scaledHeight);
         this.addOptions(scaledWidth, scaledHeight, mc.gameSettings.generalSettings.settingsList);
-        this.buttons.add(new GuiButton("Video Settings...", scaledWidth / 2 - 100, scaledHeight / 6 + 96 + 12, mc).setOnMouseDownListener(p -> mc.uiManager.displayGuiScreen(new GuiVideoSettings(this))));
-        this.buttons.add(new GuiButton("Controls...", scaledWidth / 2 - 100, scaledHeight / 6 + 120 + 12, mc));
-        this.buttons.add(new GuiButton("Done", scaledWidth / 2 - 100, scaledHeight / 6 + 168, mc).setOnMouseDownListener(pointer -> mc.uiManager.displayGuiScreen(prevScreen)));
+        this.buttons.add(new GuiButton("Video Settings...", scaledWidth / 2 - 100, scaledHeight / 6 + 96 + 12, mc)
+                .setOnMouseDownListener(p -> mc.uiManager.displayGuiScreen(new GuiVideoSettings(this))));
+        this.buttons.add(new GuiButton("Controls...", scaledWidth / 2 - 100, scaledHeight / 6 + 120 + 12, mc).
+                setOnMouseDownListener(p -> mc.uiManager.displayGuiScreen(new GuiControls(this, mc.gameSettings))));
+        this.buttons.add(new GuiButton("Done", scaledWidth / 2 - 100, scaledHeight / 6 + 168, mc).
+                setOnMouseDownListener(pointer -> mc.uiManager.displayGuiScreen(prevScreen)));
         this.titleStringWidth = mc.uiManager.fontRenderer.getStringWidth(titleString);
     }
 
@@ -45,4 +49,11 @@ public class GuiOptions extends GuiScreen {
         super.render();
     }
 
+    @Override
+    public boolean keyDown(int keycode) {
+        if (keycode == Input.Keys.ESCAPE) {
+            mc.uiManager.displayGuiScreen(prevScreen);
+        }
+        return super.keyDown(keycode);
+    }
 }

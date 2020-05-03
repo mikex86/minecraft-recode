@@ -116,6 +116,7 @@ public class GuiButton extends TexturedButton implements Tickable {
         return disabled;
     }
 
+    @NotNull
     public GuiButton setDisplayText(@NotNull String displayText) {
         this.displayText = displayText;
         this.stringWidth = mc.uiManager.fontRenderer.getStringWidth(displayText);

@@ -99,5 +99,9 @@ public class Timer implements Tickable {
     public float getCurrentTicksPerSecond() {
         return currentTicksPerSecond;
     }
+
+    public float getTicksPerSecond() {
+        return ticksPerSecond;
+    }
 }
 

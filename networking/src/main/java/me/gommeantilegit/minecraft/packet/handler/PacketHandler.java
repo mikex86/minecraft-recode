@@ -2,6 +2,7 @@ package me.gommeantilegit.minecraft.packet.handler;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.SimpleChannelInboundHandler;
 import me.gommeantilegit.minecraft.packet.Packet;
 import me.gommeantilegit.minecraft.packet.handler.response.IPacketResponseListener;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Handles all packets that can be received
@@ -26,7 +28,7 @@ public abstract class PacketHandler<T extends Packet> extends SimpleChannelInbou
      * Stores all active packet listeners
      */
     @NotNull
-    private final List<IPacketListener<? extends T>> packetListeners = new ArrayList<>();
+    private final List<IPacketListener<? extends T>> packetListeners = new CopyOnWriteArrayList<>();
 
     /**
      * Timer instance for scheduling delayed tasks
@@ -61,7 +63,7 @@ public abstract class PacketHandler<T extends Packet> extends SimpleChannelInbou
     public abstract void handlePacket(@NotNull T packet, @NotNull ChannelHandlerContext context);
 
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     protected void messageReceived(ChannelHandlerContext ctx, T msg) {
         if (thread == null)
             handlePacket(msg, ctx);
@@ -71,8 +73,7 @@ public abstract class PacketHandler<T extends Packet> extends SimpleChannelInbou
             else System.out.println("IGNORED PACKET: " + msg);
         });
 
-        for (int i = 0; i < this.packetListeners.size(); i++) {
-            IPacketListener packetListener = this.packetListeners.get(i);
+        for (IPacketListener packetListener : this.packetListeners) {
             if (packetListener instanceof AbstractPacketListener) {
                 AbstractPacketListener listener = (AbstractPacketListener) packetListener;
                 if (listener.getPacketClass().isAssignableFrom(msg.getClass())) {
@@ -91,6 +92,10 @@ public abstract class PacketHandler<T extends Packet> extends SimpleChannelInbou
     }
 
     private void invokePacketListener(ChannelHandlerContext ctx, T msg, IPacketListener<T> packetListener) {
+        SchedulableThread thread = this.thread;
+        if (packetListener instanceof PacketHandler) {
+            thread = ((PacketHandler<?>) packetListener).getThread();
+        }
         if (thread == null)
             packetListener.onPacketReceived(msg, ctx.channel());
         else

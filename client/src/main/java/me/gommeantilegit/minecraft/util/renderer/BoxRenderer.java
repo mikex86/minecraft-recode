@@ -1,14 +1,12 @@
 package me.gommeantilegit.minecraft.util.renderer;
 
-import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.utils.Pointer;
+import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.Random;
 
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 import static me.gommeantilegit.minecraft.util.RenderUtils.rect;
@@ -39,7 +37,7 @@ public class BoxRenderer {
         this.setShape(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
     }
 
-    public void render(@NotNull MeshBuilder builder, int x, int y, int z) {
+    public void render(@NotNull OptimizedMeshBuilder builder, int x, int y, int z) {
         renderFace(builder, x, y, z, 0);
         renderFace(builder, x, y, z, 1);
         renderFace(builder, x, y, z, 2);
@@ -76,7 +74,7 @@ public class BoxRenderer {
      * @param z       the z coordinate of the block.
      * @param face    current face rendered.
      */
-    public void renderFace(@NotNull MeshBuilder builder, int x, int y, int z, int face) {
+    public void renderFace(@NotNull OptimizedMeshBuilder builder, int x, int y, int z, int face) {
         renderFace(builder, x, y, z, getUV(face), face);
     }
 
@@ -85,9 +83,7 @@ public class BoxRenderer {
         return this.textureUVs[0];
     }
 
-    private static final Random random = new Random();
-
-    public void renderFace(@NotNull MeshBuilder builder, int x, int y, int z, @NotNull Vector2 uv, int face) {
+    public void renderFace(@NotNull OptimizedMeshBuilder builder, int x, int y, int z, @NotNull Vector2 uv, int face) {
         float u0 = uv.x;
         float u1 = uv.x + 16;
         float v0 = uv.y;

@@ -105,6 +105,12 @@ public class LivingEntity extends Entity {
      */
     private int hurtTime;
 
+    public float prevCameraYaw;
+    public float cameraYaw;
+
+    public float prevCameraPitch;
+    public float cameraPitch;
+
     /**
      * Clock instance used for timing of regeneration.
      */
@@ -127,6 +133,33 @@ public class LivingEntity extends Entity {
         updateLimbSwing();
         updateYawOffset();
         updateArmSwingProgress();
+        updateCameraAngles();
+    }
+
+    private void updateCameraAngles() {
+        this.prevCameraYaw = this.cameraYaw;
+        this.prevCameraPitch = this.cameraPitch;
+
+        float f1 = (float) Math.sqrt(this.motionX * this.motionX + this.motionZ * this.motionZ);
+        float f = (float)Math.atan(-this.motionY * 0.20000000298023224D) * 15.0F; // this weired constant again
+
+        if (f1 > 0.1F)
+        {
+            f1 = 0.1F;
+        }
+
+        if (!this.isOnGround() || this.getHealth() <= 0.0F)
+        {
+            f1 = 0.0F;
+        }
+
+        if (this.isOnGround() || this.getHealth() <= 0.0F)
+        {
+            f = 0.0F;
+        }
+
+        this.cameraYaw += (f1 - this.cameraYaw) * 0.4F;
+        this.cameraPitch += (f - this.cameraPitch) * 0.8F;
     }
 
     /**
@@ -196,7 +229,7 @@ public class LivingEntity extends Entity {
         if (abs(this.motionZ) < 0.015D) {
             this.motionZ = 0.0f;
         }
-        if (jumping && onGround)
+        if (jumping && isOnGround())
             jump();
 
         //TRAVELLING
@@ -368,9 +401,9 @@ public class LivingEntity extends Entity {
 
         IBlockState verticalCollision = this.world.getBlockState((int) floor(this.posX), (int) floor(this.getBoundingBox().y0) - 1, (int) floor(this.posZ));
 
-        if (this.onGround && verticalCollision != null && verticalCollision.getBlock() != null) {
+        if (this.isOnGround() && verticalCollision != null && verticalCollision.getBlock() != null) {
             friction = verticalCollision.getBlock().getSlipperiness() * 0.91f; // friction against vertically colliding block
-        } else if(onGround){
+        } else if(isOnGround()){
             friction = 0.54600006f; // Friction for air is 0.6 * 0.91f (eg if standing on another block but due to rounding the block below is air)
         }
 
@@ -386,7 +419,7 @@ public class LivingEntity extends Entity {
             }
         }
 
-        if (this.onGround) {
+        if (this.isOnGround()) {
             speed = this.currentGroundSpeed * frictionalValue;
         } else {
             speed = this.currentAirSpeed;

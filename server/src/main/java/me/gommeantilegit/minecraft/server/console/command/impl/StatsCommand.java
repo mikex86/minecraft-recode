@@ -21,6 +21,6 @@ public class StatsCommand extends Command {
 
     @Override
     public String onCommand(@NotNull String[] args) {
-        return "ServerStats:\n\tUsed Memory: " + humanReadableByteCount(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(), true) + "\n\tFree Memory: " + humanReadableByteCount(Runtime.getRuntime().freeMemory(), true) + "\n\tTotal Memory: " + humanReadableByteCount(Runtime.getRuntime().totalMemory(), true) + "\n\tMax-memory: " + humanReadableByteCount(Runtime.getRuntime().totalMemory(), true) + "\nWorld-Stats:\n\tTick: " + mc.timer.getCurrentTicksPerSecond() + " tps\n\tWorld-Thread: " + mc.theWorld.worldThreadTimer.getCurrentTicksPerSecond() + " tps";
+        return "ServerStats:\n\tUsed Memory: " + humanReadableByteCount(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(), true) + "\n\tFree Memory: " + humanReadableByteCount(Runtime.getRuntime().freeMemory(), true) + "\n\tTotal Memory: " + humanReadableByteCount(Runtime.getRuntime().totalMemory(), true) + "\n\tMax-memory: " + humanReadableByteCount(Runtime.getRuntime().totalMemory(), true) + "\nWorld-Stats:\n\tTick: " + mc.getTimer().getCurrentTicksPerSecond() + " tps";
     }
 }

@@ -6,17 +6,11 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import me.gommeantilegit.minecraft.ClientMinecraft;
-import me.gommeantilegit.minecraft.gamesettings.settingtypes.BooleanSetting;
-import me.gommeantilegit.minecraft.gamesettings.settingtypes.PercentSetting;
-import me.gommeantilegit.minecraft.gamesettings.settingtypes.Setting;
-import me.gommeantilegit.minecraft.gamesettings.settingtypes.StringSelectionSetting;
+import me.gommeantilegit.minecraft.gamesettings.settingtypes.*;
 import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
-import me.gommeantilegit.minecraft.ui.button.BooleanValueSwitchButton;
-import me.gommeantilegit.minecraft.ui.button.GuiButton;
-import me.gommeantilegit.minecraft.ui.button.Slider;
-import me.gommeantilegit.minecraft.ui.button.StringValueSwitchButton;
+import me.gommeantilegit.minecraft.ui.button.*;
 import me.gommeantilegit.minecraft.ui.render.Overlay2D;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -42,6 +36,12 @@ public abstract class GuiScreen extends Overlay2D implements Tickable {
      */
     private static TextureWrapper backgroundTextureWrapper;
 
+    /**
+     * The colors used for the background gradient for the {@link #drawDefaultBackground()}
+     */
+    @NotNull
+    private static Color backgroundColor1 = new Color(0xc0101010), backgroundColor2 = new Color(0xd0101010);
+
     protected GuiScreen() {
         super(null);
     }
@@ -50,14 +50,18 @@ public abstract class GuiScreen extends Overlay2D implements Tickable {
      * Draws a screen full of dirt textures
      */
     protected void drawDefaultBackground() {
-        if (backgroundTextureWrapper == null) {
-            backgroundTextureWrapper = new TextureWrapper("textures/gui/gui_background.png", spriteBatch);
-            backgroundTextureWrapper.getGlTexture().setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
+        if (mc.theWorld == null) {
+            if (backgroundTextureWrapper == null) {
+                backgroundTextureWrapper = new TextureWrapper("textures/gui/gui_background.png", spriteBatch);
+                backgroundTextureWrapper.getGlTexture().setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
+            }
+            float size = 32;
+            int x = 0, y = 0, width = DPI.scaledWidthi, height = DPI.scaledHeighti;
+            backgroundTextureWrapper.imageView.drawUVTexturedRect(x, y, width, height,
+                    0, 0, width / size, height / size, 0.2509804f, 0.2509804f, 0.2509804f, 1.0f, true);
+        } else {
+            drawGradientRect(0, 0, mc.width, mc.height, 0xc0101010, 0xd0101010);
         }
-        float size = 32;
-        int x = 0, y = 0, width = DPI.scaledWidthi, height = DPI.scaledHeighti;
-        backgroundTextureWrapper.imageView.drawUVTexturedRect(x, y, width, height,
-                0, 0, width / size, height / size, 0.2509804f, 0.2509804f, 0.2509804f, 1.0f, true);
     }
 
     /**
@@ -78,21 +82,23 @@ public abstract class GuiScreen extends Overlay2D implements Tickable {
      * @param scaledWidth  the scaled width
      * @param scaledHeight the scaled height
      */
-    protected void addOptions(int scaledWidth, int scaledHeight, Setting[] settings) {
+    protected void addOptions(int scaledWidth, int scaledHeight, Setting<?>[] settings) {
         int i = 0;
-        for (Setting generalSetting : settings) {
-            if (generalSetting instanceof StringSelectionSetting) {
-                this.buttons.add(new StringValueSwitchButton((StringSelectionSetting) generalSetting, (scaledWidth / 2 - 155) + (i % 2) * 160, scaledHeight / 6 + 24 * (i >> 1), mc));
-            } else if (generalSetting instanceof BooleanSetting) {
-                this.buttons.add(new BooleanValueSwitchButton((BooleanSetting) generalSetting, (scaledWidth / 2 - 155) + (i % 2) * 160, scaledHeight / 6 + 24 * (i >> 1), mc) {
+        for (Setting<?> setting : settings) {
+            if (setting instanceof StringSelectionSetting) {
+                this.buttons.add(new StringValueSwitchButton((StringSelectionSetting) setting, (scaledWidth / 2 - 155) + (i % 2) * 160, scaledHeight / 6 + 24 * (i >> 1), mc));
+            } else if (setting instanceof BooleanSetting) {
+                this.buttons.add(new BooleanValueSwitchButton((BooleanSetting) setting, (scaledWidth / 2 - 155) + (i % 2) * 160, scaledHeight / 6 + 24 * (i >> 1), mc) {
                     @NotNull
                     @Override
                     protected String getDisplayText(BooleanSetting selectionSetting) {
                         return selectionSetting.getName() + ": " + (selectionSetting.getValue() ? "ON" : "OFF");
                     }
                 });
-            } else if (generalSetting instanceof PercentSetting) {
-                this.buttons.add(new Slider((PercentSetting) generalSetting, (scaledWidth / 2 - 155) + (i % 2) * 160, scaledHeight / 6 + 24 * (i >> 1), mc));
+            } else if (setting instanceof PercentSetting) {
+                this.buttons.add(new Slider((PercentSetting) setting, (scaledWidth / 2 - 155) + (i % 2) * 160, scaledHeight / 6 + 24 * (i >> 1), mc));
+            } else if (setting instanceof KeyBindSetting) {
+                this.buttons.add(new KeyBindButton((KeyBindSetting) setting, 70, 20, scaledWidth / 2 - 155 + (i % 2) * 160, scaledHeight / 6 + 24 * (i >> 1), mc));
             }
             i++;
         }
@@ -109,9 +115,10 @@ public abstract class GuiScreen extends Overlay2D implements Tickable {
 
     /**
      * Called when the Gui is closed
+     *
      * @param newScreen the new screen that is displayed next. Null if none is displayed.
      */
-    public void onGuiClosed(@Nullable GuiScreen newScreen){
+    public void onGuiClosed(@Nullable GuiScreen newScreen) {
     }
 
     @Override

@@ -10,14 +10,12 @@ import me.gommeantilegit.minecraft.packet.packets.client.ClientMovePacket;
 import me.gommeantilegit.minecraft.packet.packets.server.ServerPositionSetPacket;
 import me.gommeantilegit.minecraft.server.netty.channel.ChannelData;
 import me.gommeantilegit.minecraft.world.ServerWorld;
-import me.gommeantilegit.minecraft.world.WorldBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class EntityPlayerMP extends PlayerBase {
 
@@ -25,18 +23,10 @@ public class EntityPlayerMP extends PlayerBase {
      * Move packets received from the client that need to be processed
      */
     @NotNull
-    private final Queue<ClientMovePacket> movePackets = new LinkedList<>();
+    private final Queue<ClientMovePacket> movePackets = new ConcurrentLinkedQueue<>();
 
-    /**
-     * Parent channel data
-     */
     @NotNull
-    public final ChannelData channelData;
-
-    /**
-     * State if move packets need to be processed
-     */
-    private boolean movePacketsToProcess = false;
+    private final ChannelData channelData;
 
     /**
      * @param mc        the parent server minecraft instance
@@ -57,17 +47,9 @@ public class EntityPlayerMP extends PlayerBase {
      */
     @Override
     public void onLivingUpdate() {
-        if (movePacketsToProcess) {
-            try {
-                synchronized (movePackets) {
-                    while (!movePackets.isEmpty()) {
-                        ClientMovePacket packet = movePackets.remove();
-                        processMovePacket(packet);
-                    }
-                }
-            } catch (NoSuchElementException ignored) {
-            }
-            movePacketsToProcess = false;
+        while (!movePackets.isEmpty()) {
+            ClientMovePacket packet = movePackets.remove();
+            processMovePacket(packet);
         }
         if (posY < 0)
             setPosition(posX, 255, posZ);
@@ -107,7 +89,7 @@ public class EntityPlayerMP extends PlayerBase {
      */
     @Override
     public void setRotation(float yaw, float pitch) {
-        this.channelData.sendPacket(new ServerPositionSetPacket(null, null, new Vector2(yaw, pitch)));
+        this.getChannelData().sendPacket(new ServerPositionSetPacket(null, null, new Vector2(yaw, pitch)));
         super.setRotation(yaw, pitch);
     }
 
@@ -131,7 +113,7 @@ public class EntityPlayerMP extends PlayerBase {
      */
     @Override
     public void setPosition(float x, float y, float z) {
-        this.channelData.sendPacket(new ServerPositionSetPacket(null, new Vector3(x, y, z), null));
+        this.getChannelData().sendPacket(new ServerPositionSetPacket(null, new Vector3(x, y, z), null));
         super.setPosition(x, y, z);
     }
 
@@ -146,18 +128,23 @@ public class EntityPlayerMP extends PlayerBase {
      */
     public void setPositionAndRotation(float x, float y, float z, float yaw, float pitch) {
 //        System.out.println("setPositionAndRotation");
-        this.channelData.getParentChannel().writeAndFlush(new ServerPositionSetPacket(null, new Vector3(x, y, z), new Vector2(yaw, pitch)));
+        this.getChannelData().getParentChannel().writeAndFlush(new ServerPositionSetPacket(null, new Vector3(x, y, z), new Vector2(yaw, pitch)));
     }
 
     public void queueMovePacket(@NotNull ClientMovePacket movePacket) {
-        synchronized (movePackets) {
-            this.movePackets.add(movePacket);
-            this.movePacketsToProcess = true;
-        }
+        this.movePackets.add(movePacket);
     }
 
     @Override
-    public boolean allowChunkUnload(ChunkBase chunk) {
+    public boolean allowChunkUnload(@NotNull ChunkBase chunk) {
         return super.allowChunkUnload(chunk);
+    }
+
+    /**
+     * Parent channel data
+     */
+    @NotNull
+    public ChannelData getChannelData() {
+        return channelData;
     }
 }

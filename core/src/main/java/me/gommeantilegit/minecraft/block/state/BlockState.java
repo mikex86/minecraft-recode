@@ -1,7 +1,7 @@
 package me.gommeantilegit.minecraft.block.state;
 
-import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.block.Block;
+import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.state.property.BlockStateProperty;
 import me.gommeantilegit.minecraft.block.state.property.BlockStatePropertyMap;
 import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
@@ -34,8 +34,8 @@ public class BlockState implements IBlockState {
     }
 
     /**
-     * @see BlockStatePropertyMap#getPropertyValue(BlockStateProperty)
      * @throws IllegalStateException if BlockStatePropertyMap#getPropertyValue(BlockStateProperty) returns an empty optional
+     * @see BlockStatePropertyMap#getPropertyValue(BlockStateProperty)
      */
     @NotNull
     public <T> T getPropertyValue(@NotNull BlockStateProperty<T> property) {
@@ -45,7 +45,7 @@ public class BlockState implements IBlockState {
     /**
      * @see BlockStatePropertyMap#setPropertyValue(BlockStateProperty, Object)
      */
-    public <T> boolean setValue(BlockStateProperty<T> property, T value) {
+    public <T> boolean setValue(@NotNull BlockStateProperty<T> property, @NotNull T value) {
         return this.propertyMap.setPropertyValue(property, value);
     }
 
@@ -86,12 +86,12 @@ public class BlockState implements IBlockState {
 
     @NotNull
     @Override
-    public BlockState deserialize(@NotNull BitByteBuffer buffer, @NotNull AbstractMinecraft mc) throws DeserializationException {
+    public BlockState deserialize(@NotNull BitByteBuffer buffer, @NotNull Blocks blocks) throws DeserializationException {
         int blockID = buffer.readUnsignedShort();
         if (blockID == 0) {
             throw new DeserializationException("Read blockID is 0! Air does not have a block state!");
         }
-        return new BlockState(Objects.requireNonNull(mc.blocks.getBlockByID(blockID)));
+        return new BlockState(Objects.requireNonNull(blocks.getBlockByID(blockID)));
     }
 
     @NotNull

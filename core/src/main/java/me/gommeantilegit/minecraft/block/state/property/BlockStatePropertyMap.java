@@ -10,7 +10,6 @@ import java.util.Optional;
 
 /**
  * Stores Properties with their parent values.
- * Properties are added on construction of object.
  * Properties are immutable and cannot be added or removed.
  */
 public class BlockStatePropertyMap {
@@ -19,7 +18,7 @@ public class BlockStatePropertyMap {
      * The properties of the map
      */
     @NotNull
-    private final List<BlockStateProperty> properties;
+    private final List<BlockStateProperty<?>> properties;
 
     /**
      * The parent values of the properties.
@@ -96,7 +95,7 @@ public class BlockStatePropertyMap {
          * The properties for the {@link BlockStatePropertyMap} instance
          */
         @NotNull
-        private final List<BlockStateProperty> properties = new ArrayList<>();
+        private final List<BlockStateProperty<?>> properties = new ArrayList<>();
 
         /**
          * The index parent values of the specified properties in {@link #properties}

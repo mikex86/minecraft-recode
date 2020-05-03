@@ -3,7 +3,12 @@ package me.gommeantilegit.minecraft.raytrace;
 import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
+import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
+import me.gommeantilegit.minecraft.util.block.position.BlockPos;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
 
 import static java.lang.Math.cos;
 import static java.lang.Math.toRadians;
@@ -22,7 +27,7 @@ public class RayTracer implements IRayTracer {
     /**
      * Ray-trace result
      */
-    private RayTraceResult rayTraceResult;
+    private RayTraceResult rayTraceResult = new RayTraceResult(new Vector3(), new BlockPos(0, 0, 0), RayTraceResult.EnumResultType.MISS, EnumFacing.NORTH);
 
     /**
      * Minecraft instance
@@ -95,7 +100,8 @@ public class RayTracer implements IRayTracer {
         return new Vector3((float) x, (float) y, (float) z);
     }
 
+    @NotNull
     public RayTraceResult getRayTraceResult() {
-        return rayTraceResult;
+        return Objects.requireNonNull(rayTraceResult, "Raytrace result not initialized!");
     }
 }

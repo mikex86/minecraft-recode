@@ -12,10 +12,12 @@ import me.gommeantilegit.minecraft.packet.exception.PacketDecodingException;
 import me.gommeantilegit.minecraft.packet.proc.PacketDecoder;
 import me.gommeantilegit.minecraft.packet.proc.PacketEncoder;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
+import me.gommeantilegit.minecraft.world.chunk.ChunkSection;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import static me.gommeantilegit.minecraft.utils.MathHelper.humanReadableByteCount;
+import java.util.List;
+
 import static me.gommeantilegit.minecraft.utils.io.IOUtils.compress;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
@@ -41,6 +43,7 @@ public class ServerChunkDataPacket extends ServerPacket {
      * An array of states, if a given chunk region (16x16x16) has been sent in this packet. Empty chunk sections are not sent because the chunk
      * is full air.
      */
+    @NotNull
     private final boolean[] chunkSectionsSent;
 
     /**
@@ -65,13 +68,14 @@ public class ServerChunkDataPacket extends ServerPacket {
         super(PACKET_ID, serverChannel);
         this.worldHeight = chunkBase.getHeight();
         this.chunkOrigin = chunkOrigin;
-        assert chunkBase.getChunkSections().length == chunkBase.getHeight() * CHUNK_SECTION_SIZE;
-        this.chunkSectionsSent = new boolean[chunkBase.getChunkSections().length];
-        for (int i = 0; i < chunkBase.getChunkSections().length; i++) {
-            chunkSectionsSent[i] = !chunkBase.getChunkSections()[i].isEmpty();
+        List<ChunkSection> sections = chunkBase.getChunkSections();
+        assert sections.size() == chunkBase.getHeight() / CHUNK_SECTION_SIZE;
+        this.chunkSectionsSent = new boolean[sections.size()];
+        for (int i = 0; i < sections.size(); i++) {
+            chunkSectionsSent[i] = !sections.get(i).isEmpty();
         }
         BitByteBuffer buf = new BitByteBuffer();
-        chunkBase.mc.chunkSerializer.serialize(chunkBase, buf);
+        chunkBase.mc.getChunkSerializer().serialize(chunkBase, buf);
         this.chunkData = compress(buf.retrieveBytes());
     }
 
@@ -90,6 +94,7 @@ public class ServerChunkDataPacket extends ServerPacket {
         this.chunkData = chunkData;
     }
 
+    @NotNull
     public byte[] getChunkData() {
         return chunkData;
     }
@@ -103,6 +108,7 @@ public class ServerChunkDataPacket extends ServerPacket {
         return worldHeight;
     }
 
+    @NotNull
     public boolean[] getChunkSectionsSent() {
         return chunkSectionsSent;
     }
@@ -135,7 +141,7 @@ public class ServerChunkDataPacket extends ServerPacket {
          */
         @Nullable
         @Override
-        public ServerChunkDataPacket deserialize(@NotNull BitByteBuffer buffer, Channel channel) throws PacketDecodingException {
+        public ServerChunkDataPacket deserialize(@NotNull BitByteBuffer buffer, @Nullable Channel channel) throws PacketDecodingException {
             int worldHeight = buffer.readInt();
             Vector2 origin = buffer.readVector2();
             int chunkSectionsLength = buffer.readInt();

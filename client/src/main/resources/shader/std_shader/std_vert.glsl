@@ -61,7 +61,7 @@ float getFogFactor(float dst) {
 
 void main() {
 
-    highp mat4 matViewProj = projectionMat * viewMat * transMat;
+    highp mat4 matViewProj = projectionMat * (viewMat * transMat);
 
     fragColorAttr = a_Color;
 

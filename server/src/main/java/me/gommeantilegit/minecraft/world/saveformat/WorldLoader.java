@@ -14,6 +14,7 @@ import me.gommeantilegit.minecraft.utils.collections.LongHashMap;
 import me.gommeantilegit.minecraft.utils.io.IOUtils;
 import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
 import me.gommeantilegit.minecraft.world.ServerWorld;
+import me.gommeantilegit.minecraft.world.WorldBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
 import org.jetbrains.annotations.NotNull;
@@ -71,8 +72,8 @@ public class WorldLoader {
             } else if (currentEntry.getName().startsWith("chunk_")) {
                 String[] chunkOriginArgs = currentEntry.getName().substring(6).split("_");
                 assert chunkOriginArgs.length == 2;
-                int x = Integer.valueOf(chunkOriginArgs[0]);
-                int z = Integer.valueOf(chunkOriginArgs[1]);
+                int x = Integer.parseInt(chunkOriginArgs[0]);
+                int z = Integer.parseInt(chunkOriginArgs[1]);
                 long hash = Vec2i.hash64(x, z);
                 ByteArrayOutputStream packetByteOut = new ByteArrayOutputStream();
                 IOUtils.io(zipInputStream, packetByteOut);
@@ -99,7 +100,7 @@ public class WorldLoader {
     public ServerWorld loadWorld() {
         ServerWorld world = new ServerWorld(this.mc, WorldGenerator.NBT_CONVERTER.fromNBTData(this.worldGeneratorOptions, this.mc));
         world.setSpawnPoint(new Vector3(((NBTFloat) this.worldData.getValue()[0]).getValue(), ((NBTFloat) this.worldData.getValue()[1]).getValue(), ((NBTFloat) this.worldData.getValue()[2]).getValue()));
-        world.setInvokeTerrainGenerationDecider(WorldLoader.this::invokedTerrainGeneration);
+        world.setInvokeTerrainGenerationDecider(WorldLoader.this::shouldInvokedTerrainGeneration);
         world.addOnChunkCreationListener(WorldLoader.this::applyBlockStates);
         return world;
     }
@@ -116,11 +117,12 @@ public class WorldLoader {
     }
 
     /**
+     * @param world the world instance
      * @param chunk the given chunk
      * @return true if terrain generation should be invoked for the given chunk
      */
-    private boolean invokedTerrainGeneration(@NotNull ChunkBase chunk) {
-        return chunkData.get(chunk.getChunkOrigin().hash64()) == null;
+    private boolean shouldInvokedTerrainGeneration(@NotNull WorldBase world, @NotNull ChunkBase chunk) {
+        return !world.getWorldChunkHandler().chunkExistsAtOrigin(chunk.getChunkOrigin()); // Asserts that the chunk gets added after terrain generation has finished
     }
 
 }

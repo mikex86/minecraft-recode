@@ -8,6 +8,7 @@ import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
 import me.gommeantilegit.minecraft.block.texturemap.BlockTextureMap;
+import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import static me.gommeantilegit.minecraft.util.RenderUtils.rect;
@@ -44,7 +45,7 @@ public class GrassBlockTypeRenderer extends BlockTypeRenderer {
     }
 
     @Override
-    public void renderFace(@NotNull MeshBuilder builder, int x, int y, int z, int face) {
+    public void renderFace(@NotNull OptimizedMeshBuilder builder, int x, int y, int z, int face) {
         Vector2 uv = getUV(face);
 
         float u0 = uv.x;

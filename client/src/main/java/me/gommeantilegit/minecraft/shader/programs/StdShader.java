@@ -121,6 +121,7 @@ public class StdShader extends CommonShader {
         popMatrix();
     }
 
+    @NotNull
     public StdShader setCamera(Camera camera) {
         this.camera = camera;
         return this;

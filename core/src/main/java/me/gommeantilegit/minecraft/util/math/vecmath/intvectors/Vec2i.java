@@ -88,4 +88,12 @@ public class Vec2i implements LongHashable {
     public int hashCode() {
         return Long.hashCode(hash64());
     }
+
+    @Override
+    public String toString() {
+        return "Vec2i{" +
+                "x=" + x +
+                ", y=" + y +
+                '}';
+    }
 }

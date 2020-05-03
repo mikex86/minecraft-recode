@@ -1,11 +1,12 @@
 package me.gommeantilegit.minecraft.utils.async;
 
+import com.sun.jmx.snmp.ThreadContext;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedList;
-import java.util.NoSuchElementException;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * Represents a thread on which tasks can be schedules
@@ -16,12 +17,7 @@ public class SchedulableThread extends Thread {
      * Queue of Runnables to be executed on the thread
      */
     @NotNull
-    private final Queue<Runnable> tasks = new LinkedList<>();
-
-    /**
-     * State whether tasks are scheduled on the thread
-     */
-    private boolean tasksScheduled = false;
+    private final Queue<Runnable> tasks = new LinkedBlockingDeque<>();
 
     public SchedulableThread() {
     }
@@ -58,17 +54,11 @@ public class SchedulableThread extends Thread {
      * Executes and removes all queued tasks of {@link #tasks}
      */
     protected void updateTasks() {
-        if(tasksScheduled) {
-            synchronized (tasks) {
-                while (!tasks.isEmpty()) {
-                    try {
-                        tasks.remove().run();
-                    } catch (NoSuchElementException e) {
-                        tasks.clear();
-                    }
-                }
+        synchronized (this.tasks) {
+            while (!tasks.isEmpty()) {
+                Runnable remove = tasks.remove();
+                remove.run();
             }
-            tasksScheduled = false;
         }
     }
 
@@ -78,9 +68,8 @@ public class SchedulableThread extends Thread {
      * @param runnable the runnable to be executed
      */
     public void scheduleTask(@NotNull Runnable runnable) {
-        synchronized (tasks) {
+        synchronized (this.tasks) {
             this.tasks.add(runnable);
-            tasksScheduled = true;
         }
     }
 

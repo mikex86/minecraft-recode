@@ -21,14 +21,17 @@ public class MinecraftThread extends SchedulableThread {
         super("Minecraft-Thread");
         this.mc = mc;
         this.setDaemon(true);
+        this.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
     }
 
     @Override
     public void run() {
         try {
             while (mc.isRunning()) {
+                long start = System.currentTimeMillis();
                 onUpdate();
-                Thread.sleep(10);
+                long end = System.currentTimeMillis();
+                Thread.sleep(Math.max(0, (long) (1000 / mc.getTimer().getTicksPerSecond()) - (end - start)));
             }
         } catch (InterruptedException e) {
             onInterrupted();
@@ -42,7 +45,7 @@ public class MinecraftThread extends SchedulableThread {
     /**
      * Called to update the game logic
      */
-    protected void onUpdate() {
+    public void onUpdate() {
         updateTasks();
         //Updating timer and ticks
         if (enableMinecraftTick) {

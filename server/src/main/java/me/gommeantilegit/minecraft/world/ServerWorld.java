@@ -4,17 +4,19 @@ import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.ServerMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.entity.Entity;
+import me.gommeantilegit.minecraft.logging.crash.CrashReport;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
-import me.gommeantilegit.minecraft.world.chunk.creator.OnChunkCreationListener;
 import me.gommeantilegit.minecraft.world.chunk.creator.ServerChunkCreator;
 import me.gommeantilegit.minecraft.world.chunk.loader.ServerChunkLoader;
 import me.gommeantilegit.minecraft.world.chunk.world.ServerWorldChunkHandler;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.stream.Stream;
 
 import static me.gommeantilegit.minecraft.Side.SERVER;
 
@@ -37,7 +39,23 @@ public class ServerWorld extends WorldBase {
      * The listener that decides whether terrain generation should be invoked for a specified chunk
      */
     @NotNull
-    private InvokeTerrainGenerationDecider invokeTerrainGenerationDecider = chunk -> true;
+    private InvokeTerrainGenerationDecider invokeTerrainGenerationDecider = (world, chunk) -> true;
+
+    /**
+     * ForkJoin for chunk ticking
+     */
+    @NotNull
+    private ForkJoinPool chunkTickPool = new ForkJoinPool(
+            Runtime.getRuntime().availableProcessors(),
+            pool -> {
+                final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+                worker.setName("ChunkTickPoolWorker-" + worker.getPoolIndex());
+                return worker;
+            },
+            (t, e) -> mc.getLogger().crash(new CrashReport("ChunkWorker " + t.getName() + " crashed with", e)),
+            false
+    );
+
 
     /**
      * Default world constructor
@@ -48,15 +66,10 @@ public class ServerWorld extends WorldBase {
      */
     public ServerWorld(@NotNull ServerMinecraft mc, @NotNull WorldGenerator worldGenerator, int height) {
         super(mc, height);
-        this.worldThread = new Thread(this, "ServerWorld-thread");
-        this.worldChunkHandler = new ServerWorldChunkHandler(mc);
         this.worldGenerator = worldGenerator;
         this.chunkCreator = new ServerChunkCreator(this);
+        this.worldChunkHandler = new ServerWorldChunkHandler(chunkCreator); // after #chunkCreator
         this.chunkLoader = new ServerChunkLoader(this, mc);
-
-        // MUST BE THE LAST THING TO PERFORM IN WORLD CONSTRUCTOR
-        this.worldThread.setDaemon(true);
-        this.worldThread.start();
     }
 
     /**
@@ -69,30 +82,37 @@ public class ServerWorld extends WorldBase {
     @Override
     public void spawnEntityInWorld(Entity entity) {
         super.spawnEntityInWorld(entity);
-        chunkCreator.submit(entity); // Submitting the entity to the chunk creator
     }
 
-    /**
-     * Invoked by the world thread
-     */
     @Override
-    public void onAsyncThread() {
-        this.chunkCreator.onAsyncThread();
-        this.chunkLoader.onAsyncThread();
+    public void tick(float partialTicks) {
+        super.tick(partialTicks);
+    }
+
+    @Override
+    protected void tickChunks(float partialTicks, @NotNull Collection<ChunkBase> chunks) {
+        try {
+            this.chunkTickPool.submit(() -> {
+                Stream<ChunkBase> stream = chunks.parallelStream();
+                stream.forEach(c -> c.tick(partialTicks));
+            }).get();
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
      * @return the block height of the world
      */
     public int getHeight() {
-        return height;
+        return super.getHeight();
     }
 
     /**
      * Chooses the spawn position where players will spawn
      */
     public void defineSpawnPosition() {
-        for (int y = height; y >= 0; y--) {
+        for (int y = super.getHeight(); y >= 0; y--) {
             if (getBlockState(0, y, 0) != null) {
                 setSpawnPoint(new Vector3(0.5f, y + 3.5f, 0.5f));
                 break;
@@ -108,10 +128,12 @@ public class ServerWorld extends WorldBase {
 
         /**
          * Method decides whether terrain generation for the given chunk should be invoked or not
+         *
+         * @param world the world
          * @param chunk the chunk
          * @return true if terrain generation should be invoked for the chunk
          */
-        boolean invokeTerrainGeneration(@NotNull ChunkBase chunk);
+        boolean shouldInvokeTerrainGeneration(@NotNull WorldBase world, @NotNull ChunkBase chunk);
     }
 
     public void setInvokeTerrainGenerationDecider(@NotNull InvokeTerrainGenerationDecider invokeTerrainGenerationDecider) {

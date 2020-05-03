@@ -2,7 +2,6 @@ package me.gommeantilegit.minecraft.entity.particle;
 
 import com.badlogic.gdx.graphics.Mesh;
 import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
-import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
@@ -11,6 +10,7 @@ import me.gommeantilegit.minecraft.rendering.mesh.MeshBuilding;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.world.ClientWorld;
+import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -63,7 +63,7 @@ public class Particle extends Entity implements MeshBuilding {
      * Meshbuilder used to build the particles mesh
      */
     @Nullable
-    public MeshBuilder meshbuilder;
+    public OptimizedMeshBuilder meshbuilder;
 
     /**
      * Default constructor creating a particle
@@ -104,7 +104,7 @@ public class Particle extends Entity implements MeshBuilding {
 
     @NotNull
     @Override
-    public MeshBuilder buildMesh() {
+    public OptimizedMeshBuilder buildMesh() {
         /*
          * Randomly generated SOUND_RESOURCES used as u and v offset to the textureRegion, whose size is reduced when rendering the particle. The those SOUND_RESOURCES
          * are a random offset moving the actually rendered region around inside of the specified region textureRegion
@@ -112,7 +112,7 @@ public class Particle extends Entity implements MeshBuilding {
         float uOffset = (float) Math.random() * 3.0f, vOffset = (float) Math.random() * 3.0f;
 
         //Setting up mesh
-        MeshBuilder builder = new MeshBuilder();
+        OptimizedMeshBuilder builder = new OptimizedMeshBuilder();
         builder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
         int x0 = 0, y0 = 0, z0 = 0;
         float u0 = textureRegion.getPixelPositions()[0], v0 = textureRegion.getPixelPositions()[1];
@@ -146,13 +146,13 @@ public class Particle extends Entity implements MeshBuilding {
     }
 
     @Override
-    public void storeBuildMesh(@NotNull MeshBuilder meshBuilder) {
+    public void storeBuildMesh(@NotNull OptimizedMeshBuilder meshBuilder) {
         meshbuilder = meshBuilder;
     }
 
     @NeedsOpenGLContext
     @Override
-    public void finishMesh(@NotNull MeshBuilder meshBuilder) {
+    public void finishMesh(@NotNull OptimizedMeshBuilder meshBuilder) {
         mesh = meshBuilder.end();
     }
 
@@ -179,7 +179,7 @@ public class Particle extends Entity implements MeshBuilding {
         this.xSpeed *= 0.98f;
         this.ySpeed *= 0.98f;
         this.zSpeed *= 0.98f;
-        if (this.onGround) {
+        if (this.isOnGround()) {
             this.xSpeed *= 0.7f;
             this.zSpeed *= 0.7f;
         }

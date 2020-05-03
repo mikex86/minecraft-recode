@@ -27,14 +27,14 @@ public class SuperFlatChunkGenerator extends ChunkGenerator {
                     Block block;
                     switch (y) {
                         case 0:
-                            block = mc.blocks.bedrock;
+                            block = mc.getBlocks().bedrock;
                             break;
                         case 1:
                         case 2:
-                            block = mc.blocks.dirt;
+                            block = mc.getBlocks().dirt;
                             break;
                         case 3:
-                            block = mc.blocks.grass;
+                            block = mc.getBlocks().grass;
                             break;
                         default:
                             block = null;

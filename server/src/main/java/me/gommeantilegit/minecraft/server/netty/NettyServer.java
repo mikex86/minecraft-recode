@@ -63,7 +63,7 @@ public class NettyServer extends Thread {
                 ChannelFuture f = b.bind(port).sync();
                 f.sync().channel().closeFuture().sync();
             } catch (InterruptedException e) {
-                this.mc.logger.info("Netty Server Thread interrupted");
+                this.mc.getLogger().info("Netty Server Thread interrupted");
                 workerGroup.shutdownGracefully();
                 bossGroup.shutdownGracefully();
             }

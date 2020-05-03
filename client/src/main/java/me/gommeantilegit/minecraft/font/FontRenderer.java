@@ -73,9 +73,15 @@ public class FontRenderer extends TextureWrapper {
      * @param a      alpha (transparency) component
      */
     public void drawString(@NotNull String string, float x, float y, float r, float g, float b, float a) {
+        float startX = x;
         this.imageView.spriteBatch.begin();
         char[] chars = string.toCharArray();
         for (char character : chars) {
+            if (character == '\n') {
+                y += fontHeight;
+                x = startX;
+                continue;
+            }
             if (drawChar(x, y, character, r, g, b, a))
                 x += getCharWidth(character);
         }
@@ -116,6 +122,7 @@ public class FontRenderer extends TextureWrapper {
      * @param a      alpha (transparency) component
      */
     public void drawStringWithShadow(@NotNull String string, float x, float y, float r, float g, float b, float a) {
+        float startX = x;
         float shadowR, shadowG, shadowB, shadowA;
         // Computing the color of the shadow as efficiently as possible
         {
@@ -138,6 +145,11 @@ public class FontRenderer extends TextureWrapper {
         this.imageView.spriteBatch.begin();
         char[] chars = string.toCharArray();
         for (char character : chars) {
+            if (character == '\n') {
+                y += fontHeight;
+                x = startX;
+                continue;
+            }
             if (drawChar(x + scaleFactor, y + scaleFactor, character, shadowR, shadowG, shadowB, shadowA))
                 if (drawChar(x, y, character, r, g, b, a))
                     x += getCharWidth(character);

@@ -46,7 +46,7 @@ public class ServerWorldSetupPacket extends ServerPacket {
     @SideOnly(side = Side.SERVER)
     public ServerWorldSetupPacket(@Nullable Channel serverChannel, @NotNull WorldBase world) {
         super(PACKET_ID, serverChannel, false);
-        this.worldHeight = world.height;
+        this.worldHeight = world.getHeight();
         this.worldTime = world.worldTime;
         this.packetSentUnixTime = new Date().getTime();
     }

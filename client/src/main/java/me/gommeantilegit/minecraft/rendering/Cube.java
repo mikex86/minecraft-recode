@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
 import me.gommeantilegit.minecraft.shader.api.CommonShader;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
+import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 
 import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
 import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBUTES;
@@ -84,7 +85,7 @@ public class Cube {
     }
 
     private Mesh compile() {
-        MeshBuilder builder = new MeshBuilder();
+        OptimizedMeshBuilder builder = new OptimizedMeshBuilder();
         builder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
         for (int face = 0; face <= 5; face++) {
             renderFace(face, builder);
@@ -92,7 +93,7 @@ public class Cube {
         return builder.end();
     }
 
-    private void renderFace(int face, MeshBuilder builder) {
+    private void renderFace(int face, OptimizedMeshBuilder builder) {
 
         float x0 = x, y0 = y, z0 = z;
         float x1 = x + width, y1 = y + height, z1 = z + depth;
@@ -228,7 +229,7 @@ public class Cube {
         }
     }
 
-    protected void rect(MeshBuilder builder,
+    protected void rect(OptimizedMeshBuilder builder,
                         float x00, float y00, float z00,
                         float u00, float v00,
                         float x10, float y10, float z10,

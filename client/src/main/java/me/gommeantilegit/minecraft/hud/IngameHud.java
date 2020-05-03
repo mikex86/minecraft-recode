@@ -8,6 +8,8 @@ import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.ui.render.Overlay2D;
 import org.jetbrains.annotations.NotNull;
 
+import static me.gommeantilegit.minecraft.utils.MathHelper.humanReadableByteCount;
+
 public class IngameHud extends Overlay2D {
 
     @NotNull
@@ -25,19 +27,25 @@ public class IngameHud extends Overlay2D {
         this.mc = mc;
     }
 
-    private String fpsString = "FPS: " + Gdx.graphics.getFramesPerSecond();
-    private int fps;
+    private String fpsString;
+    private int fps = -1, drawCalls = -1;
 
     @Override
     public void render() {
         int fps = Gdx.graphics.getFramesPerSecond();
-        if (this.fps != fps) {
-            fpsString = "FPS: " + fps;
+
+        int sectionDrawCalls = mc.theWorld.getWorldRenderer().getChunkSectionDrawCalls();
+
+        if (this.fps != fps || this.drawCalls != sectionDrawCalls) {
+            this.fpsString = "FPS: " + fps + "\nSection-Draw-calls: " + sectionDrawCalls + "\nFree memory: " + (Runtime.getRuntime().freeMemory() / (float) Runtime.getRuntime().totalMemory()) * 100 + "%\nFree Memory: " +
+                    humanReadableByteCount(Runtime.getRuntime().freeMemory(), true) + "\nTotal Memory: " + humanReadableByteCount(Runtime.getRuntime().totalMemory(), true) +
+                    "\nMax memory " + humanReadableByteCount(Runtime.getRuntime().maxMemory(), true) + "\nGrowable: " + humanReadableByteCount(Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory(), true);
+            this.drawCalls = sectionDrawCalls;
             this.fps = fps;
         }
-        mc.uiManager.fontRenderer.drawStringWithShadow(fpsString, 0, 0, 1, 1, 1, 1);
+        this.mc.uiManager.fontRenderer.drawStringWithShadow(this.fpsString, 0, 0, 1, 1, 1, 1);
 
-        final int selectionCrossSize = 32;
+        final int selectionCrossSize = 16;
         this.mc.textureManager.hudTextures.drawSelectionCross(
                 DPI.scaledWidthi / 2 - selectionCrossSize / 2,
                 DPI.scaledHeighti / 2 - selectionCrossSize / 2, selectionCrossSize);
@@ -55,11 +63,6 @@ public class IngameHud extends Overlay2D {
 //        {
 //            RayTracer.RayTraceResult result = mc.thePlayer.rayTracer.rayTraceResult;
 //            fontRenderer.drawString("Hitresult: x: " + result.blockX + ", y: " + result.blockY + ", z: " + result.blockZ, 0, 80, 1, 1, 1, 1);
-//        }
-//        {
-//            fontRenderer.drawString("MemoryUsage: " + (Runtime.getRuntime().freeMemory() / (float) Runtime.getRuntime().maxMemory()) * 100 + "% " +
-//                    humanReadableByteCount(Runtime.getRuntime().freeMemory(), true) + " used of " + humanReadableByteCount(Runtime.getRuntime().maxMemory(), true), 0, 100, 1, 1, 1, 1);
-//
 //        }
     }
 

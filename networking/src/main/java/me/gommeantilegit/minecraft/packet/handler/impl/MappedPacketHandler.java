@@ -8,14 +8,16 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class MappedPacketHandler<T extends Packet> extends PacketHandler<T> {
 
     /**
-     * Stores the parent packet decoders for the given packetID
+     * Stores the parent packet handler for the given packetID
      */
     @NotNull
-    private final HashMap<Short, PacketHandler<? extends T>> handlerMap = new HashMap<>();
+    private final Map<Short, PacketHandler<? extends T>> handlerMap = new ConcurrentHashMap<>();
 
     public MappedPacketHandler(@Nullable SchedulableThread thread) {
         super(thread);
@@ -34,16 +36,17 @@ public abstract class MappedPacketHandler<T extends Packet> extends PacketHandle
         this.handlerMap.put(id, packetHandler);
     }
 
-    @SuppressWarnings("unchecked cast")
+    @SuppressWarnings({"unchecked cast", "rawtypes"})
     @Override
     public void handlePacket(@NotNull T packet, @NotNull ChannelHandlerContext context) {
-        @Nullable
-        PacketHandler handler = handlerMap.get(packet.getPacketID());
+        PacketHandler handler = this.handlerMap.get(packet.getPacketID());
         if (handler != null) {
-            if (handler.getThread() == null) {
+            SchedulableThread thread = handler.getThread();
+            if (thread == null) {
                 handler.handlePacket(packet, context);
             } else {
-                handler.getThread().scheduleTask(() -> handler.handlePacket(packet, context));
+                Runnable task = () -> handler.handlePacket(packet, context);;
+                thread.scheduleTask(task);
             }
         }
     }

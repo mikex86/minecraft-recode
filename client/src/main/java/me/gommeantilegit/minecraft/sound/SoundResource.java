@@ -4,8 +4,8 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.math.Vector3;
+import me.gommeantilegit.minecraft.utils.LazyProperty;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -20,15 +20,22 @@ import static java.lang.Math.log;
 public class SoundResource {
 
     /**
-     * Speed of sound (343 m/s) in blocks per second.
+     * The string that all variations of the sound resource start with
      */
-    private static final float SPEED_OF_SOUND = 6.8599997f;
+    @NotNull
+    private final String soundPath;
 
     /**
      * List of sound resources
      */
     @NotNull
-    public static final List<SoundResource> SOUND_RESOURCES = new ArrayList<>();
+    public static final List<LazyProperty<SoundResource>> SOUND_RESOURCES = new ArrayList<>();
+
+    /**
+     * Maps the sound paths to their parent sound resources wrapped in a lazy property to be evaluated on first access
+     */
+    @NotNull
+    public static final Map<String, LazyProperty<SoundResource>> RESOURCE_MAP = new HashMap<>();
 
     /**
      * Initializes the sounds
@@ -36,32 +43,36 @@ public class SoundResource {
     public static void initSounds() {
         if (!SOUND_RESOURCES.isEmpty())
             throw new IllegalStateException("SoundResources already initialized!");
-        String[] soundStartPaths = Gdx.files.classpath("sound/sounds.txt").readString(StandardCharsets.UTF_8.name()).split("\n");
-        for (String soundStartPath : soundStartPaths) {
-            SOUND_RESOURCES.add(new SoundResource(soundStartPath));
+        String[] soundPaths = Gdx.files.classpath("sound/sounds.txt").readString(StandardCharsets.UTF_8.name()).split("\n");
+        for (String soundPath : soundPaths) {
+            LazyProperty<SoundResource> lazyProperty = new LazyProperty<>(() -> new SoundResource(soundPath));
+            SOUND_RESOURCES.add(lazyProperty);
+            RESOURCE_MAP.put(soundPath, lazyProperty);
         }
     }
 
     /**
-     * The string that all variations of the sound resource start with
-     */
-    @NotNull
-    private final String soundStartPath;
-
-    /**
-     * @param resourceStartString the {@link SoundResource#soundStartPath} of a given sound resource instance
+     * @param soundPath the {@link SoundResource#soundPath} of a given sound resource instance
      * @return the {@link SoundResource} instance with a soundStartPath of the specified parameter
      */
     @NotNull
-    public static SoundResource getSound(@NotNull String resourceStartString) {
-        return SOUND_RESOURCES.stream().filter(r -> r.soundStartPath.equals(resourceStartString)).findFirst().orElseThrow(() -> new IllegalStateException("Cannot find SoundResource with resource start string: \"" + resourceStartString + "\"!"));
+    public static SoundResource getSound(@NotNull String soundPath) {
+        LazyProperty<SoundResource> property = RESOURCE_MAP.get(soundPath);
+        if (property == null)
+            throw new IllegalArgumentException("No such sound: " + soundPath);
+        return property.get();
+    }
+
+    @NotNull
+    public String getSoundPath() {
+        return soundPath;
     }
 
     /**
      * Represents a variation of the sound.
      * A Variation is a sound that is parent to a given superordinate sound resource. When a sound resource is played, a sound variant is randomly chosen to be played
      */
-    public class SoundVariation {
+    public static class SoundVariation {
 
         /**
          * The the playable libgdx sound instance
@@ -107,18 +118,18 @@ public class SoundResource {
     private final List<SoundVariation> variations = new ArrayList<>();
 
     /**
-     * @param soundStartPath the string that all the sounds variations start with
+     * @param soundPath the string that all the sounds variations start with
      */
-    SoundResource(@NotNull String soundStartPath) {
-        this.soundStartPath = soundStartPath;
+    SoundResource(@NotNull String soundPath) {
+        this.soundPath = soundPath;
         this.id = SoundResource.index();
-        List<String> variationResourceStrings = getSounds().keySet().stream().filter(p -> p.startsWith(soundStartPath)).collect(Collectors.toList());
+        List<String> variationResourceStrings = getSounds().keySet().stream().filter(p -> p.startsWith(soundPath)).collect(Collectors.toList());
         for (String soundResourcePath : variationResourceStrings) {
             FileHandle fileHandle = Gdx.files.classpath(soundResourcePath);
             this.addVariation(new SoundVariation(Gdx.audio.newSound(fileHandle), getDuration(soundResourcePath)));
         }
         if (this.variations.size() == 0)
-            throw new IllegalStateException("Sound \"" + soundStartPath + "\" resource must at least have one variation!");
+            throw new IllegalStateException("Sound \"" + soundPath + "\" resource must at least have one variation!");
     }
 
 

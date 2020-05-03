@@ -5,12 +5,13 @@ import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
+import me.gommeantilegit.minecraft.util.block.position.BlockPos;
 import me.gommeantilegit.minecraft.world.WorldBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
+import java.util.List;
 
 import static java.lang.Math.*;
 
@@ -26,10 +27,10 @@ public class Entity {
      */
     public float rotationYawTicked, rotationPitchTicked;
 
-    /**
-     * The amount of ticks the entity should skip until being updated again.
-     */
-    public int skipUpdateTicks;
+//    /**
+//     * The amount of ticks the entity should skip until being updated again.
+//     */
+//    public int skipUpdateTicks;
 
     /**
      * Amount of ticks the entity has existed
@@ -40,6 +41,8 @@ public class Entity {
      * ServerWorld that the entity is in.
      */
     public WorldBase world;
+
+    private long tickJoinMark = -1;
 
     /**
      * The chunk that the entity is currently in.
@@ -77,25 +80,24 @@ public class Entity {
      */
     public float lastRotationYaw, lastRotationPitch;
 
-    /**
-     * Bounding box / Hitbox of the entity.
-     */
-    public AxisAlignedBB boundingBox;
+    private float prevDistanceWalkedModified;
+
+    private float distanceWalkedModified;
+
+    private float distanceWalkedOnStepModified;
 
     /**
-     * State if the entity is currently on ground. Updated on tick.
+     * The distance that has to be exceeded in order to trigger a new step sound and an onEntityWalking event on a block
      */
-    public boolean onGround = false;
+    private int nextStepDistance = 1;
 
-    /**
-     * State if the entity is collided with a block on the horizontal axis.
-     */
-    public boolean collidedHorizontally = false;
+    private AxisAlignedBB boundingBox;
 
-    /**
-     * State if the entity is dead. (Entity will be removed of the world if true in the next tick)
-     */
-    public boolean dead = false;
+    private boolean onGround = false;
+
+    private boolean collidedHorizontally = false;
+
+    private boolean dead = false;
 
     protected float heightOffset = 0.0f;
 
@@ -120,9 +122,10 @@ public class Entity {
     private boolean collidable = false;
 
     /**
-     * State whether has just changed the chunk. State set to false again when entity is first updated in the new chunk.
+     * The chunk that the entity is transferred to. (Nullified when change is complete)
      */
-    public boolean chunkChanged = false;
+    @Nullable
+    private ChunkBase newChunk = null;
 
     /**
      * @param world sets {@link #world}
@@ -131,13 +134,14 @@ public class Entity {
         this.world = world;
         float w = this.bbWidth / 2.0f;
         float h = this.bbHeight / 2.0f;
-        this.boundingBox = new AxisAlignedBB(posX - w, posY - h, posZ - w, posX + w, posY + h, posZ + w);
+        this.setBoundingBox(new AxisAlignedBB(posX - w, posY - h, posZ - w, posX + w, posY + h, posZ + w));
     }
 
     /**
      * @return a new position vector equal to vec3({@link #posX}, {@link #posY}, {@link #posZ})
      * Please note, that changes made to this instance do not affect the instance in any way.
      */
+    @NotNull
     public Vector3 getPositionVector() {
         return new Vector3(posX, posY, posZ);
     }
@@ -146,7 +150,7 @@ public class Entity {
      * Sets the state of the entity being dead to true resulting in the entity being removed out of the world in the next tick.
      */
     public void setDead() {
-        this.dead = true;
+        this.setDead(true);
     }
 
     /**
@@ -173,7 +177,7 @@ public class Entity {
         this.posZ = z;
         float w = this.bbWidth / 2.0f;
         float h = this.bbHeight / 2.0f;
-        this.boundingBox.set(x - w, y - h, z - w, x + w, y + h, z + w);
+        this.getBoundingBox().set(x - w, y - h, z - w, x + w, y + h, z + w);
     }
 
     /**
@@ -183,8 +187,8 @@ public class Entity {
      * @param oldChunk the old chunk. Can be null on spawn.
      */
     public void onChunkChanged(@NotNull ChunkBase newChunk, @Nullable ChunkBase oldChunk) {
-        this.chunkChanged = true;
         this.setCurrentChunk(newChunk);
+        this.world.getChunkLoader().trackEntityChunkChange(this, newChunk, oldChunk);
     }
 
     /**
@@ -229,10 +233,10 @@ public class Entity {
 
         setEntityRenderPosition();
 
-        //TODO: FIX
-//        ArrayList<AxisAlignedBB> boundingBoxes = this.world.getBoundingBoxes(this.boundingBox.expand(-0.05f, -0.05f, -0.05f));
-//        for (AxisAlignedBB abb : boundingBoxes)
-//            this.world.collision(boundingBoxes, this, abb);
+        //TODO: FIX?
+        List<AxisAlignedBB> boundingBoxes = this.world.getBoundingBoxes(this.getBoundingBox().expand(-0.05f, -0.05f, -0.05f));
+        for (AxisAlignedBB abb : boundingBoxes)
+            this.world.collision(boundingBoxes, this, abb);
     }
 
     /**
@@ -248,8 +252,8 @@ public class Entity {
     }
 
     public boolean isFree(float xa, float ya, float za) {
-        AxisAlignedBB box = this.boundingBox.cloneMove(xa, ya, za);
-        ArrayList<AxisAlignedBB> aABBS = this.world.getBoundingBoxes(box);
+        AxisAlignedBB box = this.getBoundingBox().cloneMove(xa, ya, za);
+        List<AxisAlignedBB> aABBS = this.world.getBoundingBoxes(box);
         return aABBS.size() <= 0;
     }
 
@@ -262,85 +266,89 @@ public class Entity {
      * @param motionZ motionZ of the entity
      */
     public void moveEntity(float motionX, float motionY, float motionZ) {
+        this.setPrevDistanceWalkedModified(this.getDistanceWalkedModified());
+        float prevX = posX;
+        float prevY = posY;
+        float prevZ = posZ;
         float xNew = motionX;
         float yNew = motionY;
         float zNew = motionZ;
 
         // SNEAKING (SAFEWALK)
-        {
-            boolean flag = this.onGround && this instanceof PlayerBase && ((PlayerBase) this).isSneaking();
 
-            if (flag) {
-                double d6;
+        boolean safeWalk = this.isOnGround() && this instanceof PlayerBase && ((PlayerBase) this).isSneaking();
 
-                for (d6 = 0.05D; xNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(xNew, -1.0f, 0.0f)); ) {
-                    if (xNew < d6 && xNew >= -d6) {
-                        xNew = 0.0f;
-                    } else if (xNew > 0.0D) {
-                        xNew -= d6;
-                    } else {
-                        xNew += d6;
-                    }
+        if (safeWalk) {
+            double d6;
+
+            for (d6 = 0.05D; xNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(xNew, -1.0f, 0.0f)); ) {
+                if (xNew < d6 && xNew >= -d6) {
+                    xNew = 0.0f;
+                } else if (xNew > 0.0D) {
+                    xNew -= d6;
+                } else {
+                    xNew += d6;
+                }
+            }
+
+            for (; zNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(0.0f, -1.0f, zNew)); ) {
+                if (zNew < d6 && zNew >= -d6) {
+                    zNew = 0.0f;
+                } else if (zNew > 0.0D) {
+                    zNew -= d6;
+                } else {
+                    zNew += d6;
+                }
+            }
+
+            for (; xNew != 0.0D && zNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(xNew, -1.0f, zNew)); ) {
+                if (xNew < d6 && xNew >= -d6) {
+                    xNew = 0.0f;
+                } else if (xNew > 0.0D) {
+                    xNew -= d6;
+                } else {
+                    xNew += d6;
                 }
 
-                for (; zNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(0.0f, -1.0f, zNew)); ) {
-                    if (zNew < d6 && zNew >= -d6) {
-                        zNew = 0.0f;
-                    } else if (zNew > 0.0D) {
-                        zNew -= d6;
-                    } else {
-                        zNew += d6;
-                    }
-                }
-
-                for (; xNew != 0.0D && zNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(xNew, -1.0f, zNew)); ) {
-                    if (xNew < d6 && xNew >= -d6) {
-                        xNew = 0.0f;
-                    } else if (xNew > 0.0D) {
-                        xNew -= d6;
-                    } else {
-                        xNew += d6;
-                    }
-
-                    if (zNew < d6 && zNew >= -d6) {
-                        zNew = 0.0f;
-                    } else if (zNew > 0.0D) {
-                        zNew -= d6;
-                    } else {
-                        zNew += d6;
-                    }
+                if (zNew < d6 && zNew >= -d6) {
+                    zNew = 0.0f;
+                } else if (zNew > 0.0D) {
+                    zNew -= d6;
+                } else {
+                    zNew += d6;
                 }
             }
         }
+
         //PHYSICS
         {
-            ArrayList<AxisAlignedBB> aABBS = this.world.getBoundingBoxes(this.boundingBox.expand(motionX, motionY, motionZ));
+            List<AxisAlignedBB> aABBS = this.world.getBoundingBoxes(this.getBoundingBox().expand(motionX, motionY, motionZ));
             int i = 0;
 
             while (i < aABBS.size()) {
-                motionY = aABBS.get(i).clipYCollide(this.boundingBox, motionY);
+                motionY = aABBS.get(i).clipYCollide(this.getBoundingBox(), motionY);
                 ++i;
             }
-            this.boundingBox.move(0.0f, motionY, 0.0f);
+            this.getBoundingBox().move(0.0f, motionY, 0.0f);
 
             i = 0;
             while (i < aABBS.size()) {
-                motionX = aABBS.get(i).clipXCollide(this.boundingBox, motionX);
+                motionX = aABBS.get(i).clipXCollide(this.getBoundingBox(), motionX);
                 ++i;
             }
-            this.boundingBox.move(motionX, 0.0f, 0.0f);
+            this.getBoundingBox().move(motionX, 0.0f, 0.0f);
 
             i = 0;
             while (i < aABBS.size()) {
-                motionZ = aABBS.get(i).clipZCollide(this.boundingBox, motionZ);
+                motionZ = aABBS.get(i).clipZCollide(this.getBoundingBox(), motionZ);
                 ++i;
             }
 
         }
-        this.boundingBox.move(0.0f, 0.0f, motionZ);
+        this.getBoundingBox().move(0.0f, 0.0f, motionZ);
 
-        this.collidedHorizontally = xNew != motionX || zNew != motionZ;
-        this.onGround = yNew != motionY && yNew < 0.0f;
+        this.setCollidedHorizontally(xNew != motionX || zNew != motionZ);
+        this.setOnGround(yNew != motionY && yNew < 0.0f);
         if (xNew != motionX) {
             this.motionX = 0.0f;
         }
@@ -350,9 +358,55 @@ public class Entity {
         if (zNew != motionZ) {
             this.motionZ = 0.0f;
         }
-        this.posX = (this.boundingBox.x0 + this.boundingBox.x1) / 2.0f;
-        this.posY = this.boundingBox.y0 + this.heightOffset;
-        this.posZ = (this.boundingBox.z0 + this.boundingBox.z1) / 2.0f;
+        this.posX = (this.getBoundingBox().x0 + this.getBoundingBox().x1) / 2.0f;
+        this.posY = this.getBoundingBox().y0 + this.heightOffset;
+        this.posZ = (this.getBoundingBox().z0 + this.getBoundingBox().z1) / 2.0f;
+//        if (onGround) {
+        double xDif = abs(this.posX) - abs(prevX);
+        double yDif = abs(this.posY) - abs(prevY);
+        double zDif = abs(this.posZ) - abs(prevZ);
+
+        if ((isOnGround() || sqrt(xDif * xDif + zDif * zDif) > 0.02D) && this.canTriggerWalking() && !safeWalk) {// TODO: RIDING CHECK
+
+
+            this.setDistanceWalkedModified((float) ((double) this.getDistanceWalkedModified() + Math.sqrt(xDif * xDif + zDif * zDif) * 0.6D));
+            this.setDistanceWalkedOnStepModified((float) ((double) this.getDistanceWalkedOnStepModified() + Math.sqrt(xDif * xDif + yDif * yDif + zDif * zDif) * 0.6D));
+
+            BlockPos standingOn = getPosStandingOn();
+            if (this.getDistanceWalkedOnStepModified() > (float) this.nextStepDistance && world.getBlockState(standingOn) != null) {
+                this.nextStepDistance = (int) this.getDistanceWalkedOnStepModified() + 1;
+
+                //TODO: WHEN FLUIDS ARE IMPLEMENTED
+
+//                    if (this.isInWater()) {
+//                        float f = (float) (Math.sqrt(this.motionX * this.motionX * 0.20000000298023224D + this.motionY * this.motionY + this.motionZ * this.motionZ * 0.20000000298023224D) * 0.35F);
+//
+//                        if (f > 1.0F) {
+//                            f = 1.0F;
+//                        }
+//
+//                        this.playSound(this.getSwimSound(), f, 1.0F + (this.rand.nextFloat() - this.rand.nextFloat()) * 0.4F);
+//                    }
+
+                this.playStepSound(standingOn);
+            }
+        }
+//        }
+    }
+
+    @NotNull
+    private BlockPos getPosStandingOn() {
+        int x = (int) Math.floor(this.posX);
+        int y = (int) Math.floor(this.posY - 0.20000000298023224D);
+        int z = (int) Math.floor(this.posZ);
+        return new BlockPos(x, y, z);
+    }
+
+    protected void playStepSound(@NotNull BlockPos standingOn) {
+    }
+
+    private boolean canTriggerWalking() {
+        return true;
     }
 
     //TODO
@@ -396,7 +450,8 @@ public class Entity {
 
     /**
      * Sets the rotation yaw and pitch of the entity
-     * @param yaw the new yaw
+     *
+     * @param yaw   the new yaw
      * @param pitch the new pitch
      */
     public void setRotation(float yaw, float pitch) {
@@ -417,26 +472,31 @@ public class Entity {
      * @return the state if the entity is in the given chunk.
      */
     public boolean isInChunk(@NotNull ChunkBase chunk) {
-        return chunk.contains((int) posX, (int) posZ);
+        return chunk.contains(posX, posZ);
     }
 
+    @Nullable
     public WorldBase getWorld() {
         return world;
     }
 
-    public void setWorld(WorldBase world) {
+    public void setWorld(@Nullable WorldBase world) {
         this.world = world;
     }
 
     /**
-     * Called to check if the entity allows the scheduleUnload of it's chunk.
+     * Called to check if the entity allows the unload of a chunk it has previously loaded
      *
-     * @param chunk the chunk that the entity is in.
+     * @param chunk the chunk previously loaded by the player that is now getting unloaded
      */
-    public boolean allowChunkUnload(ChunkBase chunk) {
+    public boolean allowChunkUnload(@NotNull ChunkBase chunk) {
         return true;
     }
 
+    /**
+     * Bounding box / Hitbox of the entity.
+     */
+    @NotNull
     public AxisAlignedBB getBoundingBox() {
         return boundingBox;
     }
@@ -453,15 +513,119 @@ public class Entity {
         this.collidable = collidable;
     }
 
+    @NotNull
     @SideOnly(side = Side.CLIENT)
     public EntityRenderPosition getEntityRenderPosition() {
         return entityRenderPosition;
     }
 
+    public void onSpawned(@NotNull ChunkBase chunk) {
+        this.world.getChunkLoader().trackEntitySpawn(this, chunk);
+    }
+
+    /**
+     * State whether the entity is currently changing chunks. Set on random thread, reset from random chunks.
+     */
+    public boolean isChangingChunks() {
+        return newChunk != null;
+    }
+
+    /**
+     * Sets the entity into the state of chunk changing
+     *
+     * @param newChunk the chunk the entity is being transferred to, or null, to set it into the state of not being transferred to any chunk
+     */
+    public void setChangingToChunk(@Nullable ChunkBase newChunk) {
+        this.newChunk = newChunk;
+    }
+
+    @Nullable
+    public ChunkBase getNewChunk() {
+        return newChunk;
+    }
+
+    /**
+     * The chunk tick time stamp when to start ticking the entity again. -1 if not set
+     */
+    public long getTickJoinMark() {
+        return tickJoinMark;
+    }
+
+    public void joinTickAt(long tickJoinMark) {
+        this.tickJoinMark = tickJoinMark;
+    }
+
+    public void setBoundingBox(AxisAlignedBB boundingBox) {
+        this.boundingBox = boundingBox;
+    }
+
+    /**
+     * State if the entity is currently on ground. Updated on tick.
+     */
+    public boolean isOnGround() {
+        return onGround;
+    }
+
+    public void setOnGround(boolean onGround) {
+        this.onGround = onGround;
+    }
+
+    /**
+     * State if the entity is collided with a block on the horizontal axis.
+     */
+    public boolean isCollidedHorizontally() {
+        return collidedHorizontally;
+    }
+
+    public void setCollidedHorizontally(boolean collidedHorizontally) {
+        this.collidedHorizontally = collidedHorizontally;
+    }
+
+    /**
+     * State if the entity is dead. (Entity will be removed of the world if true in the next tick)
+     */
+    public boolean isDead() {
+        return dead;
+    }
+
+    public void setDead(boolean dead) {
+        this.dead = dead;
+    }
+
+    public float getDistanceWalkedOnStepModified() {
+        return distanceWalkedOnStepModified;
+    }
+
+    public void setDistanceWalkedOnStepModified(float distanceWalkedOnStepModified) {
+        this.distanceWalkedOnStepModified = distanceWalkedOnStepModified;
+    }
+
+    /**
+     * The distance walked multiplied by 0.6
+     */
+    public float getDistanceWalkedModified() {
+        return distanceWalkedModified;
+    }
+
+    public void setDistanceWalkedModified(float distanceWalkedModified) {
+        this.distanceWalkedModified = distanceWalkedModified;
+    }
+
+    /**
+     * The previous ticks distance walked multiplied by 0.6
+     */
+    public float getPrevDistanceWalkedModified() {
+        return prevDistanceWalkedModified;
+    }
+
+    public void setPrevDistanceWalkedModified(float prevDistanceWalkedModified) {
+        this.prevDistanceWalkedModified = prevDistanceWalkedModified;
+    }
+
     /**
      * Object representing the render position of the entity by combining last and current position in one object
      */
-    public class EntityRenderPosition {
+    public static class EntityRenderPosition {
 
         public float lastPosX, lastPosY, lastPosZ;
         public float posX, posY, posZ;
@@ -476,7 +640,7 @@ public class Entity {
         }
     }
 
-    public void setCurrentChunk(ChunkBase currentChunk) {
+    public void setCurrentChunk(@NotNull ChunkBase currentChunk) {
         this.currentChunk = currentChunk;
     }
 

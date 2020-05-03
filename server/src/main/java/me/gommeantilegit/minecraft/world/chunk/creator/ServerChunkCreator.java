@@ -14,21 +14,11 @@ public class ServerChunkCreator extends ChunkCreatorBase {
         super(world);
     }
 
-    @Override
-    protected int getChunkLoadingDistance(@NotNull Entity ent) {
-        return ent instanceof EntityPlayerMP ? ((EntityPlayerMP) ent).channelData.getChunkLoadingDistance() : world.getChunkLoadingDistance();
-    }
-
-    @Override
-    public void onAsyncThread() {
-        updatePendingEntities(); // Chunks added on manual request by the client
-    }
-
     /**
      * Adds the given chunk to the world instance.
      * - Applies block state from saved world instance
      * - Invokes the creator listener of {@link #world}
-     * - Adds the instance to {@link WorldChunkHandlerBase#getChunks()} of {@link ServerWorld#getWorldChunkHandler()} of {@link #world}
+     * - Adds the instance to {@link WorldChunkHandlerBase#collectChunks()} of {@link ServerWorld#getWorldChunkHandler()} of {@link #world}
      * <p><br>
      * NOTE: The listener is invoked before the chunk is added to the list. (If the listener is present meaning the field is not null)<br>
      * ALSO NOTE: USE MINECRAFT THREAD ONLY<br>
@@ -37,12 +27,14 @@ public class ServerChunkCreator extends ChunkCreatorBase {
      * @see OnChunkCreationListener
      */
     @Unsafe
-    protected void addChunk(@NotNull ChunkBase chunk) {
+    protected void createChunk(@NotNull ChunkBase chunk) {
         if (!this.world.getOnChunkCreationListeners().isEmpty()) {
             this.world.getOnChunkCreationListeners().forEach(l -> l.onChunkCreated(chunk));
         }
-        if (((ServerWorld) world).getInvokeTerrainGenerationDecider().invokeTerrainGeneration(chunk))
+
+        // IMPORTANT: Invoke terrain generation before adding it, because whether a chunk exists at a given origin is used to determine whether terrain generation should be invoked
+        if (((ServerWorld) world).getInvokeTerrainGenerationDecider().shouldInvokeTerrainGeneration(world, chunk))
             ((ServerWorld) world).getWorldGenerator().onChunkCreated(chunk); // Invoking the terrain generation
-        super.addChunk(chunk);
+        super.createChunk(chunk);
     }
 }

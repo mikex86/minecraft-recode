@@ -1,13 +1,18 @@
 package me.gommeantilegit.minecraft.world.chunk.world;
 
+import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
-import me.gommeantilegit.minecraft.utils.collections.LongHashMap;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
-import org.eclipse.collections.impl.set.mutable.primitive.LongHashSet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Stream;
 
 public class WorldChunkHandlerBase {
 
@@ -16,61 +21,54 @@ public class WorldChunkHandlerBase {
      * Only accessible from Minecraft Thread!
      */
     @NotNull
-    private final ArrayList<ChunkBase> loadedChunks;
+    private final List<ChunkBase> loadedChunks;
 
     /**
      * Stores all currently unloaded chunks
      * Only accessible from Minecraft Thread!
      */
     @NotNull
-    private final ArrayList<ChunkBase> unloadedChunks;
+    private final List<ChunkBase> unloadedChunks;
 
     /**
      * List storing all chunks of the world.
      * Only accessible from Minecraft Thread!
      */
     @NotNull
-    private final ArrayList<ChunkBase> chunks;
+    private final List<ChunkBase> chunks;
 
     /**
      * A map containing all registered chunk origins and their parent chunks at that origin.
      * chunkMap.get(originHash) may return null, if the chunk is currently scheduled to be created
      */
     @NotNull
-    private final LongHashMap<ChunkBase> chunkMap = new LongHashMap<>();
+    private final Map<Long, ChunkBase> chunkMap = new ConcurrentHashMap<>();
+
+//    /**
+//     * Hash set of all chunk origins
+//     */
+//    @NotNull
+//    private final Set<Long> chunkOrigins = new ConcurrentSet<>();
 
     /**
-     * Hash set of all chunk origins
+     * List of uninitialized chunks that are neither loaded or unloaded
      */
     @NotNull
-    private final LongHashSet chunkOrigins = new LongHashSet();
+    private final List<ChunkBase> uninitializedChunks = new CopyOnWriteArrayList<>();
 
     public WorldChunkHandlerBase() {
-        this(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
-    }
-
-    public WorldChunkHandlerBase(@NotNull ArrayList<ChunkBase> chunks, @NotNull ArrayList<ChunkBase> unloadedChunks, @NotNull ArrayList<ChunkBase> loadedChunks) {
-        this.chunks = chunks;
-        this.unloadedChunks = unloadedChunks;
-        this.loadedChunks = loadedChunks;
+        this.chunks = new CopyOnWriteArrayList<>();
+        this.unloadedChunks = new CopyOnWriteArrayList<>();
+        this.loadedChunks = new CopyOnWriteArrayList<>();
     }
 
     /**
      * @param vec the x, z vector
      * @return true if a chunk that handles those coordinates exists
      */
-    public synchronized boolean chunkExistsAtOrigin(@NotNull Vec2i vec) {
-        return this.chunkOrigins.contains(vec.hash64());
-    }
-
-    /**
-     * Adds the given chunk origin to {@link #chunkOrigins}. This means {@link #getChunkAt(int, int)} for the specified chunk origin will
-     * return true, but {@link #getChunkAt(int, int)} for the specified origin might still return null as creation is currently done asynchronously
-     *
-     * @param chunkOrigin the origin of the chunk whose creation has just been scheduled.
-     */
-    public synchronized void addChunkOrigin(@NotNull Vec2i chunkOrigin) {
-        this.chunkOrigins.add(chunkOrigin.hash64());
+    @ThreadSafe
+    public boolean chunkExistsAtOrigin(@NotNull Vec2i vec) {
+        return getChunkAt(vec.getX(), vec.getY()) != null;
     }
 
     /**
@@ -79,7 +77,8 @@ public class WorldChunkHandlerBase {
      * @return the chunk instance for the specified position
      */
     @Nullable
-    public synchronized ChunkBase getChunkAt(int originX, int originZ) {
+    @ThreadSafe
+    public ChunkBase getChunkAt(int originX, int originZ) {
         return this.chunkMap.get(Vec2i.hash64(originX, originZ));
     }
 
@@ -88,41 +87,50 @@ public class WorldChunkHandlerBase {
      *
      * @param chunk the new chunk
      */
+    @ThreadSafe
     public synchronized void addChunk(@NotNull ChunkBase chunk) {
+        if (getChunkAt(chunk.getX(), chunk.getZ()) != null)
+            return;
+
+        long hash = Vec2i.hash64(chunk.getX(), chunk.getZ());
         this.chunks.add(chunk);
-        this.chunkMap.put(Vec2i.hash64(chunk.getX(), chunk.getZ()), chunk);
+        this.chunkMap.put(hash, chunk);
+        this.uninitializedChunks.add(chunk);
     }
 
     @NotNull
-    public synchronized ArrayList<ChunkBase> getChunks() {
+    @ThreadSafe
+    public List<ChunkBase> collectChunks() {
         return chunks;
     }
 
     @NotNull
-    public synchronized ArrayList<ChunkBase> getUnloadedChunks() {
-        return unloadedChunks;
-    }
-
-    @NotNull
-    public synchronized ArrayList<ChunkBase> getLoadedChunks() {
+    @ThreadSafe
+    public List<ChunkBase> getLoadedChunks() {
         return loadedChunks;
     }
 
-    public synchronized void addLoadedChunk(@NotNull ChunkBase chunk) {
-        if (!loadedChunks.contains(chunk))
+    @ThreadSafe
+    public synchronized void loadChunk(@NotNull ChunkBase chunk) {
+        this.uninitializedChunks.remove(chunk);
+
+        if (!this.loadedChunks.contains(chunk))
             this.loadedChunks.add(chunk);
+
+        this.unloadedChunks.remove(chunk);
     }
 
-    public synchronized void addUnloadedChunk(ChunkBase chunk) {
-        if (!unloadedChunks.contains(chunk))
+    @ThreadSafe
+    public synchronized void unloadChunk(@NotNull ChunkBase chunk) {
+        this.uninitializedChunks.remove(chunk);
+
+        if (!this.unloadedChunks.contains(chunk))
             this.unloadedChunks.add(chunk);
-    }
-
-    public synchronized void removeLoadedChunk(ChunkBase chunk) {
         this.loadedChunks.remove(chunk);
     }
 
-    public synchronized void removeUnloadedChunk(@NotNull ChunkBase chunk) {
-        this.unloadedChunks.remove(chunk);
+    @NotNull
+    public Stream<Reference<ChunkBase>> getLoadableChunks() {
+        return Stream.concat(this.unloadedChunks.parallelStream().map(WeakReference::new), this.uninitializedChunks.parallelStream().map(WeakReference::new));
     }
 }

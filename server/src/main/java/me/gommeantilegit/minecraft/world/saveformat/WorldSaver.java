@@ -3,7 +3,6 @@ package me.gommeantilegit.minecraft.world.saveformat;
 import me.gommeantilegit.minecraft.nbt.NBTObject;
 import me.gommeantilegit.minecraft.nbt.impl.NBTArray;
 import me.gommeantilegit.minecraft.nbt.impl.NBTFloat;
-import me.gommeantilegit.minecraft.nbt.impl.NBTInteger;
 import me.gommeantilegit.minecraft.nbt.writer.NBTStreamWriter;
 import me.gommeantilegit.minecraft.packet.packets.server.ServerChunkDataPacket;
 import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
@@ -14,6 +13,8 @@ import org.jetbrains.annotations.NotNull;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -36,10 +37,14 @@ public class WorldSaver {
      * Writes the data representing {@link #world} to the output stream
      *
      * @param outputStream the zip output stream
-     * @return this
      */
-    @NotNull
-    public WorldSaver save(@NotNull ZipOutputStream outputStream) throws IOException {
+    public void save(@NotNull ZipOutputStream outputStream) throws IOException {
+        Future<Void> future = this.world.pauseTick();
+        try {
+            future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Failed to pause world tick", e);
+        }
         outputStream.putNextEntry(new ZipEntry("worldGeneratorOptions"));
         // Saving world generation options
         {
@@ -72,33 +77,34 @@ public class WorldSaver {
 
         ServerChunkDataPacket.Encoder packetEncoder = new ServerChunkDataPacket.Encoder();
 
-        synchronized (world.getWorldChunkHandler().getChunks()) {
-            this.world.getWorldChunkHandler().getChunks().forEach(c -> {
-                try {
-                    outputStream.putNextEntry(new ZipEntry("chunk_" + c.getX() + "_" + c.getZ()));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                ServerChunkDataPacket packet = new ServerChunkDataPacket(null, c.getChunkOrigin().asLibGDXVec2D(), c);
-                BitByteBuffer tempBuffer = new BitByteBuffer();
-                tempBuffer.useBytes();
-                packetEncoder.serialize(
-                        packet, tempBuffer
-                );
-                try {
-                    outputStream.write(tempBuffer.retrieveBytes());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                try {
-                    outputStream.closeEntry();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-        }
+//        synchronized (world.getWorldChunkHandler().getChunks()) {
+
+        this.world.getWorldChunkHandler().collectChunks().forEach(c -> {
+            try {
+                outputStream.putNextEntry(new ZipEntry("chunk_" + c.getX() + "_" + c.getZ()));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            ServerChunkDataPacket packet = new ServerChunkDataPacket(null, c.getChunkOrigin().asLibGDXVec2D(), c);
+            BitByteBuffer tempBuffer = new BitByteBuffer();
+            tempBuffer.useBytes();
+            packetEncoder.serialize(
+                    packet, tempBuffer
+            );
+            try {
+                outputStream.write(tempBuffer.retrieveBytes());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            try {
+                outputStream.closeEntry();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+//        }
         outputStream.close();
-        return this;
+        this.world.resumeTick();
     }
 
 

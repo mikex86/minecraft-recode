@@ -9,13 +9,16 @@ import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
+import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
-import me.gommeantilegit.minecraft.timer.api.AsyncOperation;
+import me.gommeantilegit.minecraft.texture.manager.TextureManager;
 import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
 import me.gommeantilegit.minecraft.world.ClientWorld;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
+import me.gommeantilegit.minecraft.world.chunk.ChunkSection;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
-import me.gommeantilegit.minecraft.world.chunk.world.ChunkRenderManager;
+import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
+import me.gommeantilegit.minecraft.world.chunk.world.RenderManager;
 import org.jetbrains.annotations.NotNull;
 
 import static com.badlogic.gdx.graphics.Color.argb8888ToColor;
@@ -27,7 +30,7 @@ import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBU
 import static me.gommeantilegit.minecraft.util.RenderUtils.rect;
 
 @SideOnly(side = CLIENT)
-public class WorldRenderer implements AsyncOperation, OpenGLOperation {
+public class WorldRenderer implements OpenGLOperation {
 
     private static final float CLOUD_LEVEL = 127;
 
@@ -50,10 +53,10 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
     private final EntityPlayerSP viewer;
 
     /**
-     * Minecraft instance
+     * The this.shader program used to render the world
      */
     @NotNull
-    private final ClientMinecraft mc;
+    private final StdShader shader;
 
     /**
      * State whether fog should be rendered to smooth of world render limit
@@ -66,14 +69,34 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
     private boolean renderClouds;
 
     /**
-     * @param world sets {@link #world}
-     * @param viewer sets {@link #viewer}
-     * @param mc sets {@link #mc}
+     * Manager of the textures the world renderer needs to render the world
      */
-    public WorldRenderer(@NotNull ClientWorld world, @NotNull EntityPlayerSP viewer, @NotNull ClientMinecraft mc) {
+    @NotNull
+    private final TextureManager textureManager;
+
+    /**
+     * Used to render entities
+     */
+    @NotNull
+    private final EntityRenderer entityRenderer;
+
+    /**
+     * The number of chunk section draw calls performed in the current frame
+     */
+    private int chunkSectionDrawCalls;
+
+    /**
+     * @param world          sets {@link #world}
+     * @param viewer         sets {@link #viewer}
+     * @param textureManager sets {@link #textureManager}
+     * @param entityRenderer sets {@link #entityRenderer}
+     */
+    public WorldRenderer(@NotNull ClientWorld world, @NotNull EntityPlayerSP viewer, @NotNull ClientMinecraft mc, @NotNull StdShader shader, @NotNull TextureManager textureManager, @NotNull EntityRenderer entityRenderer) {
         this.world = world;
-        this.mc = mc;
+        this.shader = shader;
         this.viewer = viewer;
+        this.textureManager = textureManager;
+        this.entityRenderer = entityRenderer;
         setEnableFog(mc.gameSettings.videoSettings.getEnableFog());
         setRenderClouds(mc.gameSettings.videoSettings.getRenderClouds());
     }
@@ -84,35 +107,34 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
      * @param partialTicks timer partial ticks
      */
     public void render(float partialTicks) {
-        Gdx.gl20.glDisable(GL_CULL_FACE); // Disable Face culling!!! (Or else white artifacts at T-Junctions will appear)
         long worldTime = world.worldTime;
-        StdShader shader = mc.shaderManager.stdShader;
-        shader.enableFog(enableFog);
+        this.shader.enableFog(enableFog);
         updateFogColor(worldTime, partialTicks);
 
         if (enableFog) {
             setupFog();
-            shader.setFogColor(fogColor);
-            Gdx.gl20.glCullFace(GL20.GL_BACK);
+            this.shader.setFogColor(fogColor);
+            Gdx.gl.glCullFace(GL20.GL_BACK);
             renderBlueSky(worldTime, partialTicks);
         }
 
+//        long renderTimeSpent = 0;
+        this.chunkSectionDrawCalls = 0;
         setupWorldLighting(worldTime, partialTicks);
         {
             // Rendering Blocks
-            this.world.chunkRenderManager.startStage(ChunkRenderManager.RenderStage.CHUNKS);
-//            synchronized (this.world.chunkRenderManager.chunks) {
+            this.world.getRenderManager().startStage(RenderManager.RenderStage.CHUNKS);
             {
-                while (this.world.chunkRenderManager.hasNext()) {
-                    ClientChunk chunk = this.world.chunkRenderManager.nextChunk();
-                    if (chunk != null) {
-                        if (isChunkInCameraFrustum(chunk)) {
-                            try {
-                                mc.textureManager.blockTextureMap.getTexture().bind();
-                                chunk.render(partialTicks);
-                            } catch (Exception e) {
-                                throw new IllegalStateException("Error while rendering chunk " + chunk, e);
-                            }
+                while (this.world.getRenderManager().hasNext()) {
+                    ClientChunk chunk = this.world.getRenderManager().nextChunk();
+                    if (isChunkInCameraFrustum(chunk)) {
+                        try {
+                            this.textureManager.blockTextureMap.getTexture().bind();
+//                            long start = System.nanoTime();
+                            this.chunkSectionDrawCalls += chunk.render(this.shader, this, this.entityRenderer, partialTicks);
+//                            renderTimeSpent += System.nanoTime() - start;
+                        } catch (Exception e) {
+                            throw new IllegalStateException("Error while rendering chunk " + chunk, e);
                         }
                     }
                 }
@@ -122,17 +144,21 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
                 // Rendering Clouds
                 setupCloudLighting(worldTime, partialTicks);
                 renderClouds(worldTime, partialTicks);
-                shader.setColor(1, 1, 1, 1);
+                this.shader.setColor(1, 1, 1, 1);
             }
+            Gdx.gl.glDisable(GL_CULL_FACE);
         }
 
-        shader.enableFog(false);
+        this.shader.enableFog(false);
         Gdx.gl.glEnable(GL_CULL_FACE);
         Gdx.gl.glCullFace(GL_FRONT); // Resetting culled face to Front face
+//        double chunkRenderTime = renderTimeSpent / 1E6;
+//        if (chunkRenderTime > 3)
+//            System.err.println("chunkRenderTime: " + chunkRenderTime);
     }
 
     /**
-     * Sets up the shader lighting uniforms for world rendering
+     * Sets up the this.shader lighting uniforms for world rendering
      *
      * @param worldTime    the world time in ticks
      * @param partialTicks timer partial ticks
@@ -143,22 +169,22 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
         brightness = clamp(brightness, 0, 1);
         double angle = 2 * PI * celestialAngle;
         Vector3 lightDir = new Vector3((float) cos(angle), (float) sin(angle), 0);
-        mc.shaderManager.stdShader.setUniformf("lightDirection", lightDir);
-        mc.shaderManager.stdShader.setMinDiffusedLighting(0.2f);
-        mc.shaderManager.stdShader.setColor(brightness, brightness, brightness, 1);
+        this.shader.setUniformf("lightDirection", lightDir);
+        this.shader.setMinDiffusedLighting(0.3f);
+        this.shader.setColor(brightness, brightness, brightness, 1);
     }
 
     /**
-     * Sets up the shader lighting uniforms for cloud rendering
+     * Sets up the this.shader lighting uniforms for cloud rendering
      *
      * @param worldTime    the world time in ticks
      * @param partialTicks timer partial ticks
      */
     public void setupCloudLighting(long worldTime, float partialTicks) {
         Color fogColor = getFogColor(worldTime, partialTicks);
-        mc.shaderManager.stdShader.setUniformf("lightDirection", 0.20000000298023224f, -1.0f, -0.69999998807907104f); // Setting up cloud lighting
-        mc.shaderManager.stdShader.setMinDiffusedLighting(0.6f);
-        mc.shaderManager.stdShader.setColor(fogColor.r, fogColor.g, fogColor.b, 0.8f);
+        this.shader.setUniformf("lightDirection", 0.20000000298023224f, -1.0f, -0.69999998807907104f); // Setting up cloud lighting
+        this.shader.setMinDiffusedLighting(0.6f);
+        this.shader.setColor(fogColor.r, fogColor.g, fogColor.b, 0.8f);
     }
 
     /**
@@ -167,18 +193,18 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
      * @return the angle for sun/moon according to the world time
      */
     public float calculateCelestialAngle(long worldTime, float partialTicks) {
-        int i = (int) (worldTime % 24000L);
-        float f1 = ((float) i + partialTicks) / 24000F - 0.25F;
-        if (f1 < 0.0F) {
-            f1++;
+        int dayTimeTicks = (int) (worldTime % 24000L);
+        float dayTimeRelative = ((float) dayTimeTicks + partialTicks) / 24000F - 0.25F;
+        if (dayTimeRelative < 0.0F) {
+            dayTimeRelative++;
         }
-        if (f1 > 1.0F) {
-            f1--;
+        if (dayTimeRelative > 1.0F) {
+            dayTimeRelative--;
         }
-        float f2 = f1;
-        f1 = 1.0F - (float) ((cos((double) f1 * 3.1415926535897931D) + 1.0D) / 2D);
-        f1 = f2 + (f1 - f2) / 3F;
-        return f1;
+        float celestialAngle = dayTimeRelative;
+        dayTimeRelative = 1.0F - (float) ((cos((double) dayTimeRelative * PI) + 1.0D) / 2D);
+        dayTimeRelative = celestialAngle + (dayTimeRelative - celestialAngle) / 3F;
+        return dayTimeRelative;
     }
 
     /**
@@ -191,7 +217,7 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
 //        WorldBase world = mc.theWorld;
 //        LivingEntity entityliving = mc.thePlayer;
         float dstFactor = 0.25F + 0.75F * (float) this.world.getChunkLoadingDistance() / ChunkBase.CHUNK_SIZE / 32.0F;
-        dstFactor = 1.0F - (float) Math.pow((double) dstFactor, 0.25D);
+        dstFactor = 1.0F - (float) Math.pow(dstFactor, 0.25D);
         Color skyColor = getSkyColor(worldTime, partialTicks);
         float skyR = skyColor.r;
         float skyG = skyColor.g;
@@ -244,37 +270,35 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
         // Building the sky top mesh
         if (blueSkyMesh == null) {
             int len = 512;
-            MeshBuilder meshBuilder = new MeshBuilder();
+            OptimizedMeshBuilder meshBuilder = new OptimizedMeshBuilder();
             meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
             meshBuilder.circle(len, 10, 0, 0, 0, 0, -1, 0);
             blueSkyMesh = meshBuilder.end();
         }
         Color skyColor = getSkyColor(worldTime, partialTicks);
-        StdShader shader = mc.shaderManager.stdShader;
 
         Gdx.gl.glBindTexture(GL_TEXTURE_2D, 0);
-        Gdx.gl.glDisable(GL_TEXTURE_2D);
+//        Gdx.gl.glDisable(GL_TEXTURE_2D);
 
-        shader.disableLighting();
-        shader.forceColor(skyColor.r, skyColor.g, skyColor.b, skyColor.a);
-        shader.pushMatrix();
-        shader.translate(viewer.posX, viewer.lastPosY + (viewer.posY - viewer.lastPosY) * partialTicks + CLOUD_LEVEL, viewer.posZ);
-        blueSkyMesh.render(shader, GL_TRIANGLES);
-        shader.popMatrix();
-        shader.resetForcedColor();
-        shader.resetForcedColor();
-        shader.enableLighting();
-        Gdx.gl.glEnable(GL_TEXTURE_2D);
+        this.shader.disableLighting();
+        this.shader.forceColor(skyColor.r, skyColor.g, skyColor.b, skyColor.a);
+        this.shader.pushMatrix();
+        this.shader.translate(viewer.posX, viewer.lastPosY + (viewer.posY - viewer.lastPosY) * partialTicks + CLOUD_LEVEL, viewer.posZ);
+        blueSkyMesh.render(this.shader, GL_TRIANGLES);
+        this.shader.popMatrix();
+        this.shader.resetForcedColor();
+        this.shader.resetForcedColor();
+        this.shader.enableLighting();
+//        Gdx.gl.glEnable(GL_TEXTURE_2D);
     }
 
     /**
      * Sets up the fog
      */
     private void setupFog() {
-        StdShader shader = mc.shaderManager.stdShader;
         float farPlaneDistance = world.getChunkLoadingDistance();
-        shader.setFogStart(farPlaneDistance * 0.25F);
-        shader.setFogEnd(farPlaneDistance);
+        this.shader.setFogStart(farPlaneDistance * 0.25F);
+        this.shader.setFogEnd(farPlaneDistance);
     }
 
     /**
@@ -312,10 +336,10 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
     private void renderClouds(long worldTime, float partialTicks) {
         int cloudSize = 12;
         Gdx.gl.glDisable(GL_CULL_FACE);
-        mc.textureManager.cloudsTexture.bind();
-        int size = mc.textureManager.cloudsTexture.getWidth() * cloudSize; // Each pixel is 12 block wide (12 block = minecraft cloud width/depth)
+        this.textureManager.cloudsTexture.bind();
+        int size = this.textureManager.cloudsTexture.getWidth() * cloudSize; // Each pixel is 12 block wide (12 block = minecraft cloud width/depth)
         if (cloudMesh == null) {
-            MeshBuilder meshBuilder = new MeshBuilder();
+            OptimizedMeshBuilder meshBuilder = new OptimizedMeshBuilder();
             meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
             rect(meshBuilder,
                     -size, 0, -size,
@@ -332,8 +356,8 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
             );
             cloudMesh = meshBuilder.end();
         }
-        mc.shaderManager.stdShader.disableLighting();
-        mc.shaderManager.stdShader.pushMatrix();
+        this.shader.disableLighting();
+        this.shader.pushMatrix();
 
         float cloudMovingSpeed = 250f;
         float movingXTranslate = (((worldTime + partialTicks) % cloudMovingSpeed) / cloudMovingSpeed) * cloudSize * 2;
@@ -344,20 +368,20 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
         int xC = (int) (viewX / cloudSize);
         int zC = (int) (viewZ / cloudSize);
 
-        mc.shaderManager.stdShader.translate(-movingXTranslate + xC * cloudSize * 2, CLOUD_LEVEL, zC * cloudSize * 2);
-        mc.shaderManager.stdShader.enableTextureMapping();
+        this.shader.translate(-movingXTranslate + xC * cloudSize * 2, CLOUD_LEVEL, zC * cloudSize * 2);
+        this.shader.enableTextureMapping();
 
         int xOffset = (int) (worldTime / cloudMovingSpeed);
 
-        mc.shaderManager.stdShader.setPixelU0(xC + xOffset);
-        mc.shaderManager.stdShader.setPixelU1(xC + xOffset + mc.textureManager.cloudsTexture.getWidth());
-        mc.shaderManager.stdShader.setPixelV0(zC);
-        mc.shaderManager.stdShader.setPixelV1(zC + mc.textureManager.cloudsTexture.getHeight());
-        cloudMesh.render(mc.shaderManager.stdShader, GL_TRIANGLES);
+        this.shader.setPixelU0(xC + xOffset);
+        this.shader.setPixelU1(xC + xOffset + this.textureManager.cloudsTexture.getWidth());
+        this.shader.setPixelV0(zC);
+        this.shader.setPixelV1(zC + this.textureManager.cloudsTexture.getHeight());
+        cloudMesh.render(this.shader, GL_TRIANGLES);
 
-        mc.shaderManager.stdShader.disableTextureMapping();
-        mc.shaderManager.stdShader.popMatrix();
-        mc.shaderManager.stdShader.enableLighting();
+        this.shader.disableTextureMapping();
+        this.shader.popMatrix();
+        this.shader.enableLighting();
         Gdx.gl.glEnable(GL_CULL_FACE);
     }
 
@@ -402,19 +426,24 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
     }
 
     /**
+     * @param section the given section to be checked
+     * @return true if the section is in the players frustum
+     */
+    public boolean isChunkInCameraFrustum(@NotNull ChunkSection section) {
+        return this.viewer.virtualCamera.frustum.boundsInFrustum(section.getBoundingBox());
+    }
+
+    /**
      * @param chunk the given chunk to be checked
      * @return true if the chunk is in the players frustum
      */
-    private boolean isChunkInCameraFrustum(@NotNull ChunkBase chunk) {
+    public boolean isChunkInCameraFrustum(@NotNull ChunkBase chunk) {
         return this.viewer.virtualCamera.frustum.boundsInFrustum(chunk.getBoundingBox());
     }
 
+    @NotNull
     public ClientWorld getWorld() {
         return world;
-    }
-
-    @Override
-    public void onAsyncThread() {
     }
 
     @Override
@@ -427,5 +456,9 @@ public class WorldRenderer implements AsyncOperation, OpenGLOperation {
 
     public void setRenderClouds(boolean renderClouds) {
         this.renderClouds = renderClouds;
+    }
+
+    public int getChunkSectionDrawCalls() {
+        return chunkSectionDrawCalls;
     }
 }

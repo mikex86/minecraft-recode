@@ -5,6 +5,7 @@ import com.badlogic.gdx.math.Vector3;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import me.gommeantilegit.minecraft.ClientMinecraft;
+import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.packet.ServerPacket;
 import me.gommeantilegit.minecraft.packet.handler.chunk.ClientChunkDataHandler;
 import me.gommeantilegit.minecraft.packet.handler.impl.MappedPacketHandler;
@@ -55,7 +56,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
     @Override
     public void registerStaticPacketHandlers() {
 
-        registerPacketHandler(ServerRequestUserInfoPacket.PACKET_ID, new PacketHandler<ServerRequestUserInfoPacket>(mc.minecraftThread) {
+        registerPacketHandler(ServerRequestUserInfoPacket.PACKET_ID, new PacketHandler<ServerRequestUserInfoPacket>() {
 
             @Override
             public void handlePacket(@NotNull ServerRequestUserInfoPacket packet, @NotNull ChannelHandlerContext context) {
@@ -64,7 +65,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
 
         });
 
-        registerPacketHandler(ServerPositionSetPacket.PACKET_ID, new PacketHandler<ServerPositionSetPacket>(mc.minecraftThread) {
+        registerPacketHandler(ServerPositionSetPacket.PACKET_ID, new PacketHandler<ServerPositionSetPacket>(mc.getMinecraftThread()) {
             @Override
             public void handlePacket(@NotNull ServerPositionSetPacket packet, @NotNull ChannelHandlerContext context) {
                 if (packet.hasPosition()) {
@@ -76,20 +77,19 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
                 if (packet.hasRotation()) {
                     Vector2 rot = packet.getRotation();
                     assert rot != null;
-                    mc.thePlayer.rotationYaw = rot.x;
-                    mc.thePlayer.rotationPitch = rot.y;
+                    mc.thePlayer.setRotation(rot.x, rot.y);
                 }
             }
         });
 
-        registerPacketHandler(ServerRequestRenderDistance.PACKET_ID, new PacketHandler<ServerRequestRenderDistance>(mc.minecraftThread) {
+        registerPacketHandler(ServerRequestRenderDistance.PACKET_ID, new PacketHandler<ServerRequestRenderDistance>(mc.getMinecraftThread()) {
             @Override
             public void handlePacket(@NotNull ServerRequestRenderDistance packet, @NotNull ChannelHandlerContext context) {
                 context.channel().writeAndFlush(new ClientChunkLoadingDistanceChangePacket(null, mc.theWorld.getChunkLoadingDistance()));
             }
         });
 
-        registerPacketHandler(ServerForceClientChunkLoadingDistanceChangePacket.PACKET_ID, new PacketHandler<ServerForceClientChunkLoadingDistanceChangePacket>(mc.minecraftThread) {
+        registerPacketHandler(ServerForceClientChunkLoadingDistanceChangePacket.PACKET_ID, new PacketHandler<ServerForceClientChunkLoadingDistanceChangePacket>() {
 
             @Override
             public void handlePacket(@NotNull ServerForceClientChunkLoadingDistanceChangePacket packet, @NotNull ChannelHandlerContext context) {
@@ -98,7 +98,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
 
         });
 
-        registerPacketHandler(ServerSessionValidationConfirmationPacket.PACKET_ID, new PacketHandler<ServerSessionValidationConfirmationPacket>(null) // Processed on netty thread as the change must occur instantly
+        registerPacketHandler(ServerSessionValidationConfirmationPacket.PACKET_ID, new PacketHandler<ServerSessionValidationConfirmationPacket>() // Processed on netty thread as the change must occur instantly
         {
             @Override
             public void handlePacket(@NotNull ServerSessionValidationConfirmationPacket packet, @NotNull ChannelHandlerContext context) {
@@ -106,15 +106,16 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
             }
         });
 
-        registerPacketHandler(ServerWorldSetupPacket.PACKET_ID, new PacketHandler<ServerWorldSetupPacket>(mc.minecraftThread) {
+        registerPacketHandler(ServerWorldSetupPacket.PACKET_ID, new PacketHandler<ServerWorldSetupPacket>(mc.getMinecraftThread()) {
             @Override
             public void handlePacket(@NotNull ServerWorldSetupPacket packet, @NotNull ChannelHandlerContext context) {
                 assert packet.getWorldHeight() % CHUNK_SECTION_SIZE == 0;
                 mc.theWorld = new ClientWorld(mc.thePlayer, mc, packet.getWorldHeight()); // Initializing the world
                 // Setting the world time to the value that the world time on the server would have progressed to assuming steady fluent tick rate
                 mc.theWorld.worldTime = packet.getWorldTime() + (new Date().getTime() - packet.getPacketSentUnixTime()) / 20;
-                mc.theWorld.getChunkCreator().addViewer(mc.thePlayer);
+                mc.theWorld.getChunkLoader().addViewer(mc.thePlayer);
                 mc.theWorld.spawnEntityInWorld(mc.thePlayer); // Spawning player
+
                 setWorldSetup(true);
             }
         });
@@ -122,7 +123,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
         registerPacketHandler(ServerDisconnectMessagePacket.PACKET_ID, new PacketHandler<ServerDisconnectMessagePacket>() {
             @Override
             public void handlePacket(@NotNull ServerDisconnectMessagePacket packet, @NotNull ChannelHandlerContext context) {
-                mc.logger.err("Server terminated connection. Reason: " + packet.getMessage());
+                mc.getLogger().err("Server terminated connection. Reason: " + packet.getMessage());
                 mc.uiManager.displayGuiScreen(new GuiConnectionFailed("Failed to connect to the server", packet.getMessage()));
             }
         });
@@ -136,11 +137,12 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
 //            if (msg instanceof ServerSessionValidationConfirmationPacket) {
 //                System.out.println("ServerSessionValidationConfirmationPacket");
 //            }
-            if ((isSessionEstablished() && isWorldSetup()) || !msg.isGamePacket())
+            if ((isSessionEstablished()) || !msg.isGamePacket())
                 super.messageReceived(ctx, msg);
-            else System.out.println("Ignored packet: " + msg);
+            else
+                System.out.println("Ignored packet: " + msg);
         } catch (Throwable t) {
-            this.mc.logger.exception("Exception on server packet processing caught!", t);
+            this.mc.getLogger().exception("Exception on server packet processing caught!", t);
         }
     }
 
@@ -149,7 +151,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
         super.channelRegistered(ctx);
         Channel channel = ctx.channel();
         this.registeredChannels.add(channel);
-        this.mc.logger.debug("Channel " + channel.remoteAddress() + " registered");
+        this.mc.getLogger().debug("Channel " + channel.remoteAddress() + " registered");
     }
 
     @Override
@@ -162,7 +164,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
     public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
         super.channelUnregistered(ctx);
         this.registeredChannels.remove(ctx.channel());
-        this.mc.logger.debug("Channel " + ctx.channel().remoteAddress() + " unregistered");
+        this.mc.getLogger().debug("Channel " + ctx.channel().remoteAddress() + " unregistered");
         mc.closeServerConnection();
     }
 

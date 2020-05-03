@@ -43,7 +43,7 @@ public class GuiMultiplayer extends GuiScreen {
     public void initGui(int scaledWidth, int scaledHeight) {
         super.initGui(scaledWidth, scaledHeight);
         GuiButton connectButton = new GuiButton("Connect", scaledWidth / 2 - 100, scaledHeight / 4 + 96 + 12, mc);
-        GuiTextField serverIPTextField = new GuiTextField("server.ip", 200, 20, scaledWidth / 2 - 100, (scaledHeight / 4 - 10) + 50 + 18, mc) {
+        GuiTextField serverIPTextField = new GuiTextField("localhost", 200, 20, scaledWidth / 2 - 100, (scaledHeight / 4 - 10) + 50 + 18, mc) {
             @Override
             public boolean keyTyped(char character) {
                 boolean state = super.keyTyped(character);

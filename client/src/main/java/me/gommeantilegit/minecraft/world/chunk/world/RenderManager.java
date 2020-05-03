@@ -2,18 +2,20 @@ package me.gommeantilegit.minecraft.world.chunk.world;
 
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
+import me.gommeantilegit.minecraft.utils.Clock;
 import me.gommeantilegit.minecraft.world.ClientWorld;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Iterator;
 import java.util.List;
 
 /**
  * Object for fluent ChunkBase Iteration for world rendering
  */
 @SideOnly(side = Side.CLIENT)
-public class ChunkRenderManager {
+public class RenderManager {
 
     @NotNull
     private final ClientWorld world;
@@ -26,9 +28,9 @@ public class ChunkRenderManager {
     /**
      * Current chunks of render queue
      */
-    public List<ChunkBase> chunks;
+    public Iterator<ChunkBase> chunkIterator;
 
-    public ChunkRenderManager(@NotNull ClientWorld world) {
+    public RenderManager(@NotNull ClientWorld world) {
         this.world = world;
     }
 
@@ -41,20 +43,24 @@ public class ChunkRenderManager {
             default:
                 return;
         }
-        this.chunks = chunks;
-        iterationIndex = 0;
+        this.chunkIterator = chunks.iterator();
+        this.iterationIndex = 0;
     }
 
     public boolean hasNext() {
-        return iterationIndex < chunks.size();
+        return this.chunkIterator.hasNext();
     }
 
+    @NotNull
     public ClientChunk nextChunk() {
-        try {
-            return (ClientChunk) this.chunks.get(iterationIndex++);
-        } catch (IndexOutOfBoundsException e) {
-            return null;
-        }
+        return (ClientChunk) this.chunkIterator.next();
+    }
+
+//    @NotNull
+//    private final Clock uploadClock = new Clock(false);
+//
+    public boolean canUpload() {
+        return true;
     }
 
     /**

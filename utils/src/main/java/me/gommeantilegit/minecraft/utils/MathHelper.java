@@ -80,4 +80,34 @@ public class MathHelper {
         double phi = Math.abs(angle2 - angle1) % 360;       // This is either the distance or 360 - distance
         return phi > 180 ? 360 - phi : phi;
     }
+
+    /**
+     * @param value the given value
+     * @return the number of bits needed to represent the given value
+     */
+    public static int getNeededBits(int value) {
+        int count = 0;
+        while (value > 0) {
+            count++;
+            value = value >> 1;
+        }
+        return count;
+    }
+
+    /**
+     * @param value the given value
+     * @return the number of bits needed to represent the given value
+     */
+    public static int getNeededBits(long value) {
+        int count = 1;
+        while (value > 0) {
+            count++;
+            value = value >> 1;
+        }
+        return count;
+    }
+
+    public static int iceil(int x, int y) {
+        return x / y + ((x % y > 0) ? 1 : 0);
+    }
 }

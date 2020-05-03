@@ -7,15 +7,23 @@ import com.badlogic.gdx.math.collision.Ray;
 import me.gommeantilegit.minecraft.block.material.Material;
 import me.gommeantilegit.minecraft.block.state.BlockState;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
+import me.gommeantilegit.minecraft.block.state.property.BlockStateProperty;
+import me.gommeantilegit.minecraft.block.state.property.BlockStatePropertyMap;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
 import me.gommeantilegit.minecraft.raytrace.RayTracer;
 import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
 import me.gommeantilegit.minecraft.util.block.position.BlockPos;
+import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
+import me.gommeantilegit.minecraft.utils.serialization.exception.DeserializationException;
 import me.gommeantilegit.minecraft.world.WorldBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 public class Block {
 
@@ -87,20 +95,107 @@ public class Block {
      */
     private String soundType;
 
+    /**
+     * Stores all block state properties the block has
+     */
+    @NotNull
+    private final List<BlockStateProperty<?>> properties = new ArrayList<>();
+
+    /**
+     * List of possible block states
+     */
+    @NotNull
+    private final List<IBlockState> blockStates;
+
     public Block(@NotNull String unlocalizedName, int id, @NotNull Material blockMaterial) {
         this.unlocalizedName = unlocalizedName;
         this.id = id;
         this.slipperiness = 0.6f;
         this.blockMaterial = blockMaterial;
         this.setShape(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+        this.onRegisterProperties();
+        this.blockStates = createBlockStates();
     }
+
+    @NotNull
+    private List<IBlockState> createBlockStates() {
+        List<IBlockState> blockStates = new ArrayList<>();
+        for (BlockStateProperty<?> property : this.properties) {
+            blockStates.addAll(createBlockStates(property));
+        }
+        if (this.properties.isEmpty()) {
+            blockStates.add(newBlockState());
+        }
+        return blockStates;
+    }
+
+    @NotNull
+    private <T> List<IBlockState> createBlockStates(@NotNull BlockStateProperty<T> property) {
+        List<IBlockState> blockStates = new ArrayList<>();
+        for (T allowedValue : property.getAllowedValues()) {
+            BlockState state = newBlockState();
+            state.setValue(property, allowedValue);
+            blockStates.add(state);
+        }
+        return blockStates;
+    }
+
+    @NotNull
+    private BlockState newBlockState() {
+        return new BlockState(this) {
+
+            @Override
+            public void initProperties(@NotNull BlockStatePropertyMap.Builder builder) {
+                for (BlockStateProperty<?> property : properties) {
+                    addProperty(builder, property);
+                }
+            }
+
+            @Override
+            public void serialize(@NotNull BitByteBuffer buffer) {
+                super.serialize(buffer);
+                for (BlockStateProperty<?> property : properties) {
+                    serializeProperty(buffer, property);
+                }
+            }
+
+            @NotNull
+            @Override
+            public BlockState deserialize(@NotNull BitByteBuffer buffer, @NotNull Blocks blocks) throws DeserializationException {
+                BlockState blockState = super.deserialize(buffer, blocks);
+                for (BlockStateProperty<?> property : properties) {
+                    deserializeProperty(blockState, buffer, property);
+                }
+                return blockState;
+            }
+
+            private <T> void deserializeProperty(@NotNull BlockState blockState, @NotNull BitByteBuffer buffer, @NotNull BlockStateProperty<T> property) {
+                blockState.setValue(property, property.deserialize(buffer));
+            }
+
+            private <T> void serializeProperty(@NotNull BitByteBuffer buffer, @NotNull BlockStateProperty<T> property) {
+                property.serialize(buffer, getPropertyValue(property));
+            }
+
+            private <T> void addProperty(@NotNull BlockStatePropertyMap.Builder builder, @NotNull BlockStateProperty<T> property) {
+                builder.withProperty(property, property.getDefaultValue());
+            }
+        };
+    }
+
+    /**
+     * Called to register all the block state properties of the block
+     */
+    protected void onRegisterProperties() {
+    }
+
 
     /**
      * @return a new default block state fitting for the blocks default state in properties
      */
     @NotNull
-    public BlockState getDefaultBlockState() {
-        return new BlockState(this);
+    public IBlockState getDefaultBlockState() {
+        return this.blockStates.get(0);
     }
 
     /**
@@ -124,6 +219,7 @@ public class Block {
 
     /**
      * Sets the sound type string of the block to the specified value
+     *
      * @param soundType the unlocalizedName of the sound type that the block has
      * @return self instance for the purpose of method chaining
      */
@@ -231,5 +327,14 @@ public class Block {
 
     private boolean isCollidable() {
         return collidable;
+    }
+
+    protected void registerProperty(@NotNull BlockStateProperty<?> property) {
+        this.properties.add(property);
+    }
+
+    @NotNull
+    public Collection<? extends IBlockState> getPossibleBlockStates() {
+        return this.blockStates;
     }
 }

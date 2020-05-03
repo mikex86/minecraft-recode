@@ -6,6 +6,7 @@ import me.gommeantilegit.minecraft.utils.async.AsyncExecutor;
 import me.gommeantilegit.minecraft.utils.async.AsyncResult;
 import me.gommeantilegit.minecraft.utils.async.Invokable;
 import me.gommeantilegit.minecraft.utils.async.ListenableFuture;
+import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -25,14 +26,14 @@ public interface MeshBuilding {
      * @return the meshbuilder that the mesh was built into
      */
     @NotNull
-    MeshBuilder buildMesh();
+    OptimizedMeshBuilder buildMesh();
 
     /**
      * Stores the built mesh that is ready to be converted into a mesh
      *
      * @param meshBuilder the just built mesh-builder
      */
-    void storeBuildMesh(@NotNull MeshBuilder meshBuilder);
+    void storeBuildMesh(@NotNull OptimizedMeshBuilder meshBuilder);
 
     /**
      * Called to set up the mesh builder that is later converted into a mesh.
@@ -59,10 +60,10 @@ public interface MeshBuilding {
      * @param meshBuilder the mesh-builder containing the built mesh ready to be finished
      */
     @NeedsOpenGLContext
-    void finishMesh(@NotNull MeshBuilder meshBuilder);
+    void finishMesh(@NotNull OptimizedMeshBuilder meshBuilder);
 
     /**
-     * Wrapper function version of {@link #finishMesh(MeshBuilder)}
+     * Wrapper function version of {@link #finishMesh(OptimizedMeshBuilder)}
      */
     @NeedsOpenGLContext
     void finishMesh();

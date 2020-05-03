@@ -15,6 +15,7 @@ import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
 import me.gommeantilegit.minecraft.ui.button.GuiButton;
 import me.gommeantilegit.minecraft.ui.screen.GuiScreen;
+import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
@@ -189,6 +190,7 @@ public class GuiMainMenu extends GuiScreen {
                 1, 1, 1
         ).nor();
 
+        private boolean rendering;
 
         private MinecraftLogo() {
             this.logoBlocks = new LogoBlock[MINECRAFT_LOGO.length][MINECRAFT_LOGO[0].length()];
@@ -207,19 +209,21 @@ public class GuiMainMenu extends GuiScreen {
         public void resize(int width, int height) {
             int k = 120 * DPI.scaleFactor;
             this.cam.viewportWidth = width;
-            this.cam.viewportHeight = height - k;
+            this.cam.viewportHeight = height / 2f;
+            this.cam.update();
         }
 
         public void render() {
+            rendering = true;
             if (stoneBlockMesh == null) {
-                MeshBuilder meshBuilder = new MeshBuilder();
+                OptimizedMeshBuilder meshBuilder = new OptimizedMeshBuilder();
                 meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
-                Objects.requireNonNull(mc.blockRendererRegistry.getRenderer(mc.blocks.stone)).render(meshBuilder, 0, 0, 0, 0, 0, 0, null, mc.blocks.stone.getDefaultBlockState(), true);
+                Objects.requireNonNull(mc.blockRendererRegistry.getRenderer(mc.getBlocks().stone)).render(meshBuilder, 0, 0, 0, null, null, mc.getBlocks().stone.getDefaultBlockState(), true);
                 stoneBlockMesh = meshBuilder.end();
             }
 
-            Gdx.gl20.glEnable(GL20.GL_CULL_FACE);
-            Gdx.gl20.glCullFace(GL20.GL_BACK);
+            Gdx.gl.glEnable(GL20.GL_CULL_FACE);
+            Gdx.gl.glCullFace(GL20.GL_BACK);
 
             Gdx.gl.glEnable(GL20.GL_BLEND);
             Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -258,7 +262,7 @@ public class GuiMainMenu extends GuiScreen {
                         if (logoBlock == null)
                             continue;
                         stdShader.pushMatrix();
-                        float translateZ = (float) (logoBlock.lastTranslation + (logoBlock.translation - logoBlock.lastTranslation) * (double) mc.timer.partialTicks);
+                        float translateZ = (float) (logoBlock.lastTranslation + (logoBlock.translation - logoBlock.lastTranslation) * (double) mc.getTimer().partialTicks);
                         float scale = 1.0F;
                         float alpha = 1.0F;
                         float rotate = 0.0F;
@@ -285,8 +289,8 @@ public class GuiMainMenu extends GuiScreen {
             stdShader.setColor(1f, 1f, 1f, 1f);
             stdShader.renderEnd();
             stdShader.end();
-            Gdx.gl20.glDisable(GL20.GL_CULL_FACE);
-            Gdx.gl20.glViewport(0, 0, mc.width, mc.height);
+            Gdx.gl.glDisable(GL20.GL_CULL_FACE);
+            Gdx.gl.glViewport(0, 0, mc.width, mc.height);
         }
 
         public void reset() {
@@ -305,6 +309,9 @@ public class GuiMainMenu extends GuiScreen {
          */
         @Override
         public void tick(float partialTicks) {
+            if (!this.rendering)
+                return;
+
             for (int i = 0; i < this.logoBlocks.length; i++) {
                 for (int j = 0; j < this.logoBlocks[i].length; j++) {
                     if (this.logoBlocks[i][j] != null)

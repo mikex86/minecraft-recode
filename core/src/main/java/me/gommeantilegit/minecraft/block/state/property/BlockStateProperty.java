@@ -1,12 +1,14 @@
 package me.gommeantilegit.minecraft.block.state.property;
 
 import me.gommeantilegit.minecraft.block.state.BlockState;
+import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
+import java.util.List;
 
 /**
  * Represents a property that is parent to a {@link BlockState} instance
+ *
  * @param <T> the type of value that is parent to the property
  */
 public abstract class BlockStateProperty<T> {
@@ -27,12 +29,43 @@ public abstract class BlockStateProperty<T> {
      * The values that the property is allowed to have
      */
     @NotNull
-    private final Collection<T> allowedValues;
+    private final List<T> allowedValues;
 
-    public BlockStateProperty(@NotNull String name, @NotNull Class<T> valueClass, @NotNull Collection<T> allowedValues) {
+    /**
+     * The default value the property holds when not specified otherwise
+     */
+    @NotNull
+    private final T defaultValue;
+
+    public BlockStateProperty(@NotNull String name, @NotNull Class<T> valueClass, @NotNull List<T> allowedValues, @NotNull T defaultValue) {
+        if (!isValidValue(defaultValue))
+            throw new IllegalStateException("Default value for property not contained in allowed values!");
         this.name = name;
         this.valueClass = valueClass;
         this.allowedValues = allowedValues;
+        this.defaultValue = defaultValue;
+    }
+
+
+    /**
+     * Serializes a block state value of this property type onto a bit-buffer
+     *
+     * @param buffer        the destination buffer
+     * @param propertyValue the value to serialize typed of this property
+     */
+    public void serialize(@NotNull BitByteBuffer buffer, @NotNull T propertyValue) {
+        buffer.writeInt(this.allowedValues.indexOf(propertyValue));
+    }
+
+    /**
+     * Deserializes a block state value of this property type from a bit-buffer
+     *
+     * @param buffer the source buffer
+     * @return the de-serialized property value
+     */
+    @NotNull
+    public T deserialize(@NotNull BitByteBuffer buffer) {
+        return this.allowedValues.get(buffer.readInt());
     }
 
     @Override
@@ -59,5 +92,15 @@ public abstract class BlockStateProperty<T> {
     @NotNull
     public Class<T> getValueClass() {
         return valueClass;
+    }
+
+    @NotNull
+    public List<T> getAllowedValues() {
+        return allowedValues;
+    }
+
+    @NotNull
+    public T getDefaultValue() {
+        return defaultValue;
     }
 }

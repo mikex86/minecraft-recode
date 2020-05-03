@@ -43,7 +43,7 @@ public class ConsoleReader extends Thread {
             while (this.minecraft.isRunning()) {
                 if (this.scanner.hasNextLine()) {
                     String line = this.scanner.nextLine();
-                    minecraft.logger.info("Console input: \"" + line + "\"", false);
+                    minecraft.getLogger().info("Console input: \"" + line + "\"", false);
                     String[] args = line.split(" ");
                     if (args.length > 0) {
                         boolean commandFound = false;
@@ -51,24 +51,24 @@ public class ConsoleReader extends Thread {
                             if (command.getName().equals(args[0])) {
                                 String msg = command.onCommand(args);
                                 if (msg.startsWith("ERROR: "))
-                                    minecraft.logger.err(msg.substring(7));
+                                    minecraft.getLogger().err(msg.substring(7));
                                 else
-                                    minecraft.logger.info(msg);
+                                    minecraft.getLogger().info(msg);
                                 commandFound = true;
                                 break;
                             }
                         }
                         if (!commandFound)
-                            minecraft.logger.err("Unknown command entered!");
+                            minecraft.getLogger().err("Unknown command entered!");
                     } else {
-                        minecraft.logger.err("Invalid command entered!");
+                        minecraft.getLogger().err("Invalid command entered!");
                     }
                 }
                 Thread.sleep(1000);
 
             }
         } catch (InterruptedException e) {
-            minecraft.logger.info("Console reader interrupted");
+            minecraft.getLogger().info("Console reader interrupted");
         }
     }
 }

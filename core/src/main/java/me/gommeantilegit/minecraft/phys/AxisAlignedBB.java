@@ -1,7 +1,10 @@
 package me.gommeantilegit.minecraft.phys;
 
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.math.collision.BoundingBox;
 import org.jetbrains.annotations.NotNull;
+
+import static java.lang.Math.abs;
 
 public class AxisAlignedBB {
 
@@ -214,6 +217,64 @@ public class AxisAlignedBB {
         this.x1 = x1;
         this.y1 = y1;
         this.z1 = z1;
+    }
+
+    @NotNull
+    public AxisAlignedBB reoder() {
+        if (x0 > x1) {
+            float tmp = x1;
+            x1 = x0;
+            x0 = tmp;
+        }
+        if (y0 > y1) {
+            float tmp = y1;
+            y1 = y0;
+            y0 = tmp;
+        }
+        if (z0 > z1) {
+            float tmp = z1;
+            z1 = z0;
+            z0 = tmp;
+        }
+        return this;
+    }
+
+    @NotNull
+    public AxisAlignedBB minXDif(float xDif) {
+        float dif = abs(x0 - x1);
+        if (dif < xDif) {
+            float adjust = (dif - xDif) / 2f;
+            x0 -= adjust;
+            x1 += adjust;
+        }
+        return this;
+    }
+
+    @NotNull
+    public AxisAlignedBB minYDif(float yDif) {
+        float dif = abs(y0 - y1);
+        if (dif < yDif) {
+            float adjust = (dif - yDif) / 2f;
+            y0 -= adjust;
+            y1 += adjust;
+        }
+        return this;
+    }
+
+    @NotNull
+    public AxisAlignedBB minZDif(float zDif) {
+        float dif = abs(z0 - z1);
+        if (dif < zDif) {
+            float adjust = (dif - zDif) / 2f;
+            z0 -= adjust;
+            z1 += adjust;
+        }
+        return this;
+    }
+
+    @NotNull
+    public BoundingBox asLibGDX() {
+        return new BoundingBox(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1));
     }
 }
 

@@ -36,7 +36,7 @@ public class ServerConfiguration {
             try {
                 configurationFile.createNewFile();
             } catch (IOException e) {
-                mc.logger.crash("Failed to create configuration file!", e);
+                mc.getLogger().crash("Failed to create configuration file!", e);
             }
             JsonObject object = getDefaultConfigurationSettings();
             FileWriter writer = new FileWriter(configurationFile);
@@ -47,7 +47,7 @@ public class ServerConfiguration {
             JsonObject object = gson.fromJson(new BufferedReader(new FileReader(configurationFile)), JsonObject.class);
             this.maxChunkLoadingDistance = object.get("maxChunkLoadingDistance").getAsInt();
         } catch (JsonSyntaxException | ClassCastException | NullPointerException e) {
-            mc.logger.crash("Your json file is formatted incorrectly! If you cannot fix this problem, delete the config.json file in your server directory", e);
+            mc.getLogger().crash("Your json file is formatted incorrectly! If you cannot fix this problem, delete the config.json file in your server directory", e);
             System.exit(0);
             throw new IllegalStateException("Unreachable code!");
         }

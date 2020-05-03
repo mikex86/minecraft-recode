@@ -3,7 +3,6 @@ package me.gommeantilegit.minecraft;
 import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.GL30;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import me.gommeantilegit.minecraft.annotations.AndroidOnly;
@@ -12,6 +11,7 @@ import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.block.sound.BlockSounds;
+import me.gommeantilegit.minecraft.block.state.storage.BlockStateStorage;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
 import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
@@ -42,7 +42,6 @@ import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
-import static com.badlogic.gdx.graphics.GL20.GL_LEQUAL;
 import static com.badlogic.gdx.graphics.GL20.GL_NO_ERROR;
 import static java.lang.Integer.min;
 
@@ -131,11 +130,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
     private boolean running = true;
 
     /**
-     * State whether tasks are scheduled on the OpenGL thread or not
-     */
-    private boolean tasksToRun = false;
-
-    /**
      * {@link GameSettings} instance
      */
     public GameSettings gameSettings;
@@ -144,12 +138,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      * ShapeRenderer instance for 2D rendering
      */
     public ShapeRenderer shapeRenderer;
-
-    /**
-     * Queue of runnables to be executed on the OpenGL thread
-     */
-    @NotNull
-    private final Queue<FutureTask> runnables = new LinkedList<>();
 
     /**
      * The registry of block renderers
@@ -192,15 +180,15 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 startUpThread.setDaemon(true);
                 startUpThread.start();
             } catch (Throwable t) {
-                this.logger.crash("Failed to load game!", t);
+                this.getLogger().crash("Failed to load game!", t);
             }
         else try {
             resumeAndroid();
         } catch (Throwable t) {
-            this.logger.crash("Failed to resume game (Android)", t);
+            this.getLogger().crash("Failed to resume game (Android)", t);
         }
 
-        this.logger.info("Created game.");
+        this.getLogger().info("Created game.");
     }
 
     @NotNull
@@ -252,13 +240,14 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 return null;
             }));
 
-            this.blocks = new Blocks(this);
+            this.setBlocks(new Blocks(this));
             // Initializing Blocks - Must be called before texture manger initialization -> access to textureManager -> building texture atlas
-            this.blocks.init();
+            this.getBlocks().init();
+            BlockStateStorage.initPalette(this.getBlocks());
 
             this.blockSounds = new BlockSounds(); // Initializing block sounds
-            this.blockSounds.init(blocks);
-            this.blockRendererRegistry = new ClientBlockRendererTypeRegistry(this, blocks); // Needs to be initialized before instantiation of TextureManager
+            this.blockSounds.init(getBlocks());
+            this.blockRendererRegistry = new ClientBlockRendererTypeRegistry(this, getBlocks()); // Needs to be initialized before instantiation of TextureManager
 
             runOnGLContextWait(new FutureTask<Void>(() -> {
                 this.startupProfiler.actionStart("Load Textures");
@@ -308,10 +297,10 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             }));
 
             this.uiManager.displayGuiScreen(new GuiMainMenu());
-            this.minecraftThread.start(); //Starting Tick Thread.
-            this.minecraftThread.startMinecraftGameLogic();
+//            this.minecraftThread.start(); //Starting Tick Thread.
+            this.getMinecraftThread().startMinecraftGameLogic();
         } catch (Throwable e) {
-            this.logger.crash("Fatal crash!!! Failed to start Minecraft!", e);
+            this.getLogger().crash("Fatal crash!!! Failed to start Minecraft!", e);
         }
     }
 
@@ -320,7 +309,11 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      *
      * @param voidFutureTask the future task to be executed
      */
-    public void runOnGLContextWait(@NotNull FutureTask voidFutureTask) {
+    public void runOnGLContextWait(@NotNull FutureTask<?> voidFutureTask) {
+        if (isCallingFromOpenGLThread()) {
+            voidFutureTask.run();
+            return;
+        }
         runOnGLContext(voidFutureTask);
         try {
             voidFutureTask.get();
@@ -334,11 +327,12 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      *
      * @param runnable the runnable to be executed
      */
-    public void runOnGLContext(@NotNull FutureTask runnable) {
-        synchronized (this.runnables) {
-            this.runnables.add(runnable);
+    public void runOnGLContext(@NotNull FutureTask<?> runnable) {
+        if (isCallingFromOpenGLThread()) {
+            runnable.run();
+            return;
         }
-        this.tasksToRun = true;
+        Gdx.app.postRunnable(runnable);
     }
 
     /**
@@ -381,7 +375,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             try {
                 theWorld.tick(partialTicks);
             } catch (Throwable t) {
-                this.logger.crash("Exception on World tick!", t);
+                this.getLogger().crash("Exception on World tick!", t);
             }
         }
     }
@@ -396,7 +390,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             try {
                 this.theWorld.onOpenGLContext(partialTicks);
             } catch (Throwable t) {
-                this.logger.crash("Failed to update World (OpenGL-Thread)", t);
+                this.getLogger().crash("Failed to update World (OpenGL-Thread)", t);
             }
         }
     }
@@ -408,15 +402,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             if (!drawMojangLogo())
                 return;
         }
-
-        if (tasksToRun) {
-            synchronized (runnables) {
-                if (!runnables.isEmpty()) {
-                    runnables.remove().run();
-                }
-                tasksToRun = !runnables.isEmpty();
-            }
-        }
         if (this.startUpThread == null || this.startUpThread.isAlive())
             return;
 
@@ -425,21 +410,28 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             Gdx.app.exit();
         }
         try {
+            // Tick
+            getMinecraftThread().onUpdate(); // TODO: REMOVE HACK
+
+//            long frameStart = System.nanoTime();
+//            long worldStart = 0, worldEnd = 0;
             //Game Rendering
             {
-                Gdx.gl20.glEnable(GL20.GL_DEPTH_TEST);
-                Gdx.gl20.glDepthFunc(GL20.GL_LEQUAL);
-                
-                Gdx.gl20.glViewport(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-                Gdx.gl20.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
+                Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
+                Gdx.gl.glDepthFunc(GL20.GL_LEQUAL);
+
+                Gdx.gl.glViewport(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+                Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 
                 Gdx.gl.glEnable(GL20.GL_BLEND);
                 Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
                 if (this.thePlayer != null && this.theWorld != null && thePlayer.getWorld() == theWorld) {
-                    float partialTicks = timer.partialTicks;
+                    float partialTicks = getTimer().partialTicks;
 
                     shaderManager.stdShader.begin();
+                    shaderManager.stdShader.pushMatrix();
+                    this.thePlayer.setupViewBobbing(partialTicks);
                     this.thePlayer.updateCameraController(partialTicks);
                     this.thePlayer.updateCamera();
 
@@ -447,7 +439,9 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
 
                     this.shaderManager.stdShader.renderStart();
 
+//                    worldStart = System.nanoTime();
                     this.theWorld.render(partialTicks);
+//                    worldEnd = System.nanoTime();
 
                     this.thePlayer.rayTracer.update();
 
@@ -455,9 +449,10 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
 
                     shaderManager.stdShader.renderEnd();
                     shaderManager.stdShader.end();
+                    shaderManager.stdShader.popMatrix();
                 }
 
-                Gdx.gl20.glDepthFunc(GL20.GL_LEQUAL);
+                Gdx.gl.glDepthFunc(GL20.GL_LEQUAL);
                 Gdx.gl.glDisable(GL20.GL_CULL_FACE);
                 Gdx.gl.glDepthMask(false);
 
@@ -468,6 +463,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 this.uiManager.render();
             }
 
+            //TODO: REMOVE
             //Updating timer and ticks
             {
                 openGLOperationsTimer.advanceTime();
@@ -476,12 +472,19 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 }
             }
 
+//            long frameEnd = System.nanoTime();
+
+//            double renderDif = (frameEnd - frameStart) / 1E6;
+//            double worldDif = (worldEnd - worldStart) / 1E6;
+//            if (renderDif > 5)
+//                System.err.println("renderFrame Took: " + (renderDif) + " ms; renderWorld: " + worldDif);
+
             int error;
             if ((error = Gdx.gl.glGetError()) != GL_NO_ERROR) {
-                System.out.println("OpenGL error: " + OpenGLUtils.getGLErrorName(error));
+                System.err.println("OpenGL error: " + OpenGLUtils.getGLErrorName(error));
             }
         } catch (Throwable t) {
-            this.logger.crash("Failed to render game!", t);
+            this.getLogger().crash("Failed to render game!", t);
         }
     }
 
@@ -501,10 +504,10 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      * @return true, if the logo was already rendered before
      */
     private boolean drawMojangLogo() {
-        Gdx.gl20.glEnable(GL20.GL_DEPTH_TEST);
-        Gdx.gl20.glDepthFunc(GL20.GL_LESS);
+        Gdx.gl.glEnable(GL20.GL_DEPTH_TEST);
+        Gdx.gl.glDepthFunc(GL20.GL_LESS);
 
-        Gdx.gl20.glViewport(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        Gdx.gl.glViewport(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         Gdx.gl.glClearColor(1f, 1f, 1f, 1f);
 
@@ -540,7 +543,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
     public void shutdown() {
         if (theWorld != null)
             this.theWorld.stopAsyncWork();
-        this.minecraftThread.interrupt();
+        this.getMinecraftThread().interrupt();
         running = false;
     }
 

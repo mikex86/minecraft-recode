@@ -1,137 +1,187 @@
 package me.gommeantilegit.minecraft.world.chunk;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.Mesh;
-import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import me.gommeantilegit.minecraft.ClientMinecraft;
+import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import me.gommeantilegit.minecraft.block.state.BlockState;
+import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
+import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
+import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.world.ClientWorld;
+import me.gommeantilegit.minecraft.world.chunk.builder.ChunkMeshRebuilder;
+import me.gommeantilegit.minecraft.world.renderer.WorldRenderer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE_2D;
-import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
-import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBUTES;
+import static com.badlogic.gdx.graphics.GL20.*;
+import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
 public class ClientChunk extends ChunkBase {
-
-    /**
-     * The mesh of the chunk being rendered.
-     */
-    @Nullable
-    private Mesh mesh;
-
-    /**
-     * State whether the chunk should be rebuilt the next time it is rendered.
-     */
-    private boolean rebuild = false;
 
     /**
      * State whether the server has sent the initial data for the given chunk
      */
     public boolean dataReceived = false;
 
+    /**
+     * The chunk rebuilder used to build chunk section meshes
+     */
     @NotNull
-    private final ClientMinecraft mc;
+    private final ChunkMeshRebuilder chunkMeshRebuilder;
+
+    /**
+     * Stores the sections of the chunk that are renderable.
+     * Null, if the chunk is not baked.
+     */
+    @Nullable
+    private ClientChunkSection[] renderableSections = null;
+
+    /**
+     * State of the chunk being baked.
+     *
+     * @see #renderableSections
+     */
+    private boolean baked = false;
 
     /**
      * Default constructor of a ChunkBase object
      *
-     * @param height height of the world -> becomes chunk height
-     * @param x      startX position where the region managed by the chunk starts
-     * @param z      startZ position where the region managed by the chunk starts
-     * @param world  the parent world
-     * @param mc     the parent minecraft instance
+     * @param height             height of the world -> becomes chunk height
+     * @param x                  startX position where the region managed by the chunk starts
+     * @param z                  startZ position where the region managed by the chunk starts
+     * @param world              the parent world
+     * @param chunkMeshRebuilder the chunk mesh rebuilder used to build chunk section meshes
      */
-    public ClientChunk(int height, int x, int z, @NotNull ClientWorld world, @NotNull ClientMinecraft mc) {
-        super(height, x, z, world);
-        this.mc = mc;
+    public ClientChunk(int height, int x, int z, @NotNull ClientWorld world, @NotNull ChunkMeshRebuilder chunkMeshRebuilder) {
+        super(height, x, z, world, new ArrayList<>(height / CHUNK_SECTION_SIZE));
+        this.chunkMeshRebuilder = chunkMeshRebuilder;
+        this.initChunkSections(); // accesses #chunkMeshRebuilder
     }
 
     @Override
-    protected void changeBlock(int x, int y, int z, @Nullable BlockState blockState) {
+    protected void changeBlock(int x, int y, int z, @Nullable IBlockState blockState) {
         super.changeBlock(x, y, z, blockState);
-        ((ClientWorld) this.world).rebuildChunksFor(x, z, true);
-    }
-
-    /**
-     * Rebuilds the chunk mesh.
-     */
-    public void rebuild() {
-        MeshBuilder builder = buildChunkMesh();
-        if (this.mesh != null) this.mesh.dispose();
-        this.mesh = builder.end();
+        rebuildFor(x, y, z);
     }
 
     @Override
-    protected void removeEntity(int entityIndex, @NotNull EntityRemoveReason removeReason) {
-        super.removeEntity(entityIndex, removeReason);
-    }
-
-    /**
-     * @return a mesh-builder with the stored chunk in it.
-     */
-    public MeshBuilder buildChunkMesh() {
-
-        MeshBuilder builder = new MeshBuilder();
-        builder.ensureCapacity(
-                (CHUNK_SIZE * CHUNK_SIZE * height * 4 * 4) / 2,
-                (CHUNK_SIZE * CHUNK_SIZE * height * 4 * 6) / 2
-        );
-        builder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
-        for (int x = this.x; x < this.x + CHUNK_SIZE; x++) {
-            for (int y = 0; y < height; y++) {
-                for (int z = this.z; z < this.z + CHUNK_SIZE; z++) {
-                    BlockState blockState = getBlockState(x, y, z);
-                    if (blockState != null) {
-                        Objects.requireNonNull(mc.blockRendererRegistry.getRenderer(blockState.getBlock())).render(builder, x - this.x, y, z - this.z, x, y, z, world, blockState, false);
-                    }
-                }
-            }
-        }
-        return builder;
+    protected void forceRemoveEntity(int entityIndex, @NotNull EntityRemoveReason removeReason) {
+        super.forceRemoveEntity(entityIndex, removeReason);
     }
 
     @NotNull
     @Override
-    protected ClientChunkSection getChunkSection(int startHeight) {
-        return new ClientChunkSection(this, startHeight);
+    protected ClientChunkSection createChunkSection(int startHeight) {
+        return new ClientChunkSection(this, startHeight, chunkMeshRebuilder);
+    }
+
+    @NotNull
+    protected ClientChunkSection getChunkSection(int y) {
+        return (ClientChunkSection) super.getChunkSection(y);
     }
 
     @Override
-    public void forceAddEntity(@NotNull Entity entity) {
-        super.forceAddEntity(entity);
-    }
-
-    /**
-     * Sets the state if the chunk should be rebuilt next time it is rendered.
-     *
-     * @param rebuild      state if the chunk should be rebuilt.
-     * @param highPriority state whether the chunk should be the first in the rebuild queue
-     * @return self instance (Builder function)
-     */
-    public ChunkBase setNeedsRebuild(boolean rebuild, boolean highPriority) {
-        if (rebuild && !this.rebuild)
-            this.mc.theWorld.getWorldChunkHandler().chunkRebuilder.scheduleRebuild(this, highPriority);
-        this.rebuild = rebuild;
-        return this;
+    protected void transferEntity(@NotNull Entity entity, @NotNull ChunkBase newChunk) {
+        super.transferEntity(entity, newChunk);
     }
 
     /**
      * Renders the given chunk.
      *
-     * @param partialTicks delta time
+     * @param shader         the shader program to render the chunk with
+     * @param entityRenderer used to render the entities of the chunk
+     * @param partialTicks   delta time
+     * @return the number of draw section draw calls it has made
      */
-    public void render(float partialTicks) {
-        mc.shaderManager.stdShader.pushMatrix();
-        mc.shaderManager.stdShader.translate(x, 0, z);
-        if (mesh != null)
-            this.mesh.render(mc.shaderManager.stdShader, GL_TRIANGLES);
-        mc.shaderManager.stdShader.popMatrix();
-        this.renderEntities(partialTicks);
+    public int render(@NotNull StdShader shader, @NotNull WorldRenderer worldRenderer, @NotNull EntityRenderer entityRenderer, float partialTicks) {
+
+        Gdx.gl.glCullFace(GL_FRONT); // Resetting culled face to Front face
+        Gdx.gl.glDisable(GL_CULL_FACE); // Disable Face culling!!! (Or else white artifacts at T-Junctions will appear)
+
+        shader.pushMatrix();
+        shader.translate(x, 0, z);
+
+        int drawCalls = 0;
+        if (this.baked) {
+            ClientChunkSection[] renderableSections = getRenderableSections();
+
+            for (ClientChunkSection chunkSection : renderableSections) {
+                if (worldRenderer.isChunkInCameraFrustum(chunkSection)) {
+                    drawCalls += chunkSection.render(shader);
+                }
+            }
+        } else {
+            List<ChunkSection> renderableSections = getChunkSections();
+
+            for (ChunkSection chunkSection : renderableSections) {
+                if (worldRenderer.isChunkInCameraFrustum(chunkSection)) {
+                    drawCalls += ((ClientChunkSection) chunkSection).render(shader);
+                }
+            }
+        }
+        shader.popMatrix();
+
+        this.renderEntities(shader, entityRenderer, partialTicks);
+        return drawCalls;
+    }
+
+
+    /**
+     * Rebuilds the chunk mesh with the position of the block change in mind
+     *
+     * @param x change x coordinate
+     * @param y change y coordinate
+     * @param z change z coordinate
+     */
+    public void rebuildFor(int x, int y, int z) {
+        ClientChunkSection section = getChunkSection(y);
+        section.rebuildFor((ClientMinecraft) mc, true, x, y, z); // auto bakes the chunk
+    }
+
+    /**
+     * Rebuilds the chunk mesh
+     */
+    public void rebuild() {
+        //TODO: CHUNK ENTITY TRANSFER AND CHUNK REBUILDING ARE SOURCES OF LAG
+        int nSections = this.getChunkSections().size();
+        AtomicInteger sectionCounter = new AtomicInteger(0);
+        for (ChunkSection chunkSection : this.getChunkSections()) {
+            if (chunkSection instanceof ClientChunkSection) {
+                ((ClientChunkSection) chunkSection).setNeedsRebuild(true, true, () -> {
+                    if (sectionCounter.incrementAndGet() >= nSections) {
+                        ((ClientMinecraft) mc).runOnGLContext(new FutureTask<Void>(() -> {
+                            this.bake();
+                            return null;
+                        }));
+                    }
+                });
+            }
+        }
+    }
+
+    /**
+     * Bakes the chunk changes
+     */
+    public void bake() {
+        List<ChunkSection> sections = this.getChunkSections();
+        List<ClientChunkSection> toRender = new ArrayList<>();
+        for (ChunkSection chunkSection : sections) {
+            if (!(chunkSection instanceof ClientChunkSection)) {
+                throw new IllegalStateException();
+            }
+            if (((ClientChunkSection) chunkSection).shouldHaveMesh()) {
+                toRender.add((ClientChunkSection) chunkSection);
+            }
+        }
+        this.renderableSections = toRender.toArray(new ClientChunkSection[0]);
+        this.baked = true;
     }
 
     /**
@@ -139,37 +189,12 @@ public class ClientChunk extends ChunkBase {
      *
      * @param partialTicks this performed this frame
      */
-    private void renderEntities(float partialTicks) {
-        for (int i = 0; i < entities.size(); i++) {
-            try {
-                Entity entity = entities.get(i);
-                if (entity != null) {
-                    mc.entityRenderer.renderEntity(entity, partialTicks, mc.shaderManager.stdShader);
-                }
-            } catch (IndexOutOfBoundsException e) {
-                break;
+    private void renderEntities(@NotNull StdShader shader, @NotNull EntityRenderer entityRenderer, float partialTicks) {
+        for (Entity entity : entities) {
+            if (entity != null) {
+                entityRenderer.renderEntity(entity, partialTicks, shader);
             }
         }
-    }
-
-    /**
-     * @return the state if the chunk should be rebuilt.
-     */
-    public boolean needsRebuild() {
-        return rebuild;
-    }
-
-    /**
-     * Nullifies the variable {@link #mesh}
-     */
-    public void nullifyMesh() {
-        this.mesh = null;
-    }
-
-    @NotNull
-    public ChunkBase setMesh(@Nullable Mesh mesh) {
-        this.mesh = mesh;
-        return this;
     }
 
     @NotNull
@@ -178,35 +203,24 @@ public class ClientChunk extends ChunkBase {
         return (ClientWorld) super.getWorld();
     }
 
-    @Nullable
-    public Mesh getMesh() {
-        return mesh;
-    }
-
     @Override
+    @ThreadSafe
     public void load() {
-        if (mesh == null && dataReceived)
-            setNeedsRebuild(true, false);
         super.load();
     }
 
+    @ThreadSafe
     public void setDataReceived() {
         this.dataReceived = true;
-        rebuildNeighbors(); // Rebuilding neighbors to optimize mesh performance as the mesh is rendered as if this chunk instance was fully air.
+        rebuild();
     }
 
-    private void rebuildNeighbors() {
-        ClientChunk c1 = (ClientChunk) world.getChunkAtOrigin(x + CHUNK_SIZE, z);
-        ClientChunk c2 = (ClientChunk) world.getChunkAtOrigin(x - CHUNK_SIZE, z);
-        ClientChunk c3 = (ClientChunk) world.getChunkAtOrigin(x, z + CHUNK_SIZE);
-        ClientChunk c4 = (ClientChunk) world.getChunkAtOrigin(x, z - CHUNK_SIZE);
-        if (c1 != null)
-            c1.setNeedsRebuild(true, false);
-        if (c2 != null)
-            c2.setNeedsRebuild(true, false);
-        if (c3 != null)
-            c3.setNeedsRebuild(true, false);
-        if (c4 != null)
-            c4.setNeedsRebuild(true, false);
+    @NotNull
+    public ClientChunkSection[] getRenderableSections() {
+        return Objects.requireNonNull(renderableSections, "Tried to access renderable chunk sections! Chunk is not baked.");
+    }
+
+    public void unbake() {
+        this.baked = false;
     }
 }

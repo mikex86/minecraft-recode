@@ -10,14 +10,16 @@ import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.Block;
-import me.gommeantilegit.minecraft.block.state.BlockState;
+import me.gommeantilegit.minecraft.block.sound.BlockSoundType;
+import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
-import me.gommeantilegit.minecraft.entity.player.base.skin.SkinBase;
 import me.gommeantilegit.minecraft.entity.player.packet.PacketSender;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
+import me.gommeantilegit.minecraft.gamesettings.settingtypes.KeyBindSetting;
 import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.raytrace.RayTracer;
 import me.gommeantilegit.minecraft.raytrace.RenderingRayTracer;
+import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.ui.button.Button;
 import me.gommeantilegit.minecraft.ui.button.TexturedButton;
 import me.gommeantilegit.minecraft.ui.render.Overlay2D;
@@ -41,19 +43,6 @@ import static java.lang.StrictMath.min;
 
 @SideOnly(side = Side.CLIENT)
 public class EntityPlayerSP extends PlayerBase {
-
-    /*
-     * MOVE KEY CONSTANTS
-     * //TODO: GAME-SETTINGS SYSTEM
-     */
-    private static final int FORWARDS = Input.Keys.W;
-    private static final int BACKWARDS = Input.Keys.S;
-    private static final int LEFT = Input.Keys.A;
-    private static final int RIGHT = Input.Keys.D;
-    private static final int JUMP = Input.Keys.SPACE;
-    private static final int SNEAKING = Input.Keys.SHIFT_LEFT;
-    private static final int SPRINTING = Input.Keys.CONTROL_LEFT;
-    private static final int SWITCH_CAMERA_MODE = Input.Keys.F5;
 
     /**
      * Controller object for player logic such as block breaking
@@ -80,6 +69,7 @@ public class EntityPlayerSP extends PlayerBase {
      */
     @NotNull
     private Vector3 updatedPositionVector = new Vector3();
+
 
     /**
      * Enum representing all camera modes
@@ -112,7 +102,7 @@ public class EntityPlayerSP extends PlayerBase {
     /**
      * State whether the player has already received a PositionSetPacket
      */
-    private boolean posPacketReceieved = false;
+    private boolean posPacketReceived = false;
 
     /**
      * Player perspective camera operating with position zero.
@@ -125,6 +115,8 @@ public class EntityPlayerSP extends PlayerBase {
         public void update() {
             float aspect = viewportWidth / viewportHeight;
 
+            //noinspection ConstantConditions
+            far = (mc == null || mc.theWorld == null) ? 512 : (float) (mc.theWorld.getChunkLoadingDistance() * sqrt(2)); // TODO: Might optimize
             projection.setToProjection(Math.abs(near), Math.abs(far), fieldOfView, aspect);
 
             view.setToLookAt(position, new Vector3(position).add(direction), new Vector3(0, 1f, 0));
@@ -142,6 +134,12 @@ public class EntityPlayerSP extends PlayerBase {
     public final PerspectiveCamera virtualCamera = new PerspectiveCamera(100, 0, 0) {
         @Override
         public void update() {
+            this.viewportWidth = camera.viewportWidth;
+            this.viewportHeight = camera.viewportHeight;
+
+            this.near = camera.near;
+            this.far = camera.far;
+
             this.direction.set(camera.direction);
             this.position.set(cameraPosition);
 
@@ -196,17 +194,17 @@ public class EntityPlayerSP extends PlayerBase {
     @Override
     public void tick() {
         updateMovementValues();
-        if (!posPacketReceieved || currentChunk instanceof ClientChunk && !((ClientChunk) currentChunk).dataReceived) {
+        if (!posPacketReceived || currentChunk instanceof ClientChunk && !((ClientChunk) currentChunk).dataReceived) {
             mc.thePlayer.motionY *= 0;
         }
         if (!spawned) {
-            if (posPacketReceieved) {
-                if (currentChunk instanceof ClientChunk && ((ClientChunk) currentChunk).dataReceived) {
-                    spawned = true;
-                }
+            if (posPacketReceived) {
+//                if (currentChunk instanceof ClientChunk && ((ClientChunk) currentChunk).dataReceived) {
+                spawned = true;
+//                }
             }
         }
-        if (posPacketReceieved) {
+        if (posPacketReceived) {
             super.tick();
             playerController.onPlayerBlockDamage();
             this.packetSender.sendMovePackets();
@@ -215,36 +213,34 @@ public class EntityPlayerSP extends PlayerBase {
     }
 
     @Override
+    public void onSpawned(@NotNull ChunkBase chunk) {
+        super.onSpawned(chunk);
+    }
+
+    @Override
     public void setPosition(float x, float y, float z) {
         super.setPosition(x, y, z);
         updatedPositionVector.set(x, y, z);
-        posPacketReceieved = true;
+        posPacketReceived = true;
     }
 
     @Override
     public void setRotation(float yaw, float pitch) {
         super.setRotation(yaw, pitch);
-        //TODO: FIX CAMERA BUG ON SERVER REJOIN
-//        yaw = (float) toRadians(yaw);
-//        pitch = (float) toRadians(-pitch);
-//        float xzLen = (float) cos(pitch);
-//        float x = (float) (xzLen * cos(yaw));
-//        float y = (float) sin(pitch);
-//        float z = (float) (xzLen * sin(-yaw));
-//        camera.direction.set(x, y, z);
+        this.camController.calculateLookDirection();
     }
 
     /**
      * Updates {@link #moveForward} and {@link #moveStrafing} accordingly to the pressed keys
      */
     private void updateMovementValues() {
-        boolean forwards = keyDown(FORWARDS);
-        boolean backwards = keyDown(BACKWARDS);
-        boolean left = keyDown(LEFT);
-        boolean right = keyDown(RIGHT);
-        boolean jump = keyDown(JUMP);
-        boolean sprint = keyDown(SPRINTING);
-        boolean sneak = keyDown(SNEAKING);
+        boolean forwards = keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue());
+        boolean backwards = keyDown(mc.gameSettings.keyBindings.keyBindBack.getValue());
+        boolean left = keyDown(mc.gameSettings.keyBindings.keyBindLeft.getValue());
+        boolean right = keyDown(mc.gameSettings.keyBindings.keyBindRight.getValue());
+        boolean jump = keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue());
+        boolean sprint = keyDown(mc.gameSettings.keyBindings.keyBindSprint.getValue());
+        boolean sneak = keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue());
 
         if (forwards ^ backwards) {
             this.moveForward = forwards ? 1 : -1;
@@ -260,10 +256,10 @@ public class EntityPlayerSP extends PlayerBase {
         float f = 0.8f;
         if (!this.isSprinting() && this.moveForward >= f && sprint) {
             this.setSprinting(true);
-            this.camController.setKeyDown(SPRINTING, false);
+            this.camController.setKeyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue(), false);
         }
 
-        if (this.isSprinting() && (this.moveForward < f || this.collidedHorizontally)) {
+        if (this.isSprinting() && (this.moveForward < f || this.isCollidedHorizontally())) {
             this.setSprinting(false);
         }
 
@@ -271,7 +267,8 @@ public class EntityPlayerSP extends PlayerBase {
 
         setJumping(jump);
 
-        if (keyDown(SWITCH_CAMERA_MODE))
+        //TODO: GAME SETTING
+        if (keyDown(Input.Keys.F5))
             this.cameraMode = cameraMode.next();
     }
 
@@ -280,9 +277,9 @@ public class EntityPlayerSP extends PlayerBase {
         switch (Gdx.app.getType()) {
             case Android:
             case iOS:
-                return new EntityPlayerSP.MobilePlayerController(0.7f, this, mc);
+                return new EntityPlayerSP.MobilePlayerController(this, mc);
             case Desktop:
-                return new EntityPlayerSP.DesktopPlayerController(0.7f, this);
+                return new EntityPlayerSP.DesktopPlayerController(this);
             default:
                 throw new IllegalStateException("Unsupported platform: " + Gdx.app.getType());
         }
@@ -343,6 +340,65 @@ public class EntityPlayerSP extends PlayerBase {
         this.mc.shaderManager.stdShader.setCamera(camera);
     }
 
+    @Override
+    protected void playStepSound(@NotNull BlockPos standingOn) {
+        Block block = world.getBlock(standingOn);
+        if (block == null)
+            return;
+
+        BlockSoundType soundType;
+
+        //TODO: WHEN SNOW IS IMPLEMENTED
+//        BlockState above = world.getBlockState(standingOn.offset(EnumFacing.UP));
+//        if (above != mc.blocks.snow) {
+//            soundType = mc.blockSounds.getSoundType(mc.blocks.snow);
+//        } else
+//        if (!block.isLiquid()) { //TODO: WHEN FLUIDS ARE IMPLEMENTED
+        soundType = mc.blockSounds.getSoundType(block);
+        soundType.getStepSound().play(soundType.getVolume() * 0.15F, soundType.getPitch());
+//        }
+    }
+
+
+    public void setupViewBobbing(float partialTicks) {
+//        if (!onGround) return;
+        float f = getDistanceWalkedModified() - getPrevDistanceWalkedModified();
+        float f1 = -(getDistanceWalkedModified() + f * partialTicks);
+        float f2 = prevCameraYaw + (cameraYaw - prevCameraYaw) * partialTicks;
+        float f3 = prevCameraPitch + (cameraPitch - prevCameraPitch) * partialTicks;
+        StdShader stdShader = this.mc.shaderManager.stdShader;
+
+        Vector3 posOffset = new Vector3(
+                (float) sin(f1 * (float) PI) * f2 * 0.5F,
+//                0,
+                (float) -abs(cos(f1 * (float) PI) * f2),
+                0
+        )
+                .rotate(-(rotationPitch), 1, 0, 0)
+                .rotate(rotationYaw, 0, 1, 0);
+
+        stdShader.translate(
+                posOffset.x, posOffset.y, posOffset.z
+        );
+
+        Vector3 direction = camera.direction;
+        stdShader.rotate(direction.x * -1, 0, direction.z * -1, (float) (Math.sin(f1 * (float) Math.PI) * f2 * 3.0F));
+
+        direction = camera.direction.cpy().rotate(90, 0, -1, 0);
+
+        stdShader.rotate(direction.x, 0, direction.z, (float) (Math.abs(Math.cos(f1 * (float) Math.PI - 0.2F) * f2) * 5.0F));
+
+        direction = camera.direction.cpy().rotate(90, 0, -1, 0);
+        stdShader.rotate(direction.x, 0, direction.z, f3);
+
+
+        // old
+//        stdShader.rotate(0, 0, 1, (float) (Math.sin(f1 * (float) Math.PI) * f2 * 3.0F));
+//        stdShader.rotate(1, 0, 0, (float) (Math.abs(Math.cos(f1 * (float) Math.PI - 0.2F) * f2) * 5.0F));
+//        stdShader.rotate(1, 0, 0, f3);
+    }
+
+
     @NotNull
     public Vector3 getUpdatedPositionVector() {
         return this.updatedPositionVector;
@@ -382,11 +438,8 @@ public class EntityPlayerSP extends PlayerBase {
         @NotNull
         protected HashMap<Integer, Boolean> keys = new HashMap<>();
 
-        protected float mouseSensitivity;
-
-        protected PlayerInputAdapter(@NotNull EntityPlayerSP player, float mouseSensitivity) {
+        protected PlayerInputAdapter(@NotNull EntityPlayerSP player) {
             this.player = player;
-            this.mouseSensitivity = mouseSensitivity;
         }
 
         /**
@@ -405,9 +458,25 @@ public class EntityPlayerSP extends PlayerBase {
          */
         void setKeyDown(int keyCode, boolean state) {
             if (state)
-                player.onKeyDown(keyCode);
-            else player.onKeyUp(keyCode);
-            keys.put(keyCode, state);
+                this.player.onKeyDown(keyCode);
+            else this.player.onKeyUp(keyCode);
+            this.keys.put(keyCode, state);
+        }
+
+        /**
+         * Sets the cameras view direction to the players yaw and pitch
+         */
+        void calculateLookDirection() {
+            PerspectiveCamera camera = this.player.camera;
+            double yaw = toRadians(this.player.rotationYaw + 90);
+            double pitch = toRadians(this.player.rotationPitch);
+
+            double xzLen = cos(pitch);
+            double x = (xzLen * cos(yaw));
+            double y = -sin(pitch);
+            double z = (xzLen * sin(-yaw));
+
+            camera.lookAt((float) x, (float) y, (float) z);
         }
 
         /**
@@ -415,7 +484,7 @@ public class EntityPlayerSP extends PlayerBase {
          * @return if the key is currently being held down
          */
         boolean key(int key) {
-            return keys.get(key) != null && keys.get(key);
+            return this.keys.get(key) != null && this.keys.get(key);
         }
 
         /**
@@ -436,7 +505,7 @@ public class EntityPlayerSP extends PlayerBase {
      * @param keyCode the key-code that was just pressed down
      */
     private void onKeyDown(int keyCode) {
-        if (keyCode == FORWARDS) {
+        if (keyCode == mc.gameSettings.keyBindings.keyBindForward.getValue()) {
             if (sprintingStartClock.getTimePassed() <= 300) {
                 setSprinting(true);
             }
@@ -460,22 +529,10 @@ public class EntityPlayerSP extends PlayerBase {
     private static class DesktopPlayerController extends EntityPlayerSP.PlayerInputAdapter {
 
         /**
-         * Temp vector for rotation calculation
+         * @param player sets {@link #player}
          */
-        @NotNull
-        private final Vector3 tmp = new Vector3();
-
-        /**
-         * Last frames player pitch in degrees
-         */
-        private float lastPitchDegrees;
-
-        /**
-         * @param mouseSensitivity sets {@link #mouseSensitivity}
-         * @param player           sets {@link #player}
-         */
-        DesktopPlayerController(float mouseSensitivity, @NotNull EntityPlayerSP player) {
-            super(player, mouseSensitivity);
+        DesktopPlayerController(@NotNull EntityPlayerSP player) {
+            super(player);
         }
 
         private int lastX = Gdx.input.getX(), lastY = Gdx.input.getY();
@@ -490,7 +547,7 @@ public class EntityPlayerSP extends PlayerBase {
 
         @Override
         public boolean mouseMoved(int screenX, int screenY) {
-            updateMouseInput(-screenX + lastX, screenY - lastY);
+            updateMouseInput(-Gdx.input.getDeltaX(), Gdx.input.getDeltaY());
             lastX = screenX;
             lastY = screenY;
             return super.mouseMoved(screenX, screenY);
@@ -501,25 +558,30 @@ public class EntityPlayerSP extends PlayerBase {
          */
         private void updateMouseInput(int deltaX, int deltaY) {
 
-            Gdx.input.setCursorCatched(player.mc.uiManager.currentScreen == null);
+            float relativeSensitivity = (float) player.mc.gameSettings.generalSettings.mouseSensitivity.getRelativeValue();
+            float sensitivity = relativeSensitivity * 0.6F + 0.2F;
+            float scl = sensitivity * sensitivity * sensitivity * 8.0f * 0.1f;
 
-            PerspectiveCamera camera = this.player.camera;
+            float scaledDX = deltaX * scl;
+            float scaledDY = deltaY * scl * (player.mc.gameSettings.generalSettings.invertMouse.getValue() ? -1 : 1);
+//            Gdx.input.setCursorCatched(player.mc.uiManager.currentScreen == null);
 
             //X Rotation
             {
-                camera.direction.rotate(camera.up, deltaX);
-                tmp.set(camera.direction).crs(camera.up).nor();
-                player.rotationYaw += deltaX;
+//                camera.direction.rotate(camera.up, deltaX);
+//                tmp.set(camera.direction).crs(camera.up).nor();
+                player.rotationYaw += scaledDX;
             }
             //Y Rotation
             {
 
-                float newPitchDegrees = player.rotationPitch + deltaY;
-                newPitchDegrees = max(-89, min(newPitchDegrees, 89));
+                float newPitchDegrees = player.rotationPitch + scaledDY;
+                newPitchDegrees = max(-89.9f, min(newPitchDegrees, 89.9f));
                 player.rotationPitch = newPitchDegrees;
-                camera.direction.rotate(tmp, lastPitchDegrees - newPitchDegrees);
-                lastPitchDegrees = newPitchDegrees;
+//                camera.direction.rotate(tmp, lastPitchDegrees - newPitchDegrees);
+//                lastPitchDegrees = newPitchDegrees;
             }
+            calculateLookDirection();
         }
 
         /**
@@ -578,17 +640,6 @@ public class EntityPlayerSP extends PlayerBase {
         }
     }
 
-    /**
-     * Not allowing the player's chunk to be unloaded.
-     *
-     * @param chunk the chunk that the entity is in.
-     * @return false
-     */
-    @Override
-    public boolean allowChunkUnload(ChunkBase chunk) {
-        return false;
-    }
-
     boolean breakingBlocks = false;
 
     /**
@@ -617,10 +668,10 @@ public class EntityPlayerSP extends PlayerBase {
         if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK) {
             assert result.getBlockPos() != null;
             int x = result.getBlockPos().getX(), y = result.getBlockPos().getY(), z = result.getBlockPos().getZ();
-            BlockState prevBlockState = world.getBlockState(x, y, z);
+            IBlockState prevBlockState = world.getBlockState(x, y, z);
             assert prevBlockState != null;
             world.setBlock(x, y, z, null);
-            mc.theWorld.particleEngine.spawnBlockBreakingParticles(x, y, z, prevBlockState.getBlock());
+            mc.theWorld.getParticleEngine().spawnBlockBreakingParticles(x, y, z, prevBlockState.getBlock());
         }
     }
 
@@ -656,12 +707,11 @@ public class EntityPlayerSP extends PlayerBase {
         private final ClientMinecraft mc;
 
         /**
-         * @param mouseSensitivity sets {@link #mouseSensitivity}
-         * @param player           sets {@link #player}
-         * @param mc               sets {@link #mc}
+         * @param player sets {@link #player}
+         * @param mc     sets {@link #mc}
          */
-        MobilePlayerController(float mouseSensitivity, @NotNull EntityPlayerSP player, ClientMinecraft mc) {
-            super(player, mouseSensitivity);
+        MobilePlayerController(@NotNull EntityPlayerSP player, ClientMinecraft mc) {
+            super(player);
             this.mc = mc;
         }
 
@@ -673,9 +723,10 @@ public class EntityPlayerSP extends PlayerBase {
          * @param pointer pointer index
          */
         void onTouchDragged(int screenX, int screenY, int pointer) {
+            float sensitivity = (float) player.mc.gameSettings.generalSettings.mouseSensitivity.getRelativeValue();
 
-            float deltaX = (lastScreenX - screenX) * mouseSensitivity;
-            float deltaY = (lastScreenY - screenY) * mouseSensitivity;
+            float deltaX = (lastScreenX - screenX) * sensitivity;
+            float deltaY = (lastScreenY - screenY) * sensitivity;
 
             this.buttonLayout.pointerMovedInLastSecond += hypot(deltaX, deltaY);
 
@@ -826,21 +877,21 @@ public class EntityPlayerSP extends PlayerBase {
                 this.buttons = new Button[]{forwardButton, leftButton, backwardsButton, rightButton, jumpButton};
                 this.moveButtons = new Button[]{forwardButton, leftButton, backwardsButton, rightButton};
                 {
-                    applyKeyBind(forwardButton, FORWARDS);
-                    applyKeyBind(leftButton, LEFT);
-                    applyKeyBind(backwardsButton, BACKWARDS);
-                    applyKeyBind(rightButton, RIGHT);
-                    applyKeyBind(jumpButton, JUMP);
+                    applyKeyBind(forwardButton, mc.gameSettings.keyBindings.keyBindForward);
+                    applyKeyBind(leftButton, mc.gameSettings.keyBindings.keyBindLeft);
+                    applyKeyBind(backwardsButton, mc.gameSettings.keyBindings.keyBindBack);
+                    applyKeyBind(rightButton, mc.gameSettings.keyBindings.keyBindRight);
+                    applyKeyBind(jumpButton, mc.gameSettings.keyBindings.keyBindJump);
                     //Extra configuration for the jump button
                     {
                         jumpButton.setOnDragEnterListener(pointer -> {
-                                    setKeyDown(JUMP, true);
+                                    setKeyDown(mc.gameSettings.keyBindings.keyBindJump.getValue(), true);
                                     jumpButton.transparency = 0.70;
                                     pressingButtonWithRotationPointer = true;
                                 }
                         );
                         jumpButton.setOnDragLeaveListener(pointer -> {
-                                    setKeyDown(JUMP, false);
+                                    setKeyDown(mc.gameSettings.keyBindings.keyBindJump.getValue(), false);
                                     jumpButton.transparency = 0.5;
                                     pressingButtonWithRotationPointer = false;
                                 }
@@ -855,17 +906,17 @@ public class EntityPlayerSP extends PlayerBase {
              * @param button  the button that should handle the given key-bind
              * @param keyBind the specified key to be controlled.
              */
-            private void applyKeyBind(TexturedButton button, int keyBind) {
+            private void applyKeyBind(TexturedButton button, KeyBindSetting keyBind) {
                 button.transparency = 0.5;
                 button.setOnDragEnterListener(pointer -> {
                             if (pointer != this.rotationPointer) {
-                                setKeyDown(keyBind, true);
+                                setKeyDown(keyBind.getValue(), true);
                                 button.transparency = 0.70;
                             }
                         }
                 );
                 button.setOnDragLeaveListener(pointer -> {
-                            setKeyDown(keyBind, false);
+                            setKeyDown(keyBind.getValue(), false);
                             button.transparency = 0.5;
                         }
                 );
@@ -964,7 +1015,6 @@ public class EntityPlayerSP extends PlayerBase {
         public void render() {
             buttonLayout.render();
         }
-
 
         @Override
         public boolean touchDragged(int screenX, int screenY, int pointer) {

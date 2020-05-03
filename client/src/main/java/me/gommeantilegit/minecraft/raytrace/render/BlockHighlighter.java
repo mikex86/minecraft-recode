@@ -12,6 +12,7 @@ import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.utils.Pointer;
 import me.gommeantilegit.minecraft.util.renderer.BoxRenderer;
+import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import static com.badlogic.gdx.graphics.GL20.*;
@@ -56,7 +57,7 @@ public class BlockHighlighter {
         this.player = player;
         //Lines mesh
         {
-            MeshBuilder meshBuilder = new MeshBuilder();
+            OptimizedMeshBuilder meshBuilder = new OptimizedMeshBuilder();
             meshBuilder.setColor(1, 0, 0, 1); // White color
             meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL20.GL_LINES);
             {
@@ -68,7 +69,7 @@ public class BlockHighlighter {
         }
         //Triangles mesh
         {
-            MeshBuilder meshBuilder = new MeshBuilder();
+            OptimizedMeshBuilder meshBuilder = new OptimizedMeshBuilder();
             meshBuilder.setColor(1, 0, 0, 1);
             meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL20.GL_TRIANGLES);
             {
@@ -78,7 +79,7 @@ public class BlockHighlighter {
         }
     }
 
-    private void createBlockMesh(@NotNull MeshBuilder meshBuilder) {
+    private void createBlockMesh(@NotNull OptimizedMeshBuilder meshBuilder) {
         BoxRenderer renderer = new BoxRenderer(new Vector2[]{
                 new Vector2(0, 0)
         }, new Pointer<>(mc.textureManager.blockDestroyStages[0]));

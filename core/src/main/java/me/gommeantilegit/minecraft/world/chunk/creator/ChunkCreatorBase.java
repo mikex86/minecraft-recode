@@ -1,24 +1,24 @@
 package me.gommeantilegit.minecraft.world.chunk.creator;
 
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
-import me.gommeantilegit.minecraft.annotations.Unsafe;
+import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import me.gommeantilegit.minecraft.entity.Entity;
-import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
-import me.gommeantilegit.minecraft.timer.api.AsyncOperation;
+import me.gommeantilegit.minecraft.timer.api.Tickable;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
 import me.gommeantilegit.minecraft.world.WorldBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
+import me.gommeantilegit.minecraft.world.chunk.world.WorldChunkHandlerBase;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
+import static java.lang.Math.abs;
 import static java.lang.Math.ceil;
 
 /**
  * Object generating chunks around entities and handling the access to the chunk array lists
  */
-public abstract class ChunkCreatorBase implements AsyncOperation {
+public abstract class ChunkCreatorBase implements Tickable {
 
     /**
      * The parent world
@@ -26,26 +26,8 @@ public abstract class ChunkCreatorBase implements AsyncOperation {
     @NotNull
     protected final WorldBase world;
 
-    /**
-     * Players viewing the world
-     */
-    @NotNull
-    private final List<PlayerBase> viewers;
-
-    /**
-     * Stores all entities that still need to be assigned to chunks
-     */
-    @NotNull
-    private final Queue<Entity> pendingEntities = new LinkedList<>();
-
-    /**
-     * State whether currently entities are scheduled to be added.
-     */
-    private boolean entitiesPending = false;
-
     public ChunkCreatorBase(@NotNull WorldBase world) {
         this.world = world;
-        this.viewers = new ArrayList<>();
     }
 
     /**
@@ -55,59 +37,20 @@ public abstract class ChunkCreatorBase implements AsyncOperation {
      * @param chunkZ chunk Z origin
      * @param world  the world
      */
-    protected void addChunk(int chunkX, int chunkZ, WorldBase world){
-        this.addChunk(new ChunkBase(world.height, chunkX, chunkZ, world));
+    @NotNull
+    @ThreadSafe
+    public ChunkBase createChunk(int chunkX, int chunkZ, WorldBase world) {
+        ChunkBase chunk = new ChunkBase(world.getHeight(), chunkX, chunkZ, world);
+        createChunk(chunk);
+        return chunk;
     }
 
     @Override
-    public void onAsyncThread() {
-        updatePendingEntities();
-        for (int i = 0; i < viewers.size(); i++) {
-            Entity ent = viewers.get(i);
-            generateChunksAroundEntity(ent, getChunkLoadingDistance(ent));
-        }
-    }
-
-    /**
-     * @param ent the given entity
-     * @return the chunk loading distance for the given entity
-     */
-    protected abstract int getChunkLoadingDistance(@NotNull Entity ent);
-
-    /**
-     * Handles all pending entities
-     */
-    protected void updatePendingEntities() {
-        if (entitiesPending) {
-            synchronized (pendingEntities) {
-                while (!pendingEntities.isEmpty()) {
-                    try {
-                        Entity entity = pendingEntities.element();
-                        if (handle(entity))
-                            pendingEntities.remove();
-                    } catch (NoSuchElementException ignored) {
-                    }
-                }
-                entitiesPending = false;
-            }
-        }
-    }
-
-    /**
-     * Creates the needed chunk for the given entity and assigns it to it's chunk.
-     *
-     * @param entity the given entity
-     * @return true, if the entity was scheduled to be added to the created chunk. False, if the entity is still pending, thus waiting for it's chunks to be created asynchronously.
-     */
-    private boolean handle(@NotNull Entity entity) {
-        ChunkBase chunk = world.getChunkFor(entity);
-        if (chunk != null) {
-            chunk.addEntity(entity);
-            return true;
-        } else {
-            generateChunksAroundEntity(entity, ChunkBase.CHUNK_SIZE * 2);
-            return false;
-        }
+    public void tick(float partialTicks) {
+//        for (int i = 0; i < viewers.size(); i++) {
+//            Entity ent = viewers.get(i);
+//            generateChunksAroundEntity(ent, getChunkLoadingDistance(ent));
+//        }
     }
 
     /**
@@ -115,9 +58,12 @@ public abstract class ChunkCreatorBase implements AsyncOperation {
      *
      * @param entity      the entity that chunks should be generated around
      * @param maxDistance the maximum distance to a chunk that should be created
+     * @return the chunks around the entity (not only the newly created ones)
      */
-    private void generateChunksAroundEntity(@NotNull Entity entity, int maxDistance) {
-        generateChunksAroundPosition(entity.getPositionVector(), maxDistance);
+    @NotNull
+    @ThreadSafe
+    public List<ChunkBase> generateChunksAroundEntity(@NotNull Entity entity, int maxDistance) {
+        return generateChunksAroundPosition(entity.getPositionVector(), maxDistance);
     }
 
     /**
@@ -125,55 +71,87 @@ public abstract class ChunkCreatorBase implements AsyncOperation {
      *
      * @param positionVector the position that chunks should be generated around
      * @param maxDistance    the maximum distance to a chunk that should be created
+     * @return the chunks around the entity (not only the newly created ones)
      */
-    public void generateChunksAroundPosition(@NotNull Vector3 positionVector, int maxDistance) {
-        int range = (int) ceil(((maxDistance / 2f) / (double) ChunkBase.CHUNK_SIZE)) * ChunkBase.CHUNK_SIZE;
-        for (int zo = -range; zo < range; zo += ChunkBase.CHUNK_SIZE) {
-            for (int xo = -range; xo < range; xo += ChunkBase.CHUNK_SIZE) {
-                float x = positionVector.x + xo, z = positionVector.z + zo;
+    @NotNull
+    @ThreadSafe
+    public List<ChunkBase> generateChunksAroundPosition(@NotNull Vector3 positionVector, int maxDistance) {
+        List<ChunkBase> chunkBases = new ArrayList<>();
+        int range = (int) ceil(((maxDistance) / (double) ChunkBase.CHUNK_SIZE));
 
-                Vector2 origin = new Vector2(x, z);
-                double distance;
-                {
-                    Vector2 pos;
-                    {
-                        pos = new Vector2(positionVector.x, positionVector.z);
+        Vec2i origin = this.world.getChunkOrigin(positionVector.x, positionVector.z);
+
+        // in unit chunks
+        int cx = origin.getX() / ChunkBase.CHUNK_SIZE, cz = origin.getY() / ChunkBase.CHUNK_SIZE;
+        int cxo = 0, czo = 0;
+        int xSize = 1, zSize = 1;
+
+        chunkBases.add(tryCreateChunkFor(origin));
+
+        traverse:
+        {
+            while (true) {
+                for (int i = 0; i < xSize; i++) {
+                    cxo++;
+                    if (cxo > range) {
+                        break traverse;
                     }
-                    distance = pos.dst(origin);
+                    int chunkX = (cx + cxo) * ChunkBase.CHUNK_SIZE, chunkZ = (cz + czo) * ChunkBase.CHUNK_SIZE;
+                    Vec2i vec2i = new Vec2i(chunkX, chunkZ);
+                    chunkBases.add(tryCreateChunkFor(vec2i));
                 }
-                if (distance < maxDistance)
-                    tryCreateChunkFor(new Vec2i(origin));
+                xSize++;
+                for (int i = 0; i < zSize; i++) {
+                    czo++;
+                    if (czo > range) {
+                        break traverse;
+                    }
+                    int chunkX = (cx + cxo) * ChunkBase.CHUNK_SIZE, chunkZ = (cz + czo) * ChunkBase.CHUNK_SIZE;
+                    Vec2i vec2i = new Vec2i(chunkX, chunkZ);
+                    chunkBases.add(tryCreateChunkFor(vec2i));
+                }
+                zSize++;
+
+                for (int i = 0; i < xSize; i++) {
+                    cxo--;
+                    if (cxo < -range) {
+                        break traverse;
+                    }
+                    int chunkX = (cx + cxo) * ChunkBase.CHUNK_SIZE, chunkZ = (cz + czo) * ChunkBase.CHUNK_SIZE;
+                    Vec2i vec2i = new Vec2i(chunkX, chunkZ);
+                    chunkBases.add(tryCreateChunkFor(vec2i));
+                }
+                xSize++;
+                for (int i = 0; i < zSize; i++) {
+                    czo--;
+                    if (czo < -range) {
+                        break traverse;
+                    }
+                    int chunkX = (cx + cxo) * ChunkBase.CHUNK_SIZE, chunkZ = (cz + czo) * ChunkBase.CHUNK_SIZE;
+                    Vec2i vec2i = new Vec2i(chunkX, chunkZ);
+                    chunkBases.add(tryCreateChunkFor(vec2i));
+                }
+                zSize++;
             }
         }
-        if (!world.isLoaded)
-            world.isLoaded = true;
-    }
-
-    /**
-     * Submits an entity to the chunk creator that handles the creation of the chunks needed for the entity to spawn and the assignation to it's corresponding chunk after it's created.
-     *
-     * @param entity the given entity
-     */
-    public void submit(@NotNull Entity entity) {
-        synchronized (pendingEntities) {
-            this.pendingEntities.add(entity);
-            this.entitiesPending = true;
-        }
+        return chunkBases;
     }
 
     /**
      * Defines the chunk that contains the given position vector accordingly to the chunk grid of CHUNK_SIZE by CHUNK_SIZE meaning that chunk origins are always multiples of CHUNK_SIZE. (either positive or negative)
      *
      * @param position the given position vector (2D vector. x represents x axis of world; y represents z axis of world) (Top View)
-     * @return true if a chunk has been defined. If false, a chunk already handles the given area that the vector is in.
+     * @return the chunk for the specified position. (Either created or existing)
      */
-    public boolean tryCreateChunkFor(@NotNull Vec2i position) {
+    @NotNull
+    @ThreadSafe
+    public synchronized ChunkBase tryCreateChunkFor(@NotNull Vec2i position) {
         Vec2i origin = world.getChunkOrigin(position.getX(), position.getY());
-        if (!world.getWorldChunkHandler().chunkExistsAtOrigin(origin)) {
-            createChunk(origin);
-            return true;
+        ChunkBase chunk = world.getWorldChunkHandler().getChunkAt(origin.getX(), origin.getY());
+        if (chunk == null) {
+            return createChunk(origin);
         } else {
-            return false;
+            return chunk;
         }
     }
 
@@ -182,11 +160,10 @@ public abstract class ChunkCreatorBase implements AsyncOperation {
      *
      * @param origin the chunk origin where to create the chunk
      */
-    private synchronized void createChunk(@NotNull Vec2i origin) {
-        world.getWorldChunkHandler().addChunkOrigin(origin);
-        synchronized (world.getWorldChunkHandler().getLoadedChunks()) {
-            addChunk(origin.getX(), origin.getY(), world);
-        }
+    @NotNull
+    @ThreadSafe
+    public synchronized ChunkBase createChunk(@NotNull Vec2i origin) {
+        return createChunk(origin.getX(), origin.getY(), world);
     }
 
     /**
@@ -194,22 +171,10 @@ public abstract class ChunkCreatorBase implements AsyncOperation {
      *
      * @param chunk the chunk to be added
      */
-    @Unsafe
-    protected void addChunk(@NotNull ChunkBase chunk) {
-        this.world.getWorldChunkHandler().addChunk(chunk); // Adding the chunk to the world chunks list
-        this.world.getWorldChunkHandler().addUnloadedChunk(chunk); // Adding the chunk to the list of unloaded chunks because the chunk is not loaded by default and therefore unloaded. If it gets loaded later on, it gets removed.
-    }
-
-    /**
-     * Adds a new viewer to the list of viewers
-     *
-     * @param viewer the viewer
-     */
-    public void addViewer(@NotNull PlayerBase viewer) {
-        this.viewers.add(viewer);
-    }
-
-    public List<PlayerBase> getViewers() {
-        return viewers;
+    @ThreadSafe
+    protected synchronized void createChunk(@NotNull ChunkBase chunk) {
+        WorldChunkHandlerBase chunkHandler = this.world.getWorldChunkHandler();
+        chunkHandler.addChunk(chunk); // Adding the chunk to the world chunks list
+        // Chunk is in initial state --> not loaded, not unloaded thus GC loop will not occur
     }
 }

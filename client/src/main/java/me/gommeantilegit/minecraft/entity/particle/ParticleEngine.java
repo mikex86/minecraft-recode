@@ -3,18 +3,21 @@ package me.gommeantilegit.minecraft.entity.particle;
 import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
+import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
+import me.gommeantilegit.minecraft.timer.api.AsyncOperation;
 import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
-import me.gommeantilegit.minecraft.timer.api.AbstractAsyncOperation;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.Queue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
 
-public class ParticleEngine extends AbstractAsyncOperation implements OpenGLOperation {
+public class ParticleEngine implements AsyncOperation, OpenGLOperation {
 
     /**
      * The parent world that the particle engine spawns the new particles into.
@@ -26,7 +29,7 @@ public class ParticleEngine extends AbstractAsyncOperation implements OpenGLOper
      * Queue of particles to be spawned
      */
     @NotNull
-    private final Queue<Particle> scheduledParticles = new LinkedList<>();
+    private final Queue<Particle> scheduledParticles = new LinkedBlockingDeque<>();
 
     /**
      * Current state of any particles being in the spawn queue
@@ -34,15 +37,10 @@ public class ParticleEngine extends AbstractAsyncOperation implements OpenGLOper
     private boolean particlesToSpawn = false;
 
     /**
-     * Queue of particles whose meshes need to be built
+     * ExecutorService to build particle meshes
      */
     @NotNull
-    private final Queue<Particle> toBuild = new LinkedList<>();
-
-    /**
-     * Current state of any being particles in the build queue
-     */
-    private boolean particlesToBuild = false;
+    private final ExecutorService executorService = Executors.newFixedThreadPool(2, r -> new Thread(r, "ParticleEngine-PoolThread"));
 
     /**
      * Default constructor for a particle engine
@@ -50,16 +48,15 @@ public class ParticleEngine extends AbstractAsyncOperation implements OpenGLOper
      * @param mc sets {@link #mc}
      */
     public ParticleEngine(@NotNull ClientMinecraft mc) {
-        super("ParticleEngine-Async-Thread", 20);
         this.mc = mc;
     }
 
     /**
      * Spawns a few particles into the world with the texture of the block with prevBlock as it's id
      *
-     * @param blockX      x pos of destroyed block
-     * @param blockY      y pos of destroyed block
-     * @param blockZ      z pos of destroyed block
+     * @param blockX    x pos of destroyed block
+     * @param blockY    y pos of destroyed block
+     * @param blockZ    z pos of destroyed block
      * @param prevBlock id of destroyed block
      */
     public void spawnBlockBreakingParticles(int blockX, int blockY, int blockZ, @NotNull Block prevBlock) {
@@ -102,11 +99,13 @@ public class ParticleEngine extends AbstractAsyncOperation implements OpenGLOper
      *
      * @param particle the particle to be spawned
      */
+    @ThreadSafe
     private void scheduleParticle(@NotNull Particle particle) {
-        synchronized (this.toBuild) {
-            this.toBuild.add(particle);
-            particlesToBuild = true;
-        }
+        this.executorService.submit(() -> {
+            particle.setupMesh();
+            particlesToSpawn = true;
+            scheduledParticles.add(particle);
+        });
     }
 
     /**
@@ -114,40 +113,25 @@ public class ParticleEngine extends AbstractAsyncOperation implements OpenGLOper
      *
      * @param partialTicks timer partial ticks
      */
-    @NeedsOpenGLContext
     @Override
+    @NeedsOpenGLContext
     public void onOpenGLContext(float partialTicks) {
         if (particlesToSpawn) {
-            synchronized (scheduledParticles) {
-                while (!this.scheduledParticles.isEmpty()) {
-                    try {
-                        Particle particle = this.scheduledParticles.remove();
-                        particle.finishMesh();
-                        this.mc.theWorld.spawnEntityInWorld(particle);
-                    } catch (NoSuchElementException ignored) {
-                        this.scheduledParticles.clear();
-                    }
+            while (!this.scheduledParticles.isEmpty()) {
+                try {
+                    Particle particle = this.scheduledParticles.remove();
+                    particle.finishMesh();
+                    this.mc.theWorld.spawnEntityInWorld(particle);
+                } catch (NoSuchElementException ignored) {
+                    this.scheduledParticles.clear();
                 }
-                particlesToSpawn = false;
             }
+            particlesToSpawn = false;
         }
     }
 
     @Override
-    public void onAsyncThread() {
-        if (particlesToBuild) {
-            synchronized (toBuild) {
-                while (!this.toBuild.isEmpty()) {
-                    try {
-                        Particle particle = this.toBuild.remove();
-                        particle.setupMesh();
-                        particlesToSpawn = true;
-                        scheduledParticles.add(particle);
-                    } catch (NoSuchElementException ignored) {
-                    }
-                }
-                particlesToBuild = false;
-            }
-        }
+    public void stopAsyncWork() {
+        this.executorService.shutdown();
     }
 }

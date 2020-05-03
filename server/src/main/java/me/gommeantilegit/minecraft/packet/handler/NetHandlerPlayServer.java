@@ -12,7 +12,6 @@ import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadingDista
 import me.gommeantilegit.minecraft.packet.packets.client.ClientUserInfoPacket;
 import me.gommeantilegit.minecraft.packet.packets.server.*;
 import me.gommeantilegit.minecraft.server.netty.channel.ChannelData;
-import me.gommeantilegit.minecraft.world.ServerWorld;
 import me.gommeantilegit.minecraft.world.chunk.loader.ServerChunkLoader;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -20,6 +19,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Packet handler for the server to handle incoming packets from the clients
@@ -42,7 +42,7 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
      * Stores all channel data parent to the corresponding channels
      */
     @NotNull
-    public final HashMap<Channel, ChannelData> channelData = new HashMap<>();
+    public final Map<Channel, ChannelData> channelData = new HashMap<>();
 
     /**
      * Contains all registered channels
@@ -51,7 +51,7 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
     private final List<Channel> registeredChannels = new ArrayList<>();
 
     public NetHandlerPlayServer(@NotNull ServerMinecraft mc) {
-        super(mc.minecraftThread);
+        super(null);
         this.mc = mc;
         registerStaticPacketHandlers();
         this.addListener(((ServerChunkLoader) mc.theWorld.getChunkLoader()));
@@ -59,7 +59,7 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
 
     @Override
     public void registerStaticPacketHandlers() {
-        registerPacketHandler(ClientMovePacket.PACKET_ID, new PacketHandler<ClientMovePacket>(mc.minecraftThread) {
+        registerPacketHandler(ClientMovePacket.PACKET_ID, new PacketHandler<ClientMovePacket>() {
             @Override
             public void handlePacket(@NotNull ClientMovePacket packet, @NotNull ChannelHandlerContext context) {
                 ChannelData channelData = getData(context.channel());
@@ -99,11 +99,11 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
 
                         EntityPlayerMP entityPlayerMP = new EntityPlayerMP(mc, mc.theWorld, 20, packet.getUserName(), packet.getSkin(), channel);
                         channelData.setPlayerMP(entityPlayerMP);
-                        mc.theWorld.spawnEntityInWorld(entityPlayerMP);
-                        mc.theWorld.getChunkCreator().addViewer(entityPlayerMP);
-                        channel.writeAndFlush(new ServerWorldSetupPacket(null, mc.theWorld));
 
+                        channel.writeAndFlush(new ServerSessionValidationConfirmationPacket(null));
+                        channel.writeAndFlush(new ServerWorldSetupPacket(null, mc.theWorld)); // send before requesting render distance
                         channel.writeAndFlush(new ServerRequestRenderDistance(null));
+
                         expectPacketResponse(channel, RESPONSE_TIMEOUT, ClientChunkLoadingDistanceChangePacket.class, new IPacketResponseListener<ClientChunkLoadingDistanceChangePacket>() {
 
                             @Override
@@ -116,9 +116,13 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
                             public void onPacketReceived(@NotNull ClientChunkLoadingDistanceChangePacket renderDistanceChangePacket, @NotNull Channel channel) {
                                 if (renderDistanceChangePacket.getRenderDistance() <= mc.configuration.getMaxChunkLoadingDistance())
                                     channelData.modifyChunkLoadingDistance(renderDistanceChangePacket.getRenderDistance());
-                                else channelData.setChunkLoadingDistance(mc.configuration.getMaxChunkLoadingDistance());
-                                channel.writeAndFlush(new ServerSessionValidationConfirmationPacket(null));
-                                channelData.getPlayerMP().setPositionAndRotation(mc.theWorld.getSpawnPoint().x, mc.theWorld.getSpawnPoint().y, mc.theWorld.getSpawnPoint().z, 0, 0);
+                                else
+                                    channelData.setChunkLoadingDistance(mc.configuration.getMaxChunkLoadingDistance());
+
+                                channelData.getPlayerMP().setPositionAndRotation(mc.theWorld.getSpawnPoint().x, mc.theWorld.getSpawnPoint().y, mc.theWorld.getSpawnPoint().z, 45, 90);
+
+                                mc.theWorld.getChunkLoader().addViewer(entityPlayerMP);
+                                mc.theWorld.spawnEntityInWorld(entityPlayerMP);
                             }
                         });
                     }
@@ -140,7 +144,7 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
                 ctx.channel().close();
             }
         } catch (Throwable t) {
-            this.mc.logger.exception("Exception caught on netty thread while processing " + ctx.channel() + "'s packet", t);
+            this.mc.getLogger().exception("Exception caught on netty thread while processing " + ctx.channel() + "'s packet", t);
             t.printStackTrace();
             // TODO: MESSAGE
             ctx.channel().close();
@@ -155,7 +159,7 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
     public void registerChannel(@NotNull Channel channel) {
         this.registeredChannels.add(channel);
         this.channelData.put(channel, new ChannelData(channel));
-        this.mc.logger.debug("Channel " + channel.remoteAddress() + " registered");
+        this.mc.getLogger().debug("Channel " + channel.remoteAddress() + " registered");
     }
 
     /**
@@ -166,9 +170,11 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
      */
     public void unregisterChannel(@NotNull Channel channel) {
         this.registeredChannels.remove(channel);
-        this.getData(channel).getPlayerMP().setDead();
+        EntityPlayerMP playerMP = this.getData(channel).getPlayerMP();
+        playerMP.setDead();
+        mc.theWorld.getChunkLoader().removeViewer(playerMP);
         this.channelData.remove(channel);
-        this.mc.logger.debug("Channel " + channel.remoteAddress() + " unregistered");
+        this.mc.getLogger().debug("Channel " + channel.remoteAddress() + " unregistered");
     }
 
     @NotNull

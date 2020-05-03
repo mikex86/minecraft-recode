@@ -9,7 +9,6 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.packet.ClientPacket;
 import me.gommeantilegit.minecraft.packet.handler.NetHandlerPlayClient;
-import me.gommeantilegit.minecraft.packet.packets.client.ClientRequestChunkDataPacket;
 import me.gommeantilegit.minecraft.packet.proc.impl.dec.ServerPacketDecoder;
 import me.gommeantilegit.minecraft.packet.proc.impl.enc.ClientPacketEncoder;
 import org.jetbrains.annotations.NotNull;
@@ -85,7 +84,7 @@ public class NettyClient extends Thread {
                 ChannelFuture f = b.connect(hostAddress, port).sync();
                 f.channel().closeFuture().sync();
             } catch (InterruptedException e) {
-                mc.logger.info("Netty Client Thread interrupted");
+                mc.getLogger().info("Netty Client Thread interrupted");
             }
         } finally {
             workerGroup.shutdownGracefully();

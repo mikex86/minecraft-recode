@@ -1,11 +1,10 @@
 package me.gommeantilegit.minecraft.world.chunk.loader;
 
 
-import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadConfirmPacket;
+import me.gommeantilegit.minecraft.entity.Entity;
+import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkUnloadPacket;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientRequestChunkDataPacket;
 import me.gommeantilegit.minecraft.world.ClientWorld;
@@ -13,7 +12,7 @@ import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.ArrayList;
 
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 
@@ -27,12 +26,6 @@ public class ClientChunkLoader extends ChunkLoaderBase {
     private final ClientMinecraft mc;
 
     /**
-     * Queue of all chunks which data has already been requested
-     */
-    @NotNull
-    private final ArrayList<ClientChunk> requested = new ArrayList<>();
-
-    /**
      * @param world sets {@link #world}
      * @param mc    parent minecraft instance
      */
@@ -42,40 +35,7 @@ public class ClientChunkLoader extends ChunkLoaderBase {
     }
 
     @Override
-    public void onAsyncThread() {
-        ClientWorld world = (ClientWorld) this.world;
-        super.onAsyncThread();
-        Vector2 playerPosition; //2D vector storing the viewers x and y coordinates
-        {
-            Vector3 viewingPosition = mc.thePlayer.getPositionVector();
-            playerPosition = new Vector2(viewingPosition.x, viewingPosition.z);
-        }
-
-        List<ChunkBase> chunks = world.getWorldChunkHandler().getChunks();
-        for (ChunkBase chunkBase : chunks) {
-            ClientChunk chunk = (ClientChunk) chunkBase;
-            float distance = chunk.getChunkOrigin().asLibGDXVec2D().dst(playerPosition);
-            if (distance < world.getChunkLoadingDistance()) {
-
-                if (!world.getWorldChunkHandler().getNearChunks().contains(chunk))
-                    world.getWorldChunkHandler().addNearChunk(chunk);
-
-                if (!chunk.isLoaded()) {
-                    mc.nettyClient.sendPacket(new ClientChunkLoadConfirmPacket(null, chunk.getChunkOrigin().asLibGDXVec2D()));
-                    chunk.load();
-                    if (!requested.contains(chunk))
-                        requestChunkData(chunk);
-                }
-
-            } else {
-                if (world.getWorldChunkHandler().getNearChunks().contains(chunk))
-                    world.getWorldChunkHandler().removeNearChunk(chunk);
-                if (chunk.isLoaded()) {
-                    chunk.unload();
-                    mc.nettyClient.sendPacket(new ClientChunkUnloadPacket(null, chunk.getChunkOrigin().asLibGDXVec2D()));
-                }
-            }
-        }
+    public void tick(float partialTicks) {
     }
 
     /**
@@ -83,8 +43,39 @@ public class ClientChunkLoader extends ChunkLoaderBase {
      *
      * @param chunk the specified chunk
      */
-    private void requestChunkData(@NotNull ClientChunk chunk) {
-        mc.nettyClient.sendPacket(new ClientRequestChunkDataPacket(null, chunk.getChunkOrigin().asLibGDXVec2D()));
-        this.requested.add(chunk);
+    private void requestChunkData(@NotNull ChunkBase chunk) {
+        this.mc.nettyClient.sendPacket(new ClientRequestChunkDataPacket(null, chunk.getChunkOrigin().asLibGDXVec2D()));
     }
+
+    /**
+     * Sends a packet to the server to inform it that a chunk has been unloaded
+     *
+     * @param chunk the chunk that was unloaded
+     */
+    public void informUnload(@NotNull ChunkBase chunk) {
+        this.mc.nettyClient.sendPacket(new ClientChunkUnloadPacket(null, chunk.getChunkOrigin().asLibGDXVec2D()));
+    }
+
+    @Override
+    protected void load(@NotNull ChunkBase chunk, @NotNull Entity entity) {
+        if (chunk.isLoaded())
+            return;
+        super.load(chunk, entity);
+        this.requestChunkData(chunk);
+    }
+
+    @Override
+    protected void unload(@NotNull ChunkBase chunk, @NotNull Entity entity) {
+        super.unload(chunk, entity);
+        this.informUnload(chunk);
+    }
+
+    @Override
+    public int getChunkLoadingDistance(@NotNull Entity ent) {
+        if (!(ent instanceof EntityPlayerSP)) {
+            return 16; // entities should only spawn in already loaded chunks on the client
+        }
+        return this.world.getChunkLoadingDistance();
+    }
+
 }

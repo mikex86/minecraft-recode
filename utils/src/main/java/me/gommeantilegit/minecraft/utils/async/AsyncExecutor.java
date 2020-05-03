@@ -26,7 +26,7 @@ public class AsyncExecutor {
         executor = new ListenableThreadPoolExecutor(maxConcurrent, maxConcurrent,
                 0L, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(), r -> {
-            Thread thread = new Thread(r, "AsynchExecutor-Thread");
+            Thread thread = new Thread(r, "AsyncExecutor-Thread");
             thread.setDaemon(true);
             return thread;
         });

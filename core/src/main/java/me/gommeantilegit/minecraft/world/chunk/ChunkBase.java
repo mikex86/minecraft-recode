@@ -2,28 +2,27 @@ package me.gommeantilegit.minecraft.world.chunk;
 
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.collision.BoundingBox;
+import kotlin.Pair;
 import me.gommeantilegit.minecraft.AbstractMinecraft;
+import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import me.gommeantilegit.minecraft.annotations.Unsafe;
 import me.gommeantilegit.minecraft.block.Block;
-import me.gommeantilegit.minecraft.block.state.BlockState;
+import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
-import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
 import me.gommeantilegit.minecraft.utils.serialization.exception.DeserializationException;
 import me.gommeantilegit.minecraft.world.WorldBase;
-import me.gommeantilegit.minecraft.world.saveformat.data.ChunkData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static java.lang.Math.max;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
 
@@ -52,24 +51,19 @@ public class ChunkBase implements Tickable {
 
     /**
      * State if the chunk is currently loaded (tick updated)
+     * (-1 -> initial state, 0 unloaded, 1 loaded)
      */
-    protected boolean loaded = false;
+    protected int loadedState = -1;
 
     /**
      * List storing all entities of the chunk.
      */
-    protected final ArrayList<Entity> entities;
+    protected final List<Entity> entities;
 
     /**
      * A unique id of the current chunk.
      */
     protected final long id = new Random().nextLong();
-
-    /**
-     * Three dimensional array of blockStates storing information about all block states.
-     */
-    @NotNull
-    public final BlockState[][][] blockStates;
 
     /**
      * Chunk bounding box for frustum culling
@@ -84,16 +78,30 @@ public class ChunkBase implements Tickable {
     public final AbstractMinecraft mc;
 
     /**
-     * Array of chunk sections
+     * List of chunk sections
      */
     @NotNull
-    private final ChunkSection[] chunkSections;
+    private final List<ChunkSection> chunkSections;
+
+//    /**
+//     * 2D array storing a Biome id for a given x and z value.
+//     */
+//    @NotNull
+//    private final byte[][] biome = new byte[CHUNK_SIZE][CHUNK_SIZE];
 
     /**
-     * 2D array storing a Biome id for a given x and z value.
+     * Threadsafe queue of entities (and respective data to perform the operation) that should be added to the entity list of the chunk on the next tick.
      */
     @NotNull
-    private final byte[][] biome = new byte[CHUNK_SIZE][CHUNK_SIZE];
+    private final Queue<Pair<Entity, Consumer<Entity>>> pendingEntitiesToAdd = new ConcurrentLinkedQueue<>();
+
+    /**
+     * Threadsafe queue of entities (and respective data to perform the operation) that should be removed to the entity list of the chunk on the next tick.
+     */
+    @NotNull
+    private final Queue<Pair<Pair<Entity, EntityRemoveReason>, Consumer<Entity>>> pendingEntitiesToRemove = new ConcurrentLinkedQueue<>();
+
+    private long nTicksPerformed;
 
     /**
      * Default constructor of a ChunkBase object
@@ -108,13 +116,29 @@ public class ChunkBase implements Tickable {
         this.x = x;
         this.z = z;
         this.world = world;
-        this.blockStates = new BlockState[CHUNK_SIZE][height][CHUNK_SIZE];
         this.boundingBox = new BoundingBox(new Vector3(x, 0, z), new Vector3(x + CHUNK_SIZE, height, z + CHUNK_SIZE));
         this.mc = world.mc;
         this.entities = new ArrayList<>();
-        this.chunkSections = new ChunkSection[height / CHUNK_SECTION_SIZE];
-        for (int i = 0; i < chunkSections.length; i++) {
-            chunkSections[i] = getChunkSection(i * CHUNK_SECTION_SIZE);
+        this.chunkSections = new ArrayList<>(height / CHUNK_SECTION_SIZE);
+        this.initChunkSections();
+    }
+
+
+    protected ChunkBase(int height, int x, int z, @NotNull WorldBase world, @NotNull List<ChunkSection> sections) {
+        this.height = height;
+        this.x = x;
+        this.z = z;
+        this.world = world;
+        this.boundingBox = new BoundingBox(new Vector3(x, 0, z), new Vector3(x + CHUNK_SIZE, height, z + CHUNK_SIZE));
+        this.mc = world.mc;
+        this.entities = new ArrayList<>();
+        this.chunkSections = sections;
+    }
+
+    protected void initChunkSections() {
+        assert chunkSections.isEmpty();
+        for (int i = 0; i < height / CHUNK_SECTION_SIZE; i++) {
+            this.chunkSections.add(createChunkSection(i * CHUNK_SECTION_SIZE));
         }
     }
 
@@ -123,7 +147,7 @@ public class ChunkBase implements Tickable {
      * @return the chunk section instance to be stored in {@link #chunkSections} during object init.
      */
     @NotNull
-    protected ChunkSection getChunkSection(int startHeight) {
+    protected ChunkSection createChunkSection(int startHeight) {
         return new ChunkSection(this, startHeight);
     }
 
@@ -134,7 +158,32 @@ public class ChunkBase implements Tickable {
      */
     @Override
     public void tick(float partialTicks) {
+        this.updatePendingEntities();
         this.trackEntities();
+        this.nTicksPerformed++;
+    }
+
+    private void updatePendingEntities() {
+        while (!this.pendingEntitiesToAdd.isEmpty()) {
+            Pair<Entity, Consumer<Entity>> pair = this.pendingEntitiesToAdd.remove();
+            Entity entity = pair.getFirst();
+            forceAddEntity(entity);
+            Consumer<Entity> listener = pair.getSecond();
+            if (listener != null) {
+                listener.accept(entity);
+            }
+        }
+        while (!this.pendingEntitiesToRemove.isEmpty()) {
+            Pair<Pair<Entity, EntityRemoveReason>, Consumer<Entity>> pair = this.pendingEntitiesToRemove.remove();
+            Pair<Entity, EntityRemoveReason> entityPair = pair.getFirst();
+            Entity entity = entityPair.getFirst();
+            EntityRemoveReason reason = entityPair.getSecond();
+            forceRemoveEntity(entity, reason);
+            Consumer<Entity> listener = pair.getSecond();
+            if (listener != null) {
+                listener.accept(entity);
+            }
+        }
     }
 
     /**
@@ -145,7 +194,6 @@ public class ChunkBase implements Tickable {
      */
     public void forceAddEntity(@NotNull Entity entity) {
         entity.setWorld(world);
-        entity.onChunkChanged(this, null);
         this.entities.add(entity);
     }
 
@@ -159,35 +207,82 @@ public class ChunkBase implements Tickable {
         for (int i = 0; i < this.entities.size(); i++) {
             Entity entity = entities.get(i);
 
-            if (entity.skipUpdateTicks > 0)
-                entity.skipUpdateTicks--;
-            else {
-                long currentTick = mc.timer.performedTicks;
-                if (entity.lastUpdated != currentTick) {
-                    entity.tick();
-                    entity.lastUpdated = currentTick;
+            if (entity.getNewChunk() == this)
+                entity.setChangingToChunk(null); // chunk transfer complete
+
+            // entity update
+            if (entity.getNewChunk() == null) {
+                long ticksToPerform = entity.getTickJoinMark() == -1 ? 1 : (nTicksPerformed - entity.getTickJoinMark() + 1);
+                for (long j = 0; j < ticksToPerform; j++) {
+                    long currentTick = mc.getTimer().performedTicks;
+                    if (entity.lastUpdated != currentTick) {
+                        entity.tick();
+                        entity.lastUpdated = currentTick;
+                    }
                 }
+                entity.joinTickAt(-1);
             }
 
-            if (entity.isInChunk(this) || entity.chunkChanged) {
+            if (entity.isInChunk(this)) {
                 //Entity is still in the same chunk.
-                if (entity.dead) {
+                if (entity.isDead()) {
                     entity.onDeath();
-                    removeEntity(i--, EntityRemoveReason.ENTITY_DEATH);
+                    scheduleRemoveEntity(entity, EntityRemoveReason.ENTITY_DEATH);
                 }
-                entity.chunkChanged = false;
-            } else {
+            } else if (entity.getNewChunk() == null) {
                 //Entity has moved to another chunk
                 ChunkBase newChunk = world.getChunkFor(entity);
 
                 //Keeping the entity in the old chunk, if the chunk is indeed null.
+                if (newChunk == this) {
+                    System.err.println("New chunk for entity is equal to it's current one. world.getChunkFor(entity) returned the wrong chunk, which could either mean rare floating point rounding errors or a bug in the method.");
+                    continue;
+                }
                 if (newChunk != null) {
-                    entity.onChunkChanged(newChunk, this);
-                    removeEntity(i--, EntityRemoveReason.ENTITY_CHUNK_CHANGED);
-                    newChunk.forceAddEntity(entity);
+                    transferEntity(entity, newChunk);
+//                    entity.joinTickAt(nTicksPerformed); // start ticking again >>after<< the target chunk performed >>this<< tick, so start ticking next tick
                 }
             }
         }
+    }
+
+    /**
+     * Transfers the entity to a new chunk
+     *
+     * @param entity   the entity to be transferred
+     * @param newChunk the chunk the entity should be transferred into
+     */
+    protected void transferEntity(@NotNull Entity entity, @NotNull ChunkBase newChunk) {
+//        entity.skipUpdateTicks += 1;
+        entity.setChangingToChunk(newChunk);
+        newChunk.scheduleAddEntity(entity, e -> {
+            scheduleRemoveEntity(entity, EntityRemoveReason.ENTITY_CHUNK_CHANGED);
+            entity.onChunkChanged(newChunk, this);
+        });
+        System.out.println("Chunk changed: " + entity.getPositionVector() + " oldChunk: " + this.getChunkOrigin() + ", newChunk: " + newChunk.getChunkOrigin());
+    }
+
+    /**
+     * Schedules the entity to be removed on the next tick by the chunk.
+     *
+     * @param entity       the entity to remove
+     * @param removeReason the reason why it got removed from the chunk
+     */
+    @ThreadSafe
+    public void scheduleRemoveEntity(@NotNull Entity entity, @NotNull EntityRemoveReason removeReason) {
+        this.pendingEntitiesToRemove.add(new Pair<>(new Pair<>(entity, removeReason), null));
+    }
+
+    /**
+     * Schedules the entity to be removed on the next tick performed by the chunk.
+     *
+     * @param entity       the entity to remove
+     * @param removeReason the reason why it got removed from the chunk
+     * @param listener     the listener invoked when the removal is performed. Invoked on a random thread. Only assert the chunk that the entity is in is ticked on this thread that the listener is invoked with
+     */
+    @ThreadSafe
+    public void scheduleRemoveEntity(@NotNull Entity entity, @NotNull EntityRemoveReason removeReason, @NotNull Consumer<Entity> listener) {
+        this.pendingEntitiesToRemove.add(new Pair<>(new Pair<>(entity, removeReason), listener));
     }
 
     /**
@@ -196,8 +291,18 @@ public class ChunkBase implements Tickable {
      * @param entityIndex  the index of the entity to be removed in the {@link #entities} list
      * @param removeReason the reason the entity was removed from the list
      */
-    protected void removeEntity(int entityIndex, @NotNull EntityRemoveReason removeReason) {
+    protected void forceRemoveEntity(int entityIndex, @NotNull EntityRemoveReason removeReason) {
         this.entities.remove(entityIndex);
+    }
+
+    /**
+     * The method that removes a given entity
+     *
+     * @param entity       the entity to be removed in the {@link #entities} list
+     * @param removeReason the reason the entity was removed from the list
+     */
+    protected void forceRemoveEntity(@NotNull Entity entity, @NotNull EntityRemoveReason removeReason) {
+        this.entities.remove(entity);
     }
 
     /**
@@ -205,10 +310,10 @@ public class ChunkBase implements Tickable {
      * @return if an entity is in the given bounding box
      */
     public boolean isFree(AxisAlignedBB axisAlignedBB) {
-        ArrayList<Entity> entities = this.entities;
+        List<Entity> entities = this.entities;
         for (int i = 0; i < entities.size(); i++) {
             Entity entity = entities.get(i);
-            if (entity.boundingBox.intersects(axisAlignedBB)) {
+            if (entity.getBoundingBox().intersects(axisAlignedBB)) {
                 return false;
             }
         }
@@ -225,15 +330,21 @@ public class ChunkBase implements Tickable {
     }
 
     /**
-     * Loads the chunk. The chunk is now being rendered and updated on tick.
-     * Minecraft Thread Only!
-     * Also tells the chunk cache to un-optimize the chunks data to get quicker access time to the element.
-     * All this happens asynchronous. Invocation of this method will be quick.
+     * @param x block x position
+     * @param z block z position
+     * @return the state if the given block coordinate is managed by the chunk instance.
      */
-    public synchronized void load() {
-        if (!loaded) {
-            world.getWorldChunkHandler().addLoadedChunk(this);
-            world.getWorldChunkHandler().removeUnloadedChunk(this);
+    public boolean contains(float x, float z) {
+        return x >= this.x && z >= this.z && x < this.x + CHUNK_SIZE && z < this.z + CHUNK_SIZE;
+    }
+
+    /**
+     * Loads the chunk. The chunk is now being rendered and updated on tick.
+     */
+    // TODO: DOESN'T SEEM THAT THREAD-SAFE TO MEE... INVESTIGATE FURTHER
+    public void load() {
+        if (loadedState != 1) {
+            world.getWorldChunkHandler().loadChunk(this);
             setLoaded(true);
         }
     }
@@ -244,10 +355,9 @@ public class ChunkBase implements Tickable {
      * Also tells the block state cache to optimize the chunks data.
      * All this happens asynchronous. Invocation of this method will be quick.
      */
-    public synchronized void unload() {
-        if (loaded) {
-            world.getWorldChunkHandler().removeLoadedChunk(this);
-            world.getWorldChunkHandler().addUnloadedChunk(this);
+    public void unload() {
+        if (loadedState != 0) {
+            world.getWorldChunkHandler().unloadChunk(this);
             setLoaded(false);
         }
     }
@@ -261,7 +371,7 @@ public class ChunkBase implements Tickable {
      * @param newBlockState the new block state
      * @throws IllegalStateException if the specified coordinates are not managed by the chunk.
      */
-    public void setBlock(int x, int y, int z, @Nullable BlockState newBlockState) {
+    public void setBlock(int x, int y, int z, @Nullable IBlockState newBlockState) {
         changeBlock(x, y, z, newBlockState);
     }
 
@@ -274,13 +384,16 @@ public class ChunkBase implements Tickable {
      * @param blockState the new block state
      */
     @Unsafe
-    protected void changeBlock(int x, int y, int z, @Nullable BlockState blockState) {
+    protected void changeBlock(int x, int y, int z, @Nullable IBlockState blockState) {
+        if (y < 0 || y >= height) {
+            throw new IllegalStateException("Chunk Y-index out of bounds: " + y + " for height " + height);
+        }
         int relX = x - this.x;
-        int relY = max(0, y);
         int relZ = z - this.z;
         if (!this.contains(x, z))
-            throw new IllegalStateException("Couldn't set block state to blockState: " + blockState + ". Coordinates x: " + x + ", y: " + y + ", z: " + z + "; relX: " + relX + ", relY: " + relY + ", relZ: " + relZ + "; are not contained in ChunkBase: [" + this.toString() + "]");
-        this.blockStates[relX][relY][relZ] = blockState;
+            throw new IllegalStateException("Couldn't set block state to blockState: " + blockState + ". Coordinates x: " + x + ", y: " + y + ", z: " + z + "; relX: " + relX + ", relY: " + y + ", relZ: " + relZ + "; are not contained in ChunkBase: [" + this.toString() + "]");
+        ChunkSection section = this.getChunkSection(y);
+        section.setBlockState(relX, y - section.getStartHeight(), relZ, blockState);
     }
 
     /**
@@ -304,7 +417,7 @@ public class ChunkBase implements Tickable {
      */
     @Nullable
     public Block getBlockAt(int x, int y, int z) {
-        BlockState blockState = getBlockState(x, y, z);
+        IBlockState blockState = getBlockState(x, y, z);
         if (blockState == null)
             return null;
         else return blockState.getBlock();
@@ -317,57 +430,64 @@ public class ChunkBase implements Tickable {
      * @return the block state at the specified coordinate
      */
     @Nullable
-    public BlockState getBlockState(int x, int y, int z) {
-        if (y < 0 || y >= height)
+    public IBlockState getBlockState(int x, int y, int z) {
+        if (y < 0 || y >= this.height)
             return null; //Returning air, if the block pos is below the world
         int relX = x - this.x;
         int relZ = z - this.z;
         if (!this.contains(x, z))
-            throw new IllegalStateException("Couldn't get block state of coordinates x: " + x + ", y: " + y + ", z:" + z + "; relX: " + relX + ", relY: " + y + ", relZ: " + relZ + "; are not contained in ChunkBase: [" + this.toString() + "]");
-        return blockStates[relX][y][relZ];
+            throw new IllegalArgumentException("Couldn't get block state of coordinates x: " + x + ", y: " + y + ", z:" + z + "; relX: " + relX + ", relY: " + y + ", relZ: " + relZ + "; are not contained in ChunkBase: [" + this.toString() + "]");
+        ChunkSection section = this.getChunkSection(y);
+        return section.getRelativeBlockState(relX, y - section.getStartHeight(), relZ);
     }
 
+
     /**
-     * @return the true if all entities allow the scheduleUnload of this chunk
+     * @param x chunk relative x coordinate
+     * @param y chunk relative y coordinate
+     * @param z chunk relative  z coordinate
+     * @return the block state in the chunk for the specified chunk relative coordinates
      */
-    public boolean checkForUnload() {
-        for (Entity entity : this.entities) {
-            if (!entity.allowChunkUnload(this)) {
-                return false;
-            }
-        }
-        return true;
+    @Nullable
+    public IBlockState getRelativeBlockState(int x, int y, int z) {
+        if (y < 0 || y >= height)
+            return null; //Returning air, if the block pos is below the world
+        if (x < 0 || x > CHUNK_SIZE)
+            throw new IllegalArgumentException("X-Coordinate " + x + " not in relative chunk bounds.");
+        if (z < 0 || z > CHUNK_SIZE)
+            throw new IllegalArgumentException("Z-Coordinate " + z + " not in relative chunk bounds.");
+        ChunkSection section = this.getChunkSection(y);
+        return section.getRelativeBlockState(x, y - section.getStartHeight(), z);
     }
 
     /**
-     * Sets the chunks data accordingly to the information encoded in #chunkData.
+     * Sets the chunks data accordingly to the information encoded in the bytes
      *
      * @param bytes             the data is the encoded chunk data for this chunk
      * @param chunkSectionsSent the states if the individual chunk sections have been sent in the packet
      */
+    //TODO: DOESN'T SEEM THAT THREAD-SAFE... INVESTIGATE FURTHER
     public void setChunkData(@NotNull byte[] bytes, @NotNull boolean[] chunkSectionsSent) {
         this.clearBlocks();
-        BitByteBuffer buf = new BitByteBuffer(bytes, Integer.MAX_VALUE);
+//        BitByteBuffer buf = new BitByteBuffer(bytes, Integer.MAX_VALUE);
         try {
-            ChunkData chunkData = mc.chunkSerializer.deserialize(buf, height, chunkSectionsSent);
-            apply(chunkData);
-        } catch (DeserializationException e) {
-            mc.logger.crash("Cannot deserialize chunk data from byte array!", e);
+            apply(bytes, chunkSectionsSent);
+        } catch (Exception e) {
+            mc.getLogger().crash("Cannot deserialize chunk data from byte array!", e);
         }
     }
 
     /**
-     * Applies the chunk state of the specified {@link ChunkData} instance
-     *
-     * @param chunkData the data object storing the state that should be applied to this chunk
+     * Applies the chunk state of the specified palette backing array
      */
-    private void apply(@NotNull ChunkData chunkData) {
-        for (int x = 0; x < CHUNK_SIZE; x++) {
-            for (int y = 0; y < height; y++) {
-                for (int z = 0; z < CHUNK_SIZE; z++) {
-                    this.blockStates[x][y][z] = chunkData.getBlockStates()[x][y][z];
-                }
+    private void apply(@NotNull byte[] chunkData, @NotNull boolean[] chunkSectionsSent) {
+        int i = 0;
+        for (boolean sent : chunkSectionsSent) {
+            if (sent) {
+                ChunkSection section = chunkSections.get(i);
+                chunkData = section.apply(chunkData);
             }
+            i++;
         }
     }
 
@@ -375,12 +495,8 @@ public class ChunkBase implements Tickable {
      * Sets all blocks of the chunk to air
      */
     private void clearBlocks() {
-        for (int x = 0; x < CHUNK_SIZE; x++) {
-            for (int y = 0; y < height; y++) {
-                for (int z = 0; z < CHUNK_SIZE; z++) {
-                    this.blockStates[x][y][z] = null;
-                }
-            }
+        for (ChunkSection chunkSection : this.chunkSections) {
+            chunkSection.clearBlocks();
         }
     }
 
@@ -401,23 +517,29 @@ public class ChunkBase implements Tickable {
         return world;
     }
 
-    public ArrayList<Entity> getEntities() {
+    @NotNull
+    public List<Entity> getEntities() {
         return entities;
     }
 
     public boolean isLoaded() {
-        return loaded;
+        return loadedState == 1;
+    }
+
+    public int getLoadedState() {
+        return loadedState;
     }
 
     @Override
     public String toString() {
-        return "{loaded: " + this.loaded + ", entities: " + this.entities.size() + ", x: " + this.x + ", z: " + this.z + ", height: " + this.height + ", id: " + id + "}";
+        return "{loaded: " + this.loadedState + ", entities: " + this.entities.size() + ", x: " + this.x + ", z: " + this.z + ", height: " + this.height + ", id: " + id + "}";
     }
 
     /**
      * @return a new 2d Vector storing the values of {@link #x} and {@link #z}
      * Note that changes made to this instance do not affect the chunk in any way.
      */
+    @NotNull
     public Vec2i getChunkOrigin() {
         return new Vec2i(x, z);
     }
@@ -427,10 +549,20 @@ public class ChunkBase implements Tickable {
      *
      * @param entity the entity to be added
      */
-    public void addEntity(@NotNull Entity entity) {
-        synchronized (this.entities) {
-            forceAddEntity(entity);
-        }
+    @ThreadSafe
+    public void scheduleAddEntity(@NotNull Entity entity) {
+        this.pendingEntitiesToAdd.add(new Pair<>(entity, null));
+    }
+
+    /**
+     * Adds the given entity to the chunk's entity list
+     *
+     * @param entity   the entity to be added
+     * @param listener the listener invoked when the add operation is performed. Invoked on a random thread. Only assert the chunk that the entity is in is ticked on this thread that the listener is invoked with
+     */
+    @ThreadSafe
+    public void scheduleAddEntity(@NotNull Entity entity, @NotNull Consumer<Entity> listener) {
+        this.pendingEntitiesToAdd.add(new Pair<>(entity, listener));
     }
 
     /**
@@ -438,6 +570,7 @@ public class ChunkBase implements Tickable {
      * @param predicate the condition the entity must fulfill
      * @return a collection of entities that are in the given region and fulfill the requirements of the predicate.
      */
+    @NotNull
     public Collection<? extends Entity> getEntitiesWithinAABBForEntity(AxisAlignedBB region, Predicate<? super Entity> predicate) {
         List<Entity> entities = new ArrayList<>();
         for (Entity entity : this.entities) {
@@ -449,13 +582,13 @@ public class ChunkBase implements Tickable {
     }
 
     /**
-     * Sets {@link #loaded} to state
+     * Sets {@link #loadedState} to state
      *
      * @param state the new state of loaded
      */
     @Unsafe
     public void setLoaded(boolean state) {
-        this.loaded = state;
+        this.loadedState = state ? 1 : 0;
     }
 
     /**
@@ -467,8 +600,20 @@ public class ChunkBase implements Tickable {
     }
 
     @NotNull
-    public ChunkSection[] getChunkSections() {
+    public List<ChunkSection> getChunkSections() {
         return chunkSections;
+    }
+
+    /**
+     * @param y the y position
+     * @return the chunk section at the given y position
+     */
+    @NotNull
+    protected ChunkSection getChunkSection(int y) {
+        y /= CHUNK_SECTION_SIZE;
+        if (y < 0 || y >= this.chunkSections.size())
+            throw new IllegalArgumentException("Could not retrieve ChunkSection for y position out of chunk bounds: " + y);
+        return this.chunkSections.get(y);
     }
 
     /**

@@ -1,9 +1,12 @@
 package me.gommeantilegit.minecraft.gamesettings;
 
+import com.badlogic.gdx.Input;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.gamesettings.settingtypes.*;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Set;
 
 /**
  * Collection of all settings
@@ -28,17 +31,24 @@ public class GameSettings {
     @NotNull
     public final VideoSettings videoSettings;
 
+    /**
+     * {@link KeyBindings} instance
+     */
+    @NotNull
+    public final KeyBindings keyBindings;
+
     public GameSettings(@NotNull ClientMinecraft mc) {
         this.mc = mc;
         this.generalSettings = new GeneralSettings();
         this.videoSettings = new VideoSettings();
+        this.keyBindings = new KeyBindings();
     }
 
     /**
      * General game settings class.
      * Collection of the generalized game options. (eg. sound settings)
      */
-    public class GeneralSettings {
+    public static class GeneralSettings {
 
         /**
          * Percent setting for music volume. 0% means that music is disabled.
@@ -79,7 +89,7 @@ public class GameSettings {
          * Array of all general settings
          */
         @NotNull
-        public Setting[] settingsList = new Setting[]{
+        public Setting<?>[] settingsList = new Setting<?>[]{
                 music, sound, invertMouse, mouseSensitivity, difficultySetting
         };
     }
@@ -160,7 +170,7 @@ public class GameSettings {
          * Array of all video settings
          */
         @NotNull
-        public Setting[] settingsList = {
+        public Setting<?>[] settingsList = {
                 graphics, renderDistance, limitFrameRate, enable3D, viewBobbing, smoothLighting
         };
 
@@ -203,5 +213,50 @@ public class GameSettings {
                     return 1;
             }
         }
+    }
+
+    /**
+     * Key-bindings class
+     * Collection of all key-bind settings
+     */
+    public static class KeyBindings {
+
+        @NotNull
+        public final KeyBindSetting keyBindForward = new KeyBindSetting("Forward", Input.Keys.W);
+
+        @NotNull
+        public final KeyBindSetting keyBindLeft = new KeyBindSetting("Left", Input.Keys.A);
+
+        @NotNull
+        public final KeyBindSetting keyBindBack = new KeyBindSetting("Back", Input.Keys.S);
+
+        @NotNull
+        public final KeyBindSetting keyBindRight = new KeyBindSetting("Right", Input.Keys.D);
+
+        @NotNull
+        public final KeyBindSetting keyBindJump = new KeyBindSetting("Jump", Input.Keys.SPACE);
+
+        @NotNull
+        public final KeyBindSetting keyBindSprint = new KeyBindSetting("Sprint", Input.Keys.CONTROL_LEFT);
+
+        @NotNull
+        public final KeyBindSetting keyBindInventory = new KeyBindSetting("Intentory", Input.Keys.E);
+
+        @NotNull
+        public final KeyBindSetting keyBindDrop = new KeyBindSetting("Drop", Input.Keys.Q);
+
+        @NotNull
+        public final KeyBindSetting keyBindChat = new KeyBindSetting("Chat", Input.Keys.T);
+
+        @NotNull
+        public final KeyBindSetting keyBindSneak = new KeyBindSetting("Sneak", Input.Keys.SHIFT_LEFT);
+
+        /**
+         * List of all keybinds
+         */
+        @NotNull
+        public final KeyBindSetting[] keyBindList = {
+                keyBindForward, keyBindLeft, keyBindBack, keyBindRight, keyBindJump, keyBindSprint, keyBindSneak, keyBindDrop, keyBindInventory, keyBindChat
+        };
     }
 }

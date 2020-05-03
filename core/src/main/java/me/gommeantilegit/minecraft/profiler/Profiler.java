@@ -14,6 +14,7 @@ import me.gommeantilegit.minecraft.utils.Clock;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Profiler object for profiling code.
@@ -65,7 +66,8 @@ public class Profiler {
     /**
      * Stores all Profilers used for different actions with their parent name
      */
-    private final HashMap<String, Profiler> subActions = new HashMap<>();
+    @NotNull
+    private final Map<String, Profiler> subActions = new HashMap<>();
 
     /**
      * Default constructor for the Profiler object

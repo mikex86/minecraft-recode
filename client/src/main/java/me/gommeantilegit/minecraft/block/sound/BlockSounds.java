@@ -35,7 +35,7 @@ public class BlockSounds {
     public final BlockSoundType metal = new BlockSoundType("stone", 1.0F, 1.5F);
 
     @NotNull
-    public final BlockSoundType glass = new BlockSoundType("stone", 1.0F, 1.0F) {
+    public final BlockSoundType glass = new BlockSoundType("glass", 1.0F, 1.0F) {
 
         @NotNull
         public String getBreakSoundResourceStartString() {

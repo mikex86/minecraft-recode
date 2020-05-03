@@ -1,6 +1,8 @@
 package me.gommeantilegit.minecraft;
 
 import me.gommeantilegit.minecraft.block.Blocks;
+import me.gommeantilegit.minecraft.block.state.palette.BlockStatePalette;
+import me.gommeantilegit.minecraft.block.state.storage.BlockStateStorage;
 import me.gommeantilegit.minecraft.logging.LogLevel;
 import me.gommeantilegit.minecraft.logging.Logger;
 import me.gommeantilegit.minecraft.logging.crash.CrashReport;
@@ -9,14 +11,15 @@ import me.gommeantilegit.minecraft.timer.Timer;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
 import me.gommeantilegit.minecraft.timer.tick.MinecraftThread;
 import me.gommeantilegit.minecraft.utils.Hardware;
-import me.gommeantilegit.minecraft.utils.async.AsyncExecutor;
 import me.gommeantilegit.minecraft.world.saveformat.ChunkSerializer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Objects;
 
 public abstract class AbstractMinecraft implements Tickable {
 
@@ -29,21 +32,24 @@ public abstract class AbstractMinecraft implements Tickable {
      * Side of this minecraft implementation
      */
     @NotNull
-    final Side side;
+    private final Side side;
 
     /**
-     * Minecraft thread instance
+     * The minecraft thread
      */
     @NotNull
-    public final MinecraftThread minecraftThread = createMinecraftThread();
+    private final MinecraftThread minecraftThread = createMinecraftThread();
 
     /**
-     * ID of the minecraft instance in the minecraft provider
+     * The id of the minecraft instance provided by the {@link MinecraftProvider}
      */
-    public final long id;
+    private final long id;
 
-    @NotNull
-    public final ChunkSerializer chunkSerializer;
+    /**
+     * Used for chunk data serialization
+     */
+    @Nullable
+    private ChunkSerializer chunkSerializer;
 
     /**
      * @return the minecraft thread to be used as initial value for {@link #minecraftThread}
@@ -52,15 +58,13 @@ public abstract class AbstractMinecraft implements Tickable {
     protected abstract MinecraftThread createMinecraftThread();
 
     /**
-     * Blocks instance
+     * Manages block instances
      */
-    public Blocks blocks;
+    @Nullable
+    private Blocks blocks;
 
-    /**
-     * Timer instance for timing game logic.
-     */
     @NotNull
-    public Timer timer = new Timer(20.0f);
+    private Timer timer = new Timer(20.0f);
 
     /**
      * Handler object for handling file names of log files
@@ -69,10 +73,10 @@ public abstract class AbstractMinecraft implements Tickable {
     protected final LogFileHandler logFileHandler;
 
     /**
-     * Default logger instance of the server
+     * The minecraft root logger instance
      */
     @NotNull
-    public final Logger logger;
+    private final Logger logger;
 
     /**
      * Minecraft version constant
@@ -91,11 +95,6 @@ public abstract class AbstractMinecraft implements Tickable {
      */
     public static final char MINECRAFT_VERSION_PREFIX_CHAR = 'a';
 
-    /**
-     * Asynchronous executor instance
-     */
-    public AsyncExecutor asyncExecutor;
-
     protected AbstractMinecraft(@NotNull Side side) {
         Hardware.init();
         this.id = MinecraftProvider.createMinecraft(this);
@@ -112,10 +111,9 @@ public abstract class AbstractMinecraft implements Tickable {
             @Override
             public void print(String s) {
                 super.print(s);
-                logger.info("[STD_OUT]", s, true);
+                getLogger().info("[STD_OUT]", s, true);
             }
         });
-        chunkSerializer = new ChunkSerializer(this);
     }
 
     /**
@@ -123,7 +121,6 @@ public abstract class AbstractMinecraft implements Tickable {
      * Super constructor must be called
      */
     protected void loadGame(){
-        this.asyncExecutor = new AsyncExecutor(16);
     }
 
     /**
@@ -132,6 +129,8 @@ public abstract class AbstractMinecraft implements Tickable {
     public abstract boolean isRunning();
 
     /**
+     * Timer instance for timing game logic.
+     */ /**
      * @return the tick timer of the minecraft instance
      */
     @NotNull
@@ -146,7 +145,7 @@ public abstract class AbstractMinecraft implements Tickable {
 
     @Override
     protected void finalize() throws Throwable {
-        MinecraftProvider.removeMinecraft(id);
+        MinecraftProvider.removeMinecraft(getId());
         super.finalize();
     }
 
@@ -158,12 +157,61 @@ public abstract class AbstractMinecraft implements Tickable {
      * @return true, if this method was executed on the minecraft thread else false.
      */
     public boolean isCallingFromMinecraftThread() {
-        return Thread.currentThread() == this.minecraftThread;
+        return Thread.currentThread() == this.getMinecraftThread();
     }
 
     /**
      * Shuts down minecraft
      */
     public abstract void shutdown();
+
+    /**
+     * Blocks instance
+     */
+    @NotNull
+    public Blocks getBlocks() {
+        return Objects.requireNonNull(blocks, "Blocks not yet initialized!");
+    }
+
+    public void setBlocks(@NotNull Blocks blocks) {
+        this.blocks = blocks;
+        this.setChunkSerializer(new ChunkSerializer(blocks));
+    }
+
+    @NotNull
+    public ChunkSerializer getChunkSerializer() {
+        return Objects.requireNonNull(chunkSerializer, "ChunkSerializer not yet initialized!");
+    }
+
+    public void setChunkSerializer(@NotNull ChunkSerializer chunkSerializer) {
+        this.chunkSerializer = chunkSerializer;
+    }
+
+    /**
+     * ID of the minecraft instance in the minecraft provider
+     */
+    public long getId() {
+        return id;
+    }
+
+    /**
+     * Minecraft thread instance
+     */
+    @NotNull
+    public MinecraftThread getMinecraftThread() {
+        return minecraftThread;
+    }
+
+    /**
+     * Default logger instance of the server
+     */
+    @NotNull
+    public Logger getLogger() {
+        return logger;
+    }
+
+    public void setTimer(@NotNull Timer timer) {
+        this.timer = timer;
+    }
 }
 
