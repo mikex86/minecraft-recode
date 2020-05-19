@@ -20,12 +20,14 @@ public class PacketSender {
     /**
      * Server side player position
      */
-    private Vector3 serverPosition;
+    @NotNull
+    private final Vector3 serverPosition = new Vector3();
 
     /**
      * Server side player rotation
      */
-    private Vector2 serverRotation;
+    @NotNull
+    private final Vector2 serverRotation = new Vector2();
 
     public PacketSender(@NotNull EntityPlayerSP playerSP) {
         this.playerSP = playerSP;
@@ -37,30 +39,18 @@ public class PacketSender {
     public void sendMovePackets() {
         boolean position = false;
         boolean rotation = false;
-        block:
         {
-            if (serverPosition == null) {
-                serverPosition = playerSP.getPositionVector();
-                position = true;
-            }
-
-            if (serverRotation == null) {
-                serverRotation = new Vector2(playerSP.rotationYawTicked, playerSP.rotationPitchTicked);
-                rotation = true;
-            }
-            if (position && rotation) break block;
-            assert serverPosition != null;
             {
                 Vector3 newPos = playerSP.getPositionVector();
                 if (serverPosition.dst(newPos) > 0.25) {
-                    serverPosition = newPos;
+                    serverPosition.set(newPos);
                     position = true;
                 }
             }
             {
                 Vector2 newRot = new Vector2(playerSP.rotationYawTicked, playerSP.rotationPitchTicked);
                 if (serverRotation.dst(newRot) > 0.5) {
-                    serverRotation = newRot;
+                    serverRotation.set(newRot);
                     rotation = true;
                 }
             }

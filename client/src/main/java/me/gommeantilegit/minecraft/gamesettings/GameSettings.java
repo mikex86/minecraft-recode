@@ -202,13 +202,13 @@ public class GameSettings {
         private int determineChunkLoadingDistance(@NotNull String settingValue) {
             switch (settingValue) {
                 case "Tiny":
-                    return 2 * ChunkBase.CHUNK_SIZE;
+                    return 2 * 16;
                 case "Short":
-                    return 8 * ChunkBase.CHUNK_SIZE;
+                    return 8 * 16;
                 case "Normal":
-                    return 16 * ChunkBase.CHUNK_SIZE;
+                    return 16 * 16;
                 case "Far":
-                    return 32 * ChunkBase.CHUNK_SIZE;
+                    return 32 * 16;
                 default:
                     return 1;
             }

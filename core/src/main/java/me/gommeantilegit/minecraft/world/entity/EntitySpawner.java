@@ -31,10 +31,10 @@ public class EntitySpawner {
     @ThreadSafe
     private void handle(@NotNull Entity entity) {
         int chunkLoadingDistance = world.getChunkLoader().getChunkLoadingDistance(entity);
-        ChunkBase chunk = this.world.getChunkFor(entity);
+        ChunkBase chunk = this.world.getAbsoluteChunkFor(entity);
         if (chunk == null) {
             this.world.getChunkCreator().generateChunksAroundEntity(entity, chunkLoadingDistance); // could be asynchronous
-            chunk = this.world.getChunkFor(entity);
+            chunk = this.world.getAbsoluteChunkFor(entity);
             Objects.requireNonNull(chunk, "Chunk was not created after explicitly requested");
         }
         entity.onSpawned(chunk);

@@ -11,7 +11,6 @@ import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.block.sound.BlockSounds;
-import me.gommeantilegit.minecraft.block.state.storage.BlockStateStorage;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
 import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
@@ -24,22 +23,20 @@ import me.gommeantilegit.minecraft.localization.StringTranslate;
 import me.gommeantilegit.minecraft.music.MusicTicker;
 import me.gommeantilegit.minecraft.netty.NettyClient;
 import me.gommeantilegit.minecraft.profiler.Profiler;
+import me.gommeantilegit.minecraft.rendering.GLContext;
 import me.gommeantilegit.minecraft.shader.ShaderManager;
 import me.gommeantilegit.minecraft.sound.SoundResource;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.texture.manager.TextureManager;
 import me.gommeantilegit.minecraft.timer.Timer;
 import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
-import me.gommeantilegit.minecraft.timer.tick.MinecraftThread;
 import me.gommeantilegit.minecraft.ui.UIManager;
 import me.gommeantilegit.minecraft.ui.screen.impl.GuiMainMenu;
 import me.gommeantilegit.minecraft.utils.OpenGLUtils;
 import me.gommeantilegit.minecraft.world.ClientWorld;
+import me.gommeantilegit.minecraft.world.saveformat.ChunkFragmenter;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
 import static com.badlogic.gdx.graphics.GL20.GL_NO_ERROR;
@@ -72,11 +69,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      * The SP player instance
      */
     public EntityPlayerSP thePlayer;
-
-    /**
-     * Rendering thread (OpenGL Context thread instance)
-     */
-    public final Thread renderingThread;
 
     /**
      * IngameHud rendering object
@@ -161,7 +153,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
 
     public ClientMinecraft() {
         super(Side.CLIENT);
-        renderingThread = Thread.currentThread();
+        GLContext.initGLContext();
     }
 
     /**
@@ -178,6 +170,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             try {
                 startUpThread = new Thread(this::loadGame);
                 startUpThread.setDaemon(true);
+                startUpThread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
                 startUpThread.start();
             } catch (Throwable t) {
                 this.getLogger().crash("Failed to load game!", t);
@@ -189,12 +182,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
         }
 
         this.getLogger().info("Created game.");
-    }
-
-    @NotNull
-    @Override
-    protected MinecraftThread createMinecraftThread() {
-        return new MinecraftThread(this);
     }
 
     /**
@@ -212,7 +199,8 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             Gdx.input.setInputProcessor(inputHandler);
 
             // Initializing sprite batch for 2D rendering
-            runOnGLContextWait(new FutureTask<Void>(() -> {
+            GLContext glContext = GLContext.getGlContext();
+            glContext.runOnGLContextWait(new FutureTask<Void>(() -> {
                 {
                     this.shapeRenderer = new ShapeRenderer(); // Initializing 2D Shape renderer
                     this.shapeRenderer.getProjectionMatrix().setToOrtho(0, DPI.scaledWidthi, DPI.scaledHeighti, 0, 0, 1);
@@ -225,7 +213,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 return null;
             }));
 
-            runOnGLContextWait(new FutureTask<Void>(() -> {
+            glContext.runOnGLContextWait(new FutureTask<Void>(() -> {
                 this.startupProfiler.actionStart();
                 this.startupProfiler.actionStart("Compile shaders");
                 this.shaderManager = new ShaderManager();
@@ -234,7 +222,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 return null;
             }));
 
-            runOnGLContextWait(new FutureTask<Void>(() -> {
+            glContext.runOnGLContextWait(new FutureTask<Void>(() -> {
                 // Initializing UiManager for GuiScreen handling
                 this.uiManager = new UIManager(spriteBatch, this);
                 return null;
@@ -243,13 +231,14 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             this.setBlocks(new Blocks(this));
             // Initializing Blocks - Must be called before texture manger initialization -> access to textureManager -> building texture atlas
             this.getBlocks().init();
-            BlockStateStorage.initPalette(this.getBlocks());
 
             this.blockSounds = new BlockSounds(); // Initializing block sounds
             this.blockSounds.init(getBlocks());
             this.blockRendererRegistry = new ClientBlockRendererTypeRegistry(this, getBlocks()); // Needs to be initialized before instantiation of TextureManager
 
-            runOnGLContextWait(new FutureTask<Void>(() -> {
+            this.chunkFragmenter = new ChunkFragmenter(this);
+
+            glContext.runOnGLContextWait(new FutureTask<Void>(() -> {
                 this.startupProfiler.actionStart("Load Textures");
 
                 //Initializing textures
@@ -273,14 +262,11 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             // Initializing music ticker
             this.musicTicker = new MusicTicker(this);
 
-            runOnGLContext(new FutureTask<Void>(() -> {
-                textureManager.blockTextureMap.build();
-                return null;
-            }));
+            glContext.runOnGLContext(() -> textureManager.blockTextureMap.build());
 
             this.ingameHud = new IngameHud(spriteBatch, this);
 
-            runOnGLContextWait(new FutureTask<Void>(() -> {
+            glContext.runOnGLContextWait(new FutureTask<Void>(() -> {
                 this.thePlayer = new EntityPlayerSP(null, this, "Steve", new ClientSkin(Gdx.files.classpath("textures/entities/steve.png")));
                 return null;
             }));
@@ -291,48 +277,12 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             this.startupProfiler.printResults();
             this.loaded = true;
 
-            runOnGLContext(new FutureTask<Void>(() -> {
-                System.out.println("Renderer: " + Gdx.gl.glGetString(GL20.GL_RENDERER));
-                return null;
-            }));
+            glContext.runOnGLContext(() -> System.out.println("Renderer: " + Gdx.gl.glGetString(GL20.GL_RENDERER)));
 
             this.uiManager.displayGuiScreen(new GuiMainMenu());
-//            this.minecraftThread.start(); //Starting Tick Thread.
-            this.getMinecraftThread().startMinecraftGameLogic();
         } catch (Throwable e) {
             this.getLogger().crash("Fatal crash!!! Failed to start Minecraft!", e);
         }
-    }
-
-    /**
-     * Executes the specified runnable on the OpenGL Thrad an waits until it was executed
-     *
-     * @param voidFutureTask the future task to be executed
-     */
-    public void runOnGLContextWait(@NotNull FutureTask<?> voidFutureTask) {
-        if (isCallingFromOpenGLThread()) {
-            voidFutureTask.run();
-            return;
-        }
-        runOnGLContext(voidFutureTask);
-        try {
-            voidFutureTask.get();
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Executes the specified runnable on the OpenGL Thread
-     *
-     * @param runnable the runnable to be executed
-     */
-    public void runOnGLContext(@NotNull FutureTask<?> runnable) {
-        if (isCallingFromOpenGLThread()) {
-            runnable.run();
-            return;
-        }
-        Gdx.app.postRunnable(runnable);
     }
 
     /**
@@ -411,7 +361,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
         }
         try {
             // Tick
-            getMinecraftThread().onUpdate(); // TODO: REMOVE HACK
+            onUpdate();
 
 //            long frameStart = System.nanoTime();
 //            long worldStart = 0, worldEnd = 0;
@@ -543,7 +493,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
     public void shutdown() {
         if (theWorld != null)
             this.theWorld.stopAsyncWork();
-        this.getMinecraftThread().interrupt();
         running = false;
     }
 
@@ -618,13 +567,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
     }
 
     /**
-     * @return true, if this method was executed on the OpenGL thread else false
-     */
-    public boolean isCallingFromOpenGLThread() {
-        return Thread.currentThread() == this.renderingThread;
-    }
-
-    /**
      * Shuts down and closes the netty client and nullifies the world instance
      */
     public void closeServerConnection() {
@@ -636,5 +578,10 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
             theWorld.stopAsyncWork();
             theWorld = null;
         }
+    }
+
+    @Override
+    public boolean isCallingFromMinecraftThread() {
+        return GLContext.getGlContext().isCallingFromOpenGLThread();
     }
 }

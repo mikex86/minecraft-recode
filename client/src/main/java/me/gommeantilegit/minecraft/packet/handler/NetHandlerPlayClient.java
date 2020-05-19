@@ -5,7 +5,6 @@ import com.badlogic.gdx.math.Vector3;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import me.gommeantilegit.minecraft.ClientMinecraft;
-import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.packet.ServerPacket;
 import me.gommeantilegit.minecraft.packet.handler.chunk.ClientChunkDataHandler;
 import me.gommeantilegit.minecraft.packet.handler.impl.MappedPacketHandler;
@@ -65,7 +64,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
 
         });
 
-        registerPacketHandler(ServerPositionSetPacket.PACKET_ID, new PacketHandler<ServerPositionSetPacket>(mc.getMinecraftThread()) {
+        registerPacketHandler(ServerPositionSetPacket.PACKET_ID, new PacketHandler<ServerPositionSetPacket>() {
             @Override
             public void handlePacket(@NotNull ServerPositionSetPacket packet, @NotNull ChannelHandlerContext context) {
                 if (packet.hasPosition()) {
@@ -82,7 +81,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
             }
         });
 
-        registerPacketHandler(ServerRequestRenderDistance.PACKET_ID, new PacketHandler<ServerRequestRenderDistance>(mc.getMinecraftThread()) {
+        registerPacketHandler(ServerRequestRenderDistance.PACKET_ID, new PacketHandler<ServerRequestRenderDistance>() {
             @Override
             public void handlePacket(@NotNull ServerRequestRenderDistance packet, @NotNull ChannelHandlerContext context) {
                 context.channel().writeAndFlush(new ClientChunkLoadingDistanceChangePacket(null, mc.theWorld.getChunkLoadingDistance()));
@@ -106,11 +105,11 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
             }
         });
 
-        registerPacketHandler(ServerWorldSetupPacket.PACKET_ID, new PacketHandler<ServerWorldSetupPacket>(mc.getMinecraftThread()) {
+        registerPacketHandler(ServerWorldSetupPacket.PACKET_ID, new PacketHandler<ServerWorldSetupPacket>() {
             @Override
             public void handlePacket(@NotNull ServerWorldSetupPacket packet, @NotNull ChannelHandlerContext context) {
                 assert packet.getWorldHeight() % CHUNK_SECTION_SIZE == 0;
-                mc.theWorld = new ClientWorld(mc.thePlayer, mc, packet.getWorldHeight()); // Initializing the world
+                mc.theWorld = new ClientWorld(mc.thePlayer, mc, packet.getWorldHeight(), mc.getBlocks().getGlobalPalette()); // Initializing the world
                 // Setting the world time to the value that the world time on the server would have progressed to assuming steady fluent tick rate
                 mc.theWorld.worldTime = packet.getWorldTime() + (new Date().getTime() - packet.getPacketSentUnixTime()) / 20;
                 mc.theWorld.getChunkLoader().addViewer(mc.thePlayer);

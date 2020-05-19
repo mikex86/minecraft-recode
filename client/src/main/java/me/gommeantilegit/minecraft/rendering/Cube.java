@@ -7,6 +7,7 @@ import me.gommeantilegit.minecraft.shader.api.CommonShader;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
+import org.jetbrains.annotations.NotNull;
 
 import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
 import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBUTES;
@@ -29,10 +30,14 @@ public class Cube {
     public float xRot, yRot, zRot;
     private Mesh mesh;
 
+    public float rotationPointX;
+    public float rotationPointY;
+    public float rotationPointZ;
+
     /**
      * Translation vector components (x,y,z)
      */
-    private float translateX, translateY, translateZ;
+    public float translateX, translateY, translateZ;
 
     /**
      * Scale vector components (x,y,z)
@@ -56,7 +61,7 @@ public class Cube {
         this.depth = depth;
     }
 
-    public void render(CommonShader shaderProgram) {
+    public void render(@NotNull CommonShader shaderProgram) {
         if (mesh == null) {
             mesh = compile();
         }
@@ -68,6 +73,7 @@ public class Cube {
         shaderProgram.scale(scaleX, scaleY, scaleZ);
         shaderProgram.translate(translateX, translateY, translateZ);
 
+        shaderProgram.translate(this.rotationPointX * scaleX, this.rotationPointY * scaleY, this.rotationPointZ * scaleZ);
         shaderProgram.rotate(0, 0, 1, zRot);
         shaderProgram.rotate(0, 1, 0, yRot);
         shaderProgram.rotate(1, 0, 0, xRot);
@@ -84,6 +90,7 @@ public class Cube {
         this.scaleZ = z;
     }
 
+    @NotNull
     private Mesh compile() {
         OptimizedMeshBuilder builder = new OptimizedMeshBuilder();
         builder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);

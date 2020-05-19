@@ -6,7 +6,8 @@ import org.jetbrains.annotations.NotNull;
 
 public abstract class Liquid extends Block {
 
-    public Liquid(@NotNull String name, int id, @NotNull Material material) {
-        super(name, id, material);
+    public Liquid(int firstPaletteVersion, int id, @NotNull String name, @NotNull Material material) {
+        super(firstPaletteVersion, id, name, material);
     }
+
 }

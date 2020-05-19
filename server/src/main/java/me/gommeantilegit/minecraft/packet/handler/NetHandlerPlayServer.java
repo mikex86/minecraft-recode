@@ -1,14 +1,16 @@
 package me.gommeantilegit.minecraft.packet.handler;
 
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
 import me.gommeantilegit.minecraft.ServerMinecraft;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerMP;
 import me.gommeantilegit.minecraft.packet.ClientPacket;
 import me.gommeantilegit.minecraft.packet.handler.impl.MappedPacketHandler;
 import me.gommeantilegit.minecraft.packet.handler.response.IPacketResponseListener;
+import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadingDistanceChangePacket;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientHandshakePacket;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientMovePacket;
-import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadingDistanceChangePacket;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientUserInfoPacket;
 import me.gommeantilegit.minecraft.packet.packets.server.*;
 import me.gommeantilegit.minecraft.server.netty.channel.ChannelData;
@@ -16,10 +18,9 @@ import me.gommeantilegit.minecraft.world.chunk.loader.ServerChunkLoader;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Packet handler for the server to handle incoming packets from the clients
@@ -42,13 +43,13 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
      * Stores all channel data parent to the corresponding channels
      */
     @NotNull
-    public final Map<Channel, ChannelData> channelData = new HashMap<>();
+    public final Map<Channel, ChannelData> channelData = new ConcurrentHashMap<>();
 
     /**
      * Contains all registered channels
      */
     @NotNull
-    private final List<Channel> registeredChannels = new ArrayList<>();
+    private final List<Channel> registeredChannels = new CopyOnWriteArrayList<>();
 
     public NetHandlerPlayServer(@NotNull ServerMinecraft mc) {
         super(null);
@@ -207,13 +208,34 @@ public class NetHandlerPlayServer extends MappedPacketHandler<ClientPacket> {
      */
     @Nullable
     public EntityPlayerMP getPlayerByName(@NotNull String playerName) {
-        List<ChannelData> values = new ArrayList<>(this.channelData.values());
-        for (int i = 0; i < values.size(); i++) {
-            ChannelData data = values.get(i);
-            if (data.getPlayerMP().getUsername().equals(playerName)) {
-                return data.getPlayerMP();
-            }
+        Collection<ChannelData> values = this.channelData.values();
+        for (ChannelData value : values) {
+            EntityPlayerMP player = value.getPlayerMP();
+            if (player.getUsername().equals(playerName))
+                return player;
         }
         return null;
+    }
+
+    /**
+     * @return a copy of the list of online players. Modification is pointless
+     */
+    @NotNull
+    public List<EntityPlayerMP> getOnlinePlayers() {
+        List<EntityPlayerMP> players = new ArrayList<>();
+        Collection<ChannelData> values = this.channelData.values();
+        for (ChannelData value : values) {
+            EntityPlayerMP player = value.getPlayerMP();
+            players.add(player);
+        }
+        return players;
+    }
+
+    /**
+     * @return the channel data value collection
+     */
+    @NotNull
+    public Collection<ChannelData> getChannelData() {
+        return this.channelData.values();
     }
 }

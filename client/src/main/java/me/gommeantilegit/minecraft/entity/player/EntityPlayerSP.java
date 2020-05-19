@@ -19,6 +19,7 @@ import me.gommeantilegit.minecraft.gamesettings.settingtypes.KeyBindSetting;
 import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.raytrace.RayTracer;
 import me.gommeantilegit.minecraft.raytrace.RenderingRayTracer;
+import me.gommeantilegit.minecraft.rendering.GLContext;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.ui.button.Button;
 import me.gommeantilegit.minecraft.ui.button.TexturedButton;
@@ -35,7 +36,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.concurrent.FutureTask;
+import java.util.Objects;
 
 import static java.lang.Math.*;
 import static java.lang.StrictMath.max;
@@ -111,15 +112,21 @@ public class EntityPlayerSP extends PlayerBase {
     @NotNull
     public final PerspectiveCamera camera = new PerspectiveCamera(100, 0, 0) {
 
+        @Nullable
+        private Vector3 positionCopy = null;
+
         @Override
         public void update() {
+            // lazy init because of update call from super constructor
+            if (positionCopy == null) {
+                positionCopy = new Vector3();
+            }
             float aspect = viewportWidth / viewportHeight;
 
-            //noinspection ConstantConditions
-            far = (mc == null || mc.theWorld == null) ? 512 : (float) (mc.theWorld.getChunkLoadingDistance() * sqrt(2)); // TODO: Might optimize
+            far = 512;
             projection.setToProjection(Math.abs(near), Math.abs(far), fieldOfView, aspect);
 
-            view.setToLookAt(position, new Vector3(position).add(direction), new Vector3(0, 1f, 0));
+            view.setToLookAt(position, positionCopy.set(position).add(direction), Vector3.Y);
             combined.set(projection);
             Matrix4.mul(combined.val, view.val);
         }
@@ -132,8 +139,16 @@ public class EntityPlayerSP extends PlayerBase {
      */
     @NotNull
     public final PerspectiveCamera virtualCamera = new PerspectiveCamera(100, 0, 0) {
+
+        @Nullable
+        private Vector3 positionCopy = null;
+
         @Override
         public void update() {
+            // lazy init because of update call from super constructor
+            if (positionCopy == null) {
+                positionCopy = new Vector3();
+            }
             this.viewportWidth = camera.viewportWidth;
             this.viewportHeight = camera.viewportHeight;
 
@@ -145,7 +160,7 @@ public class EntityPlayerSP extends PlayerBase {
 
             float aspect = viewportWidth / viewportHeight;
             projection.setToProjection(Math.abs(near), Math.abs(far), fieldOfView, aspect);
-            view.setToLookAt(position, new Vector3(position).add(direction), up);
+            view.setToLookAt(position, positionCopy.set(position).add(direction), up);
             combined.set(projection);
             Matrix4.mul(combined.val, view.val);
 
@@ -175,13 +190,10 @@ public class EntityPlayerSP extends PlayerBase {
         camera.update();
 
         playerController = new PlayerController(this, mc);
-        if (mc.isCallingFromOpenGLThread())
+        if (GLContext.getGlContext().isCallingFromOpenGLThread())
             mc.shaderManager.stdShader.setCamera(camera);
         else
-            mc.runOnGLContext(new FutureTask<Void>(() -> {
-                mc.shaderManager.stdShader.setCamera(camera);
-                return null;
-            }));
+            GLContext.getGlContext().runOnGLContext(() -> mc.shaderManager.stdShader.setCamera(camera));
     }
 
     public void setCameraMode(@NotNull EntityPlayerSP.CameraMode cameraMode) {
@@ -193,8 +205,10 @@ public class EntityPlayerSP extends PlayerBase {
      */
     @Override
     public void tick() {
+
         updateMovementValues();
-        if (!posPacketReceived || currentChunk instanceof ClientChunk && !((ClientChunk) currentChunk).dataReceived) {
+        // No synchronization on data received state: Try and see
+        if (!posPacketReceived || currentChunk instanceof ClientChunk && !((ClientChunk) currentChunk).hasReceivedData()) {
             mc.thePlayer.motionY *= 0;
         }
         if (!spawned) {
@@ -209,7 +223,27 @@ public class EntityPlayerSP extends PlayerBase {
             playerController.onPlayerBlockDamage();
             this.packetSender.sendMovePackets();
         }
+//
+//        motionY *= 0;
+//        if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
+//            motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
+//            motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
+////            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+////            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+//        }
+//
+//        if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
+//            motionY = 1;
+//        }
+//        if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
+//            motionY = -1;
+//        }
         updatedPositionVector.set(posX, posY, posZ);
+    }
+
+    @Override
+    protected boolean shouldWalkSafely() {
+        return this.isSneaking();
     }
 
     @Override
@@ -294,6 +328,12 @@ public class EntityPlayerSP extends PlayerBase {
     }
 
     /**
+     * The tick to frame interpolated position vector of the entity
+     */
+    @NotNull
+    private final Vector3 interpolatedEntityPosition = new Vector3();
+
+    /**
      * Updates the camera's position according to the players position
      *
      * @param partialTicks partialTicks
@@ -304,21 +344,21 @@ public class EntityPlayerSP extends PlayerBase {
                 lastPosX, lastPosY, lastPosZ,
                 posX, posY, posZ);
 
-        Vector3 pos = new Vector3(
+        this.interpolatedEntityPosition.set(
                 entityRenderPosition.lastPosX + (entityRenderPosition.posX - entityRenderPosition.lastPosX) * partialTicks,
-                entityRenderPosition.lastPosY + (entityRenderPosition.posY - entityRenderPosition.lastPosY) * partialTicks + EYE_HEIGHT,
+                entityRenderPosition.lastPosY + (entityRenderPosition.posY - entityRenderPosition.lastPosY) * partialTicks + getEyeHeight(),
                 entityRenderPosition.lastPosZ + (entityRenderPosition.posZ - entityRenderPosition.lastPosZ) * partialTicks);
 
         switch (this.cameraMode) {
 
             case THIRD_PERSON: {
-                pos.add(camera.direction.cpy().scl(-3));
+                interpolatedEntityPosition.add(camera.direction.x * -3, camera.direction.y * -3, camera.direction.z * -3);
                 break;
             }
 
         }
-        cameraPosition.set(pos.x, pos.y, pos.z);
-        mc.shaderManager.stdShader.setVirtualCameraPos(pos.x, pos.y, pos.z);
+        cameraPosition.set(interpolatedEntityPosition.x, interpolatedEntityPosition.y, interpolatedEntityPosition.z);
+        mc.shaderManager.stdShader.setVirtualCameraPos(interpolatedEntityPosition.x, interpolatedEntityPosition.y, interpolatedEntityPosition.z);
         camera.position.set(0, 0, 0);
     }
 
@@ -342,9 +382,11 @@ public class EntityPlayerSP extends PlayerBase {
 
     @Override
     protected void playStepSound(@NotNull BlockPos standingOn) {
-        Block block = world.getBlock(standingOn);
-        if (block == null)
+        ChunkBase forPos = world.getNearChunkFor(this.currentChunk, standingOn.getX(), standingOn.getZ());
+        IBlockState blockState = Objects.requireNonNull(forPos).getBlockState(standingOn);
+        if (blockState == null)
             return;
+        Block block = blockState.getBlock();
 
         BlockSoundType soundType;
 
@@ -359,6 +401,17 @@ public class EntityPlayerSP extends PlayerBase {
 //        }
     }
 
+    /**
+     * The position offset the view-bobbing occurs in relation to
+     */
+    @NotNull
+    private final Vector3 viewBobPosOffset = new Vector3();
+
+    /**
+     * Camera direction temp vector for {@link #setupViewBobbing(float)}
+     */
+    @NotNull
+    private final Vector3 cameraDirectionTmp = new Vector3();
 
     public void setupViewBobbing(float partialTicks) {
 //        if (!onGround) return;
@@ -368,7 +421,7 @@ public class EntityPlayerSP extends PlayerBase {
         float f3 = prevCameraPitch + (cameraPitch - prevCameraPitch) * partialTicks;
         StdShader stdShader = this.mc.shaderManager.stdShader;
 
-        Vector3 posOffset = new Vector3(
+        viewBobPosOffset.set(
                 (float) sin(f1 * (float) PI) * f2 * 0.5F,
 //                0,
                 (float) -abs(cos(f1 * (float) PI) * f2),
@@ -378,17 +431,17 @@ public class EntityPlayerSP extends PlayerBase {
                 .rotate(rotationYaw, 0, 1, 0);
 
         stdShader.translate(
-                posOffset.x, posOffset.y, posOffset.z
+                viewBobPosOffset.x, viewBobPosOffset.y, viewBobPosOffset.z
         );
 
         Vector3 direction = camera.direction;
         stdShader.rotate(direction.x * -1, 0, direction.z * -1, (float) (Math.sin(f1 * (float) Math.PI) * f2 * 3.0F));
 
-        direction = camera.direction.cpy().rotate(90, 0, -1, 0);
+        direction = this.cameraDirectionTmp.set(camera.direction).rotate(90, 0, -1, 0);
 
         stdShader.rotate(direction.x, 0, direction.z, (float) (Math.abs(Math.cos(f1 * (float) Math.PI - 0.2F) * f2) * 5.0F));
 
-        direction = camera.direction.cpy().rotate(90, 0, -1, 0);
+        direction = this.cameraDirectionTmp.set(camera.direction).rotate(90, 0, -1, 0);
         stdShader.rotate(direction.x, 0, direction.z, f3);
 
 
@@ -399,7 +452,7 @@ public class EntityPlayerSP extends PlayerBase {
     }
 
 
-    @NotNull
+    @NotNull // TODO: REMOVE
     public Vector3 getUpdatedPositionVector() {
         return this.updatedPositionVector;
     }
@@ -547,7 +600,7 @@ public class EntityPlayerSP extends PlayerBase {
 
         @Override
         public boolean mouseMoved(int screenX, int screenY) {
-            updateMouseInput(-Gdx.input.getDeltaX(), Gdx.input.getDeltaY());
+            updateMouseInput(lastX - screenX, screenY - lastY);
             lastX = screenX;
             lastY = screenY;
             return super.mouseMoved(screenX, screenY);
@@ -651,7 +704,6 @@ public class EntityPlayerSP extends PlayerBase {
         if ((pointer == -1 || !(((EntityPlayerSP.MobilePlayerController) this.camController)).pressingButtonWithRotationPointer)) {
             swingItem();
             RayTracer.RayTraceResult result = rayTracer.getRayTraceResult();
-            if (result == null) return;
             if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK)
                 breakingBlocks = true;
         }
@@ -664,13 +716,17 @@ public class EntityPlayerSP extends PlayerBase {
 
     private void breakMouseOver() {
         RayTracer.RayTraceResult result = rayTracer.getRayTraceResult();
-        assert result != null;
         if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK) {
             assert result.getBlockPos() != null;
             int x = result.getBlockPos().getX(), y = result.getBlockPos().getY(), z = result.getBlockPos().getZ();
-            IBlockState prevBlockState = world.getBlockState(x, y, z);
+            ChunkBase chunk = world.getNearChunkFor(currentChunk, x, z);
+            {
+                BlockPos blockPos = new BlockPos(x, y, z);
+                Objects.requireNonNull(chunk, "Cannot break mouse over block pos: " + blockPos + ". Chunk for position is null!");
+            }
+            IBlockState prevBlockState = chunk.getBlockState(x, y, z);
             assert prevBlockState != null;
-            world.setBlock(x, y, z, null);
+            chunk.setBlock(x, y, z, null);
             mc.theWorld.getParticleEngine().spawnBlockBreakingParticles(x, y, z, prevBlockState.getBlock());
         }
     }

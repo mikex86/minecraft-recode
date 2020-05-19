@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Mesh;
-import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
@@ -130,9 +129,9 @@ public class WorldRenderer implements OpenGLOperation {
                     if (isChunkInCameraFrustum(chunk)) {
                         try {
                             this.textureManager.blockTextureMap.getTexture().bind();
-//                            long start = System.nanoTime();
+////                            long start = System.nanoTime();
                             this.chunkSectionDrawCalls += chunk.render(this.shader, this, this.entityRenderer, partialTicks);
-//                            renderTimeSpent += System.nanoTime() - start;
+////                            renderTimeSpent += System.nanoTime() - start;
                         } catch (Exception e) {
                             throw new IllegalStateException("Error while rendering chunk " + chunk, e);
                         }
@@ -158,6 +157,12 @@ public class WorldRenderer implements OpenGLOperation {
     }
 
     /**
+     * Vector storing the light direction passed to the shader
+     */
+    @NotNull
+    private final Vector3 lightDir = new Vector3();
+
+    /**
      * Sets up the this.shader lighting uniforms for world rendering
      *
      * @param worldTime    the world time in ticks
@@ -168,7 +173,7 @@ public class WorldRenderer implements OpenGLOperation {
         float brightness = (float) (cos(celestialAngle * 3.141593F * 2.0F) * 2.0F + 0.5F);
         brightness = clamp(brightness, 0, 1);
         double angle = 2 * PI * celestialAngle;
-        Vector3 lightDir = new Vector3((float) cos(angle), (float) sin(angle), 0);
+        this.lightDir.set((float) cos(angle), (float) sin(angle), 0);
         this.shader.setUniformf("lightDirection", lightDir);
         this.shader.setMinDiffusedLighting(0.3f);
         this.shader.setColor(brightness, brightness, brightness, 1);
@@ -267,6 +272,9 @@ public class WorldRenderer implements OpenGLOperation {
      * @param partialTicks timer partial ticks
      */
     private void renderBlueSky(long worldTime, float partialTicks) {
+        if (this.world.getChunkLoadingDistance() < CLOUD_LEVEL) {
+            return;
+        }
         // Building the sky top mesh
         if (blueSkyMesh == null) {
             int len = 512;
@@ -337,7 +345,8 @@ public class WorldRenderer implements OpenGLOperation {
         int cloudSize = 12;
         Gdx.gl.glDisable(GL_CULL_FACE);
         this.textureManager.cloudsTexture.bind();
-        int size = this.textureManager.cloudsTexture.getWidth() * cloudSize; // Each pixel is 12 block wide (12 block = minecraft cloud width/depth)
+        int textureSize = this.textureManager.cloudsTexture.getWidth();
+        int size = textureSize * cloudSize; // Each pixel is 12 block wide (12 block = minecraft cloud width/depth)
         if (cloudMesh == null) {
             OptimizedMeshBuilder meshBuilder = new OptimizedMeshBuilder();
             meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
@@ -408,6 +417,12 @@ public class WorldRenderer implements OpenGLOperation {
     }
 
     /**
+     * Temp color instance for sky color
+     */
+    @NotNull
+    private final Color skyColor = new Color();
+
+    /**
      * @param temperature the temperature of a block position
      * @return the sky color at that block position
      */
@@ -420,9 +435,8 @@ public class WorldRenderer implements OpenGLOperation {
         if (temperature > 1.0F) {
             temperature = 1.0F;
         }
-        Color color = new Color();
-        argb8888ToColor(color, java.awt.Color.getHSBColor(0.6222222F - temperature * 0.05F, 0.5F + temperature * 0.1F, 1.0F).getRGB());
-        return color;
+        argb8888ToColor(skyColor, java.awt.Color.HSBtoRGB(0.6222222F - temperature * 0.05F, 0.5F + temperature * 0.1F, 1.0F));
+        return skyColor;
     }
 
     /**

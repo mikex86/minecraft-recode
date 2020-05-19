@@ -3,18 +3,13 @@ package me.gommeantilegit.minecraft.block;
 import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
+import me.gommeantilegit.minecraft.block.access.IReadableBlockStateAccess;
 import me.gommeantilegit.minecraft.block.render.BlockRenderer;
-import me.gommeantilegit.minecraft.block.state.BlockState;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
-import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
-import me.gommeantilegit.minecraft.world.WorldBase;
-import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
-import me.gommeantilegit.minecraft.world.chunk.ChunkSection;
+import me.gommeantilegit.minecraft.block.state.storage.BlockStateStorage;
 import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.Objects;
 
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 
@@ -75,48 +70,37 @@ public class BlockTypeRenderer {
     /**
      * Renders the block at the specified coordinates.
      *
-     * @param builder        the MeshBuilder building the chunk's mesh.
-     * @param x              the x coordinate of the block
-     * @param y              the y coordinate of the block
-     * @param z              the z coordinate of the block
-     * @param section        the section the block is in. Can be null, if #renderAllFaces is true
-     * @param world          the world of the block
-     * @param blockState     the block state
-     * @param renderAllFaces state if every face should just be rendered without checking the neighboring blockStates to determine if a face of the block should be rendered.
+     * @param builder    the MeshBuilder building the chunk's mesh.
+     * @param x          the x coordinate of the block
+     * @param y          the y coordinate of the block
+     * @param z          the z coordinate of the block
+     * @param blockStateAccess    provides information about neighboring block positions to make meshing decisions or null if every face should just be rendered without checking the neighboring blockStates to determine if a face of the block should be rendered.
+     * @param blockState the block state
      * @return true, if it actually rendered a face depending on the neighboring blocks
      */
-    public boolean render(@NotNull OptimizedMeshBuilder builder, int x, int y, int z, @Nullable ChunkSection section, @Nullable WorldBase world, @NotNull IBlockState blockState, boolean renderAllFaces) {
-        if (!renderAllFaces && world == null) {
-            throw new IllegalStateException("Error while rendering block to MeshBuilder: " +
-                    "Specified world parameter is equal to null but state of parameter renderAllFaces is set to false." +
-                    " Parameter world is only nullable, if renderAllFaces is set to true.");
-        }
-        if (!renderAllFaces) {
-            Objects.requireNonNull(section, "Chunk section mustn't be null when renderAllFaces is false");
-        }
-
+    public boolean render(@NotNull OptimizedMeshBuilder builder, int x, int y, int z, @Nullable IReadableBlockStateAccess blockStateAccess, @NotNull IBlockState blockState) {
         boolean renderedFace = false;
-        if (renderAllFaces || shouldRenderFace(world, section, x, y, z, 0)) {
+        if (blockStateAccess == null || shouldRenderFace(blockStateAccess, x, y, z, 0)) {
             renderFace(builder, x, y, z, 0);
             renderedFace = true;
         }
-        if (renderAllFaces || shouldRenderFace(world, section, x, y, z, 1)) {
+        if (blockStateAccess == null || shouldRenderFace(blockStateAccess, x, y, z, 1)) {
             renderFace(builder, x, y, z, 1);
             renderedFace = true;
         }
-        if (renderAllFaces || shouldRenderFace(world, section, x, y, z, 2)) {
+        if (blockStateAccess == null || shouldRenderFace(blockStateAccess, x, y, z, 2)) {
             renderFace(builder, x, y, z, 2);
             renderedFace = true;
         }
-        if (renderAllFaces || shouldRenderFace(world, section, x, y, z, 3)) {
+        if (blockStateAccess == null || shouldRenderFace(blockStateAccess, x, y, z, 3)) {
             renderFace(builder, x, y, z, 3);
             renderedFace = true;
         }
-        if (renderAllFaces || shouldRenderFace(world, section, x, y, z, 4)) {
+        if (blockStateAccess == null || shouldRenderFace(blockStateAccess, x, y, z, 4)) {
             renderFace(builder, x, y, z, 4);
             renderedFace = true;
         }
-        if (renderAllFaces || shouldRenderFace(world, section, x, y, z, 5)) {
+        if (blockStateAccess == null || shouldRenderFace(blockStateAccess, x, y, z, 5)) {
             renderFace(builder, x, y, z, 5);
             renderedFace = true;
         }
@@ -139,56 +123,45 @@ public class BlockTypeRenderer {
     }
 
     /**
-     * @param world   the world of the block.
-     * @param section the chunk section that the block position is in.
-     * @param x       x coordinate
-     * @param y       y coordinate
-     * @param z       z coordinate
-     * @param face    the face to be checked.
+     * @param stateProvider the block state provider
+     * @param x             x coordinate
+     * @param y             y coordinate
+     * @param z             z coordinate
+     * @param face          the face to be checked.
      * @return if the given face should be rendered at the specified coordinates considering the blockStates neighbors.
      * The face should only be rendered if it's visible.
      */
-    private boolean shouldRenderFace(@NotNull WorldBase world, @NotNull ChunkSection section, int x, int y, int z, int face) {
+    private boolean shouldRenderFace(@NotNull IReadableBlockStateAccess stateProvider, int x, int y, int z, int face) {
         switch (face) {
             case 0:
-                return world.canSeeThrough(getBlock(world, section, x, y - 1, z));
+                return canSeeThrough(stateProvider, x, y - 1, z);
             case 1:
-                return world.canSeeThrough(getBlock(world, section, x, y + 1, z));
+                return canSeeThrough(stateProvider, x, y + 1, z);
             case 2:
-                return world.canSeeThrough(getBlock(world, section, x, y, z - 1));
+                return canSeeThrough(stateProvider, x, y, z - 1);
             case 3:
-                return world.canSeeThrough(getBlock(world, section, x, y, z + 1));
+                return canSeeThrough(stateProvider, x, y, z + 1);
             case 4:
-                return world.canSeeThrough(getBlock(world, section, x - 1, y, z));
+                return canSeeThrough(stateProvider, x - 1, y, z);
             case 5:
-                return world.canSeeThrough(getBlock(world, section, x + 1, y, z));
+                return canSeeThrough(stateProvider, x + 1, y, z);
             default:
                 return false;
         }
     }
 
-    @Nullable
-    private Block getBlock(@NotNull WorldBase world, @NotNull ChunkSection section, int x, int y, int z) {
-        ChunkBase chunk = section.getParentChunk();
-        if (x < 0 || x >= ChunkBase.CHUNK_SIZE || z < 0 || z >= ChunkBase.CHUNK_SIZE) {
-            Vec2i origin = chunk.getChunkOrigin();
-            return world.getBlock(origin.getX() + x, y + section.getStartHeight(), origin.getY() + z);
-        }
-        IBlockState blockState;
-        if (y < 0 || y >= ChunkSection.CHUNK_SECTION_SIZE) {
-            int yPos = y + section.getStartHeight();
-            if (yPos < 0 || yPos >= chunk.getHeight()) {
-                return null;
-            }
-            blockState = chunk.getRelativeBlockState(x, yPos, z);
-        } else {
-            blockState = section.getRelativeBlockState(x, y, z);
-        }
+    private boolean canSeeThrough(@NotNull IReadableBlockStateAccess access, int x, int y, int z) {
+        IBlockState blockState = access.getBlockState(x, y, z);
+        return this.canSeeThrough(blockState);
+    }
 
-        if (blockState == null) {
-            return null;
-        }
-        return blockState.getBlock();
+
+    /**
+     * @param blockState the given block state or null for air
+     * @return true if the block is has transparency or is air.
+     */
+    public final boolean canSeeThrough(@Nullable IBlockState blockState) {
+        return blockState == null || blockState.getBlock().isTransparent();
     }
 
     @NotNull

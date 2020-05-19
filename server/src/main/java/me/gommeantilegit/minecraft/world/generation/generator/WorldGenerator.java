@@ -3,13 +3,6 @@ package me.gommeantilegit.minecraft.world.generation.generator;
 import me.gommeantilegit.minecraft.ServerMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.nbt.NBTObject;
-import me.gommeantilegit.minecraft.nbt.api.INBTConverter;
-import me.gommeantilegit.minecraft.nbt.exception.NBTParsingException;
-import me.gommeantilegit.minecraft.nbt.impl.NBTArray;
-import me.gommeantilegit.minecraft.nbt.impl.NBTInteger;
-import me.gommeantilegit.minecraft.nbt.impl.NBTLong;
-import me.gommeantilegit.minecraft.nbt.impl.NBTStringMap;
 import me.gommeantilegit.minecraft.world.ServerWorld;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.generation.generator.api.ChunkGenerator;
@@ -24,12 +17,6 @@ import java.util.Random;
 public class WorldGenerator implements ServerWorld.OnServerChunkCreationListener {
 
     /**
-     * NBT Converter for {@link WorldGenerator} object
-     */
-    @NotNull
-    public static final NBTConverter NBT_CONVERTER = new NBTConverter();
-
-    /**
      * Random instance for creator
      */
     @NotNull
@@ -39,7 +26,7 @@ public class WorldGenerator implements ServerWorld.OnServerChunkCreationListener
      * ServerWorld type enum value
      */
     @NotNull
-    private final WorldType worldType;
+    private final WorldGenerationOptions.WorldType worldType;
 
     /**
      * ServerWorld Generation seed
@@ -50,29 +37,22 @@ public class WorldGenerator implements ServerWorld.OnServerChunkCreationListener
     private final ChunkGenerator chunkGenerator;
 
     /**
-     * Server Minecraft instance
-     */
-    @NotNull
-    private final ServerMinecraft mc;
-
-    /**
      * Options regarding world creator
      */
     @NotNull
     private final WorldGenerationOptions worldGenerationOptions;
 
-    public WorldGenerator(long seed, @NotNull WorldType worldType, @NotNull ServerMinecraft mc, @NotNull WorldGenerationOptions worldGenerationOptions) {
-        this.seed = seed;
+    public WorldGenerator(@NotNull ServerMinecraft mc, @NotNull WorldGenerationOptions worldGenerationOptions) {
+        this.seed = worldGenerationOptions.getSeed();
         this.random = new Random(seed);
-        this.worldType = worldType;
-        this.mc = mc;
+        this.worldType = worldGenerationOptions.getWorldType();
         this.worldGenerationOptions = worldGenerationOptions;
         switch (worldType) {
             case SUPER_FLAT:
-                chunkGenerator = new SuperFlatChunkGenerator(this, this.mc);
+                chunkGenerator = new SuperFlatChunkGenerator(this, mc);
                 break;
             case OVERWORLD:
-                chunkGenerator = new WorldChunkGenerator(this, this.mc);
+                chunkGenerator = new WorldChunkGenerator(this, mc);
                 break;
             default:
                 throw new IllegalStateException("Invalid world type: " + worldType);
@@ -85,7 +65,7 @@ public class WorldGenerator implements ServerWorld.OnServerChunkCreationListener
     }
 
     @NotNull
-    public WorldType getWorldType() {
+    public WorldGenerationOptions.WorldType getWorldType() {
         return worldType;
     }
 
@@ -108,27 +88,4 @@ public class WorldGenerator implements ServerWorld.OnServerChunkCreationListener
         return worldGenerationOptions;
     }
 
-    public enum WorldType {
-        OVERWORLD, SUPER_FLAT
-    }
-
-    public static final class NBTConverter implements INBTConverter<NBTArray, WorldGenerator> {
-        @NotNull
-        @Override
-        public NBTArray toNBTData(@NotNull WorldGenerator object) {
-            return new NBTArray(new NBTObject[]{
-                    new NBTLong(object.seed),
-                    new NBTInteger(object.worldType.ordinal()),
-                    WorldGenerationOptions.NBT_CONVERTER.toNBTData(object.worldGenerationOptions)
-            });
-        }
-
-        @Override
-        public WorldGenerator fromNBTData(NBTArray object, Object... args) throws NBTParsingException {
-            long seed = ((NBTLong) object.getValue()[0]).getValue();
-            WorldType worldType = WorldType.values()[((NBTInteger) object.getValue()[1]).getValue()];
-            WorldGenerationOptions options = WorldGenerationOptions.NBT_CONVERTER.fromNBTData(((NBTStringMap) object.getValue()[2]));
-            return new WorldGenerator(seed, worldType, (ServerMinecraft) args[0], options);
-        }
-    }
 }

@@ -75,24 +75,24 @@ public class BlockState implements IBlockState {
 
     @Override
     public String toString() {
-        return "BlockState{blockName: " + block.getUnlocalizedName() + ", id: " + block.getId() + "}";
+        return "BlockState{blockName: " + block.getUnlocalizedName() + "}";
     }
 
 
-    @Override
-    public void serialize(@NotNull BitByteBuffer buffer) {
-        buffer.writeUnsignedShort(this.block.getId());
-    }
-
-    @NotNull
-    @Override
-    public BlockState deserialize(@NotNull BitByteBuffer buffer, @NotNull Blocks blocks) throws DeserializationException {
-        int blockID = buffer.readUnsignedShort();
-        if (blockID == 0) {
-            throw new DeserializationException("Read blockID is 0! Air does not have a block state!");
-        }
-        return new BlockState(Objects.requireNonNull(blocks.getBlockByID(blockID)));
-    }
+//    @Override
+//    public void serialize(@NotNull BitByteBuffer buffer) {
+//          WRITE BLOCK
+//    }
+//
+//    @NotNull
+//    @Override
+//    public BlockState deserialize(@NotNull BitByteBuffer buffer, @NotNull Blocks blocks) throws DeserializationException {
+//        int blockID = buffer.readUnsignedShort();
+//        if (blockID == 0) {
+//            throw new DeserializationException("Read blockID is 0! Air does not have a block state!");
+//        }
+//        return new BlockState(Objects.requireNonNull(blocks.getBlockByID(blockID)));
+//    }
 
     @NotNull
     public BlockState copySelf() {

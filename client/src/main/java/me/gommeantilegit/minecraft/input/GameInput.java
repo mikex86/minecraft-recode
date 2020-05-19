@@ -12,7 +12,7 @@ public class GameInput extends InputAdapter {
     public boolean keyDown(int keycode) {
         switch (keycode){
             case Input.Keys.F11:
-                new ScreenShot(new File("./screenshots"));
+                new ScreenShot(new File("screenshots"));
                 break;
         }
         return super.keyDown(keycode);

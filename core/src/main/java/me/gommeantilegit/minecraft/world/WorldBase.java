@@ -1,13 +1,13 @@
 package me.gommeantilegit.minecraft.world;
 
 import com.badlogic.gdx.math.Vector3;
-import com.badlogic.gdx.math.collision.Ray;
-import javafx.util.Pair;
+import kotlin.Pair;
 import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.state.BlockState;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
+import me.gommeantilegit.minecraft.block.state.palette.IBlockStatePalette;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
 import me.gommeantilegit.minecraft.raytrace.IRayTracer;
@@ -18,6 +18,7 @@ import me.gommeantilegit.minecraft.util.block.position.BlockPos;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkSection;
+import me.gommeantilegit.minecraft.world.chunk.change.BlockStateSemaphoreBase;
 import me.gommeantilegit.minecraft.world.chunk.creator.ChunkCreatorBase;
 import me.gommeantilegit.minecraft.world.chunk.creator.OnChunkCreationListener;
 import me.gommeantilegit.minecraft.world.chunk.loader.ChunkLoaderBase;
@@ -33,8 +34,8 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
-import static java.lang.Math.floor;
-import static java.lang.Math.round;
+import static java.lang.Math.*;
+import static me.gommeantilegit.minecraft.utils.MathHelper.nearestInt;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkBase.CHUNK_SIZE;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
@@ -103,18 +104,34 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
      */
     private boolean shouldPauseTick = false;
 
-    protected WorldBase(@NotNull AbstractMinecraft mc) {
-        this(mc, 256);
+    /**
+     * The block state palette used to store chunks in
+     */
+    @NotNull
+    private final IBlockStatePalette blockStatePalette;
+
+    /**
+     * Manages block states
+     */
+    @NotNull
+    protected final BlockStateSemaphoreBase blockStateSemaphore;
+
+    protected WorldBase(@NotNull AbstractMinecraft mc, @NotNull IBlockStatePalette blockStatePalette, @NotNull BlockStateSemaphoreBase blockStateSemaphore) {
+        this(mc, STANDARD_WORLD_HEIGHT, blockStatePalette, blockStateSemaphore);
     }
 
     /**
-     * @param mc     sets {@link #mc}
-     * @param height sets {@link #height}
+     * @param mc                  sets {@link #mc}
+     * @param height              sets {@link #height}
+     * @param blockStatePalette   sets {@link #blockStatePalette}
+     * @param blockStateSemaphore sets {@link #blockStateSemaphore}
      */
-    protected WorldBase(@NotNull AbstractMinecraft mc, int height) {
+    protected WorldBase(@NotNull AbstractMinecraft mc, int height, @NotNull IBlockStatePalette blockStatePalette, @NotNull BlockStateSemaphoreBase blockStateSemaphore) {
+        this.blockStatePalette = blockStatePalette;
         assert height % CHUNK_SECTION_SIZE == 0;
         this.mc = mc;
         this.height = height;
+        this.blockStateSemaphore = blockStateSemaphore;
     }
 
     @Override
@@ -135,7 +152,9 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
         tickChunks(partialTicks, loadedChunks);
         this.chunkCreator.tick(partialTicks);
         this.chunkLoader.tick(partialTicks);
-        this.worldTime++;
+
+        this.blockStateSemaphore.tick(partialTicks);
+//        this.worldTime++; TODO: ADD BACK
     }
 
     protected abstract void tickChunks(float partialTicks, @NotNull Collection<ChunkBase> chunks);
@@ -146,7 +165,7 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
      * @param entity the given entity.
      */
     @ThreadSafe
-    public void spawnEntityInWorld(Entity entity) {
+    public void spawnEntityInWorld(@NotNull Entity entity) {
         entity.setWorld(this);
         this.entitySpawner.spawnEntity(entity);
     }
@@ -155,10 +174,10 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
      * @param axisAlignedBB the boundingBox
      * @return if an entity is in the given bounding box
      */
-    public boolean isFree(AxisAlignedBB axisAlignedBB) {
+    public boolean isEntityFree(@NotNull AxisAlignedBB axisAlignedBB) {
         List<ChunkBase> chunks = getChunksInBoundingBox(axisAlignedBB);
         for (ChunkBase chunk : chunks) {
-            if (!chunk.isFree(axisAlignedBB))
+            if (!chunk.isEntityFree(axisAlignedBB))
                 return false;
         }
         return true;
@@ -180,6 +199,7 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
     }
 
     @Nullable
+    @ThreadSafe
     public IBlockState getBlockState(int x, int y, int z) {
         ChunkBase chunk = this.getChunkForPosition(x, z);
         if (chunk == null) return null;
@@ -187,6 +207,7 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
     }
 
     @Nullable
+    @ThreadSafe
     public IBlockState getBlockState(@NotNull BlockPos blockPos) {
         return getBlockState(blockPos.getX(), blockPos.getY(), blockPos.getZ());
     }
@@ -220,18 +241,17 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
      */
     @NotNull
     public RayTracer.RayTraceResult rayTraceBlocks(@NotNull Vector3 rayStart, @NotNull Vector3 direction, float range) {
-        Ray ray = new Ray(rayStart, direction);
         AxisAlignedBB boundingBox = new AxisAlignedBB(
-                ray.origin.x, ray.origin.y, ray.origin.z,
-                ray.origin.x + ray.direction.x * range,
-                ray.origin.y + ray.direction.y * range,
-                ray.origin.z + ray.direction.z * range
+                rayStart.x, rayStart.y, rayStart.z,
+                rayStart.x + direction.x * range,
+                rayStart.y + direction.y * range,
+                rayStart.z + direction.z * range
         ).reoder();
         IRayTracer.RayTraceResult result = new RayTracer.RayTraceResult(null, null, RayTracer.RayTraceResult.EnumResultType.MISS, null);
         float minDst = -1;
         List<Pair<BlockPos, AxisAlignedBB>> blocks = getBlocksInBoundingBox(boundingBox);
         for (Pair<BlockPos, AxisAlignedBB> pair : blocks) {
-            BlockPos pos = pair.getKey();
+            BlockPos pos = pair.getFirst();
             Block block = getBlock(pos);
             if (block == null)
                 continue;
@@ -261,26 +281,32 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
         float z0 = axisAlignedBB.z0;
         float x1 = axisAlignedBB.x1;
         float z1 = axisAlignedBB.z1;
+        ChunkBase chunk;
         {
-            ChunkBase chunk = getChunkForPosition((int) x0, round(z0));
-            assert chunk != null;
+            chunk = getChunkForPosition((int) x0, round(z0));
             chunks.add(chunk);
         }
         {
-            ChunkBase chunk = getChunkForPosition((int) x0, round(z1));
-            assert chunk != null;
+            if (chunk == null)
+                chunk = getChunkForPosition((int) x0, round(z1));
+            else
+                chunk = getNearChunkFor(chunk, (int) x0, round(z1));
             if (!chunks.contains(chunk))
                 chunks.add(chunk);
         }
         {
-            ChunkBase chunk = getChunkForPosition((int) x1, (int) z1);
-            assert chunk != null;
+            if (chunk == null)
+                chunk = getChunkForPosition((int) x1, (int) z1);
+            else
+                chunk = getNearChunkFor(chunk, (int) x1, (int) (z1));
             if (!chunks.contains(chunk))
                 chunks.add(chunk);
         }
         {
-            ChunkBase chunk = getChunkForPosition((int) x1, (int) z0);
-            assert chunk != null;
+            if (chunk == null)
+                chunk = getChunkForPosition((int) x1, (int) z0);
+            else
+                chunk = getNearChunkFor(chunk, (int) x1, (int) (z0));
             if (!chunks.contains(chunk))
                 chunks.add(chunk);
         }
@@ -311,20 +337,25 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
      */
     private void onBlockCollision(@NotNull Entity entity, @NotNull AxisAlignedBB axisAlignedBB) {
         int x = (int) axisAlignedBB.x0, y = (int) axisAlignedBB.y0, z = (int) axisAlignedBB.z0;
-        Block block = getBlock(x, y, z);
-        assert block != null;
+        ChunkBase forPos = getNearChunkFor(entity.getCurrentChunk(), x, z);
+        if (forPos == null)
+            return;
+        IBlockState state = forPos.getBlockState(x, y, z);
+        if (state == null)
+            return;
+        Block block = state.getBlock();
         block.onEntityCollide(entity, axisAlignedBB);
     }
 
     @NotNull
     public List<Pair<BlockPos, AxisAlignedBB>> getBlocksInBoundingBox(@NotNull AxisAlignedBB box) {
         List<Pair<BlockPos, AxisAlignedBB>> boxes = new ArrayList<>();
-        int x0 = (int) Math.floor(box.x0);
-        int x1 = (int) Math.floor(box.x1 + 1.0f);
-        int y0 = (int) Math.floor(box.y0);
-        int y1 = (int) Math.floor(box.y1 + 1.0f);
-        int z0 = (int) Math.floor(box.z0);
-        int z1 = (int) Math.floor(box.z1 + 1.0f);
+        int x0 = (int) floor(box.x0);
+        int x1 = (int) floor(box.x1 + 1.0f);
+        int y0 = (int) floor(box.y0);
+        int y1 = (int) floor(box.y1 + 1.0f);
+        int z0 = (int) floor(box.z0);
+        int z1 = (int) floor(box.z1 + 1.0f);
         for (int x = x0; x < x1; x++) {
             for (int y = y0; y < y1; y++) {
                 for (int z = z0; z < z1; z++) {
@@ -350,17 +381,18 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
     @NotNull
     public List<AxisAlignedBB> getBoundingBoxes(@NotNull AxisAlignedBB box) {
         List<AxisAlignedBB> boxes = new ArrayList<>();
-        int x0 = (int) Math.floor(box.x0);
-        int x1 = (int) Math.floor(box.x1 + 1.0f);
-        int y0 = (int) Math.floor(box.y0);
-        int y1 = (int) Math.floor(box.y1 + 1.0f);
-        int z0 = (int) Math.floor(box.z0);
-        int z1 = (int) Math.floor(box.z1 + 1.0f);
+        int x0 = (int) nearestInt(box.x0);
+        int x1 = (int) nearestInt(box.x1 + 1.0f);
+        int y0 = (int) nearestInt(box.y0);
+        int y1 = (int) nearestInt(box.y1 + 1.0f);
+        int z0 = (int) nearestInt(box.z0);
+        int z1 = (int) nearestInt(box.z1 + 1.0f);
         for (int x = x0; x < x1; x++) {
             for (int y = y0; y < y1; y++) {
                 for (int z = z0; z < z1; z++) {
                     AxisAlignedBB axisAlignedBB2;
                     BlockPos bp = new BlockPos(x, y, z);
+
                     IBlockState state = getBlockState(bp);
                     if (state != null) {
                         Block block = state.getBlock();
@@ -374,6 +406,8 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
         return boxes;
     }
 
+
+
     /**
      * @param x x coordinate
      * @param y y coordinate
@@ -381,6 +415,7 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
      * @return the block instance at the specified coordinates or null for air
      */
     @Nullable
+    @ThreadSafe
     public Block getBlock(int x, int y, int z) {
         IBlockState blockState = getBlockState(x, y, z);
         if (blockState == null)
@@ -389,6 +424,7 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
     }
 
     @Nullable
+    @ThreadSafe
     public Block getBlock(@NotNull BlockPos blockPos) {
         IBlockState blockState = getBlockState(blockPos);
         if (blockState == null)
@@ -397,15 +433,84 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
     }
 
     /**
+     * Assumes that the result chunk is near to the current chunk. This algorithm is approximately O(Distance) worst case
+     *
+     * @param chunk  the chunk that the chunk requested is near to
+     * @param entity the given entity that the chunk that is searched for contains
+     * @return the chunk that contains the entity
+     */
+    @Nullable
+    @ThreadSafe
+    public ChunkBase getNearChunkFor(@NotNull ChunkBase chunk, @NotNull Entity entity) {
+        Vec2i chunkPos = getChunkOrigin(entity.posX, entity.posZ);
+        return traverseChunks(chunk, chunkPos);
+    }
+
+    /**
+     * Assumes that the result chunk is near to the current chunk. This algorithm is approximately O(Distance) worst case
+     *
+     * @param chunk the chunk that the chunk requested is near to
+     * @param x     the x component of the position that the chunk that is searched for contains
+     * @param z     the z component of the position that the chunk that is searched for contains
+     * @return the chunk that contains the block position
+     */
+    @Nullable
+    @ThreadSafe
+    public ChunkBase getNearChunkFor(@NotNull ChunkBase chunk, int x, int z) {
+        Vec2i chunkPos = getChunkOrigin(x, z);
+        return traverseChunks(chunk, chunkPos);
+    }
+
+    /**
+     * Should be used when there is no reference chunk that the result chunk is near to. If there is any chunk available to supply to the search at all, use {@link #getNearChunkFor(ChunkBase, Entity)} it will be faster.
+     *
      * @param entity the given entity
      * @return the chunk that contains the entity
      */
     @Nullable
     @ThreadSafe
-    public ChunkBase getChunkFor(@NotNull Entity entity) {
+    public ChunkBase getAbsoluteChunkFor(@NotNull Entity entity) {
         Vec2i chunkPos = getChunkOrigin(entity.posX, entity.posZ);
         return getChunkAtOrigin(chunkPos.getX(), chunkPos.getY());
     }
+
+    /**
+     * Traverses the minecraft world like 2D LinkedList to the chunk position. This algorithm is approximately O(Distance) worst case
+     *
+     * @param from     the starting chunk to start the search
+     * @param chunkPos the chunk origin of the chunk that is searched for
+     * @return the chunk, or null if not found.
+     */
+    @Nullable
+    @ThreadSafe // if the chunk link does not exist yet, it just doesn't
+    protected ChunkBase traverseChunks(@NotNull ChunkBase from, @NotNull Vec2i chunkPos) {
+        Vec2i fromPos = from.getChunkOrigin();
+        int xDif = chunkPos.getX() - fromPos.getX();
+        int zDif = chunkPos.getY() - fromPos.getY();
+        int xDir = Integer.compare(xDif, 0);
+
+        ChunkBase chunk = from;
+
+        int zDir = Integer.compare(zDif, 0);
+        // traverse z
+        if (zDir != 0) {
+            int zLen = abs(zDif);
+            int neighborIndex = zDir == 1 ? 0 : 1;
+            for (int z = 0; z < zLen && chunk != null; z += CHUNK_SIZE) {
+                chunk = chunk.getNeighbor(neighborIndex);
+            }
+        }
+        // traverse x
+        if (xDir != 0 && chunk != null) {
+            int xLen = abs(xDif);
+            int neighborIndex = xDir == 1 ? 2 : 3;
+            for (int x = 0; x < xLen && chunk != null; x += CHUNK_SIZE) {
+                chunk = chunk.getNeighbor(neighborIndex);
+            }
+        }
+        return chunk;
+    }
+
 
     /**
      * @param x x component of the position vector
@@ -441,14 +546,6 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
     }
 
     /**
-     * @param block the given block or null for air
-     * @return true if the block is has transparency or is air.
-     */
-    public boolean canSeeThrough(@Nullable Block block) {
-        return block == null || block.transparent;
-    }
-
-    /**
      * Stops all async work the world is doing
      */
     @Override
@@ -471,6 +568,7 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
 
     public void setChunkLoadingDistance(int chunkLoadingDistance) {
         this.chunkLoadingDistance = chunkLoadingDistance;
+        this.chunkLoader.trackChunkLoadingDistanceChange(chunkLoadingDistance);
     }
 
     @NotNull
@@ -492,6 +590,16 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
      */
     public int getHeight() {
         return height;
+    }
+
+    @NotNull
+    public IBlockStatePalette getBlockStatePalette() {
+        return blockStatePalette;
+    }
+
+    @NotNull
+    public BlockStateSemaphoreBase getBlockStateSemaphore() {
+        return blockStateSemaphore;
     }
 
     public interface OnServerChunkCreationListener extends OnChunkCreationListener {

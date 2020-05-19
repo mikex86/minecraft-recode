@@ -32,7 +32,7 @@ public class GuiConnecting extends GuiScreen {
     }
 
     private void connect() {
-        new Thread(() -> {
+        Thread thread = new Thread(() -> {
             mc.nettyClient = new NettyClient(hostAddress, port, mc);
             // Handling exceptions
             mc.nettyClient.setUncaughtExceptionHandler((t, e) -> {
@@ -43,7 +43,10 @@ public class GuiConnecting extends GuiScreen {
                 }
             });
             this.mc.nettyClient.start();
-        }).start();
+        });
+        thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
+        thread.setDaemon(true);
+        thread.start();
         connected = true;
     }
 

@@ -47,8 +47,8 @@ public class EntityPlayerMP extends PlayerBase {
      */
     @Override
     public void onLivingUpdate() {
-        while (!movePackets.isEmpty()) {
-            ClientMovePacket packet = movePackets.remove();
+        ClientMovePacket packet;
+        while ((packet = movePackets.poll()) != null) {
             processMovePacket(packet);
         }
         if (posY < 0)

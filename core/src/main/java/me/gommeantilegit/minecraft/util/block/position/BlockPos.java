@@ -1,15 +1,8 @@
 package me.gommeantilegit.minecraft.util.block.position;
 
 import com.badlogic.gdx.math.Vector3;
-import me.gommeantilegit.minecraft.nbt.NBTObject;
-import me.gommeantilegit.minecraft.nbt.api.INBTConverter;
-import me.gommeantilegit.minecraft.nbt.exception.NBTParsingException;
-import me.gommeantilegit.minecraft.nbt.impl.NBTArray;
-import me.gommeantilegit.minecraft.nbt.impl.NBTInteger;
-import org.jetbrains.annotations.NotNull;
-
 import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -22,9 +15,6 @@ import static com.badlogic.gdx.math.MathUtils.floor;
 public class BlockPos {
 
     public static final BlockPos COORDINATE_ORIGIN = new BlockPos(0, 0, 0);
-
-    @NotNull
-    public static final NBTConverter NBT_CONVERTER = new NBTConverter();
 
     /**
      * X, Y, Z Components of the position vector
@@ -70,7 +60,7 @@ public class BlockPos {
     }
 
     @NotNull
-    public static EnumFacing getFacing(Vector3 intersection, BlockPos facedBlock) {
+    public static EnumFacing getFacing(@NotNull Vector3 intersection, @NotNull BlockPos facedBlock) {
         EnumFacing facing = EnumFacing.UP;
         if (intersection.y == (int) intersection.y) {
             float dif = intersection.y - facedBlock.y;
@@ -115,28 +105,5 @@ public class BlockPos {
      */
     private BlockPos add(int x, int y, int z) {
         return new BlockPos(this.x + x, this.y + y, this.z + z);
-    }
-
-    public static class NBTConverter implements INBTConverter<NBTArray, BlockPos> {
-
-        @NotNull
-        @Override
-        public NBTArray toNBTData(BlockPos object) {
-            return new NBTArray(new NBTObject[]{
-                    new NBTInteger(object.getX()),
-                    new NBTInteger(object.getY()),
-                    new NBTInteger(object.getZ())
-            });
-        }
-
-        @NotNull
-        @Override
-        public BlockPos fromNBTData(NBTArray object, Object... args) throws NBTParsingException {
-            return new BlockPos(
-                    (Integer) object.getValue()[0].getValue(),
-                    (Integer) object.getValue()[1].getValue(),
-                    (Integer) object.getValue()[2].getValue()
-            );
-        }
     }
 }

@@ -21,8 +21,8 @@ public class HeightMapGenerator {
 
     @NotNull
     public double[] generateHeightmap(int scaleFactor, @NotNull double[] temperaturesFlat, @NotNull double[] humidityValuesFlat, int x, int z, int width, int height, int depth) {
-        x /= CHUNK_SIZE;
-        z /= CHUNK_SIZE;
+        x /= 16;
+        z /= 16;
 
         // Minecraft constants (probably noise scale values on the x and z axis)
         double const1 = 684.41200000000003D;

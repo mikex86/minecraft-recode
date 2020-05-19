@@ -12,11 +12,10 @@ public class PlayerBase extends LivingEntity {
     /**
      * Height of eyes above posY
      */
-    public static final float EYE_HEIGHT = 1.6f;
+    public static final float DEFAULT_EYE_HEIGHT = 1.62F;
 
     /**
      * State whether the player is sneaking
-     * //TODO: IMPLEMENT
      */
     private boolean sneaking = false;
 
@@ -44,6 +43,21 @@ public class PlayerBase extends LivingEntity {
         this.skin = skin;
     }
 
+    public float getEyeHeight() {
+        float f = DEFAULT_EYE_HEIGHT;
+
+        // TODO: WHEN SLEEPING IS IMPLEMENTED
+//        if (this.isPlayerSleeping())
+//        {
+//            f = 0.2F;
+//        }
+
+        if (this.isSneaking()) {
+            f -= 0.08F;
+        }
+        return f;
+    }
+
     @NotNull
     public String getUsername() {
         return userName;
@@ -52,7 +66,7 @@ public class PlayerBase extends LivingEntity {
     /**
      * Checks if the player has the ability to harvest a block (checks current inventory item for a tool if necessary)
      */
-    public boolean canHarvestBlock(Block blockToHarvest) {
+    public boolean canHarvestBlock(@NotNull Block blockToHarvest) {
         //TODO: IMPLEMENT WHEN INVENTORY IS ADDED
         return true;
     }
@@ -60,7 +74,7 @@ public class PlayerBase extends LivingEntity {
     /**
      * Block hardness will be further counted in {@link Block#getPlayerRelativeBlockHardness}
      */
-    public float getToolDigEfficiency(Block blockToHarvest) {
+    public float getToolDigEfficiency(@NotNull Block blockToHarvest) {
         //TODO: IMPLEMENT WHEN INVENTORY IS ADDED
         return 1;
     }

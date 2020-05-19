@@ -1,6 +1,6 @@
 package me.gommeantilegit.minecraft.logging.crash;
 
-import me.gommeantilegit.minecraft.utils.Hardware;
+import me.gommeantilegit.minecraft.logging.Hardware;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import oshi.SystemInfo;
@@ -12,17 +12,6 @@ import oshi.software.os.OperatingSystem;
  * Represents a crash triggered on code failure
  */
 public class CrashReport {
-
-    /**
-     * System info instance
-     */
-    @NotNull
-    private static final SystemInfo systemInfo = new SystemInfo();
-
-    static {
-        systemInfo.getHardware();
-        systemInfo.getOperatingSystem();
-    }
 
     /**
      * Additional message on the throwable
@@ -91,6 +80,7 @@ public class CrashReport {
     }
 
     private void printSystemInfo(@NotNull StringBuilder str) {
+        SystemInfo systemInfo = Hardware.getSystemInfo();
         HardwareAbstractionLayer hardware = systemInfo.getHardware();
         CentralProcessor cpu = hardware.getProcessor();
         str.append("CPU: ").append(cpu.getFamily()).append(" ").append(cpu.getIdentifier()).append(" ").append(cpu.getProcessorID()).append(" ").append(cpu.getPhysicalProcessorCount()).append("x ").append(cpu.getName()).append("\n");

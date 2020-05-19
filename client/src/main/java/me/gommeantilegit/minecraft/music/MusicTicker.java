@@ -5,6 +5,7 @@ import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 import me.gommeantilegit.minecraft.ClientMinecraft;
+import me.gommeantilegit.minecraft.rendering.GLContext;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -63,6 +64,9 @@ public class MusicTicker implements Tickable {
 
     @Override
     public void tick(float partialTicks) {
+        if (mc.gameSettings.generalSettings.music.getRelativeValue() <= 1E-3 && this.playingMusic == null) {
+            return;
+        }
         if (playingMusic != null && playingMusic.isPlaying() && !fadingOut && !fadingIn) {
             playingMusic.setVolume((float) mc.gameSettings.generalSettings.music.getRelativeValue());
         }
@@ -101,13 +105,13 @@ public class MusicTicker implements Tickable {
 
         if (this.currentlyPlayingMusicType == null && this.timeUntilNextMusic-- <= 0 && currentAmbientMusicType != null) {
             if (this.playingMusic != null && this.playingMusic.isPlaying()) {
-                mc.runOnGLContextWait(new FutureTask<>((Callable<Void>) () -> {
+                GLContext.getGlContext().runOnGLContextWait(new FutureTask<>((Callable<Void>) () -> {
                     this.playingMusic.stop();
                     return null;
                 }));
                 System.out.println("Stopped previously playing music to start new one. In general this should never happen!");
             }
-            mc.runOnGLContextWait(new FutureTask<>((Callable<Void>) () -> {
+            GLContext.getGlContext().runOnGLContextWait(new FutureTask<>((Callable<Void>) () -> {
                 try {
                     this.startPlayMusic(currentAmbientMusicType);
                 } catch (GdxRuntimeException e) {
@@ -127,10 +131,7 @@ public class MusicTicker implements Tickable {
         if (this.playingMusic != null) {
             this.playingMusic.setVolume(max(0f, this.playingMusic.getVolume() - 0.01f));
             if (playingMusic.getVolume() == 0) {
-                mc.runOnGLContext(new FutureTask<>((Callable<Void>) () -> {
-                    playingMusic.stop();
-                    return null;
-                }));
+                GLContext.getGlContext().runOnGLContext(() -> playingMusic.stop());
                 playingMusic = null;
                 currentlyPlayingMusicType = null;
                 this.fadingOut = false;

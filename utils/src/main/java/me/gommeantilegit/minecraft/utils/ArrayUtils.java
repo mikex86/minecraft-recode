@@ -51,4 +51,14 @@ public class ArrayUtils {
         }
         return flatArray;
     }
+
+    public static int max(int[] array) {
+        int max = 0;
+        for (int i : array) {
+            if (i > max) {
+                max = i;
+            }
+        }
+        return max;
+    }
 }

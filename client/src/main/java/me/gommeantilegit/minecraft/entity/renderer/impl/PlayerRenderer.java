@@ -1,14 +1,20 @@
 package me.gommeantilegit.minecraft.entity.renderer.impl;
 
 import com.badlogic.gdx.Gdx;
-import me.gommeantilegit.minecraft.ClientMinecraft;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Mesh;
+import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.entity.renderer.model.impl.PlayerModel;
 import me.gommeantilegit.minecraft.entity.renderer.IEntityRenderer;
+import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
+import me.gommeantilegit.minecraft.rendering.Constants;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import org.jetbrains.annotations.NotNull;
+
+import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
 
 /**
  * Rendering object to render players
@@ -34,7 +40,8 @@ public class PlayerRenderer implements IEntityRenderer<PlayerBase, StdShader> {
         float rotationYaw = entity.lastRotationYaw + (entity.rotationYawTicked - entity.lastRotationYaw) * partialTicks;
 
         Entity.EntityRenderPosition playerRenderPosition = entity.getEntityRenderPosition();
-        float realX = entity.getEntityRenderPosition().lastPosX + (playerRenderPosition.posX - playerRenderPosition.lastPosX) * partialTicks;
+
+        float realX = playerRenderPosition.lastPosX + (playerRenderPosition.posX - playerRenderPosition.lastPosX) * partialTicks;
         float realY = playerRenderPosition.lastPosY + (playerRenderPosition.posY - playerRenderPosition.lastPosY) * partialTicks;
         float realZ = playerRenderPosition.lastPosZ + (playerRenderPosition.posZ - playerRenderPosition.lastPosZ) * partialTicks;
 

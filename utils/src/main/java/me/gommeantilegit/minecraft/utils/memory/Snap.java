@@ -1,6 +1,5 @@
 package me.gommeantilegit.minecraft.utils.memory;
 
-import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -15,7 +14,6 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * @param <T> the type of value to hold
  */
-@ThreadSafe
 public class Snap<T> {
 
     @Nullable

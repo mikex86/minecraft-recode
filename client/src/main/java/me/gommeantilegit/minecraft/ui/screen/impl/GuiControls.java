@@ -41,8 +41,9 @@ public class GuiControls extends GuiScreen {
     @Override
     public void render() {
         drawDefaultBackground();
-        mc.uiManager.fontRenderer.drawCenteredStringWithShadow(titleString, mc.width / 2f, 20, 0xffffff);
         int width = DPI.scaledWidthi, height = DPI.scaledHeighti;
+        mc.uiManager.fontRenderer.drawCenteredStringWithShadow(titleString, width / 2f, 20, 0xffffff);
+
         int x = width / 2 - 155;
         int y = 0;
         for (KeyBindSetting keyBind : this.gameSettings.keyBindings.keyBindList) {

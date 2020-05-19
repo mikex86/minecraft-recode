@@ -1,10 +1,41 @@
-#version 320 es
+#version 150
 
 /* Default precisions */
+//#ifdef GL_ES
 precision highp float;
 precision highp int;
 precision lowp sampler2D;
 precision lowp samplerCube;
+
+//#else
+//in vec3 a_Position;
+//in vec3 a_Normal;
+//in vec4 a_Color;
+//in vec2 a_TextureCoord;
+//
+//uniform vec3 lightDirection;
+//
+///* Matrices */
+//uniform mat4 transMat;
+//uniform mat4 viewMat;
+//uniform mat4 projectionMat;
+//
+//uniform bool enableLighting;
+//
+//uniform float minDiffuseLighting;
+//
+///*
+//    Fog Uniform variables
+//*/
+//uniform bool enableFog;
+//uniform float fogStart;
+//uniform float fogEnd;
+//
+//out vec3 lightingColor;
+//out vec4 fragColorAttr;
+//out vec2 fragTextureCoords;
+//out float fogVisibility;
+//#endif
 
 in highp vec3 a_Position;
 in highp vec3 a_Normal;
@@ -40,12 +71,12 @@ out highp float fogVisibility;
 */
 float calculateDiffusedLighting(float min) {
     return max(dot(
-        normalize(
-        (
-            transMat * vec4(a_Normal, 0)
-        ).xyz
-        ),
-        lightDirection), min);
+    normalize(
+    (
+    transMat * vec4(a_Normal, 0)
+    ).xyz
+    ),
+    lightDirection), min);
 }
 
 /**
@@ -70,7 +101,7 @@ void main() {
     lowp float dotLighting;
 
     if (enableLighting)
-        dotLighting = calculateDiffusedLighting(minDiffuseLighting);
+    dotLighting = calculateDiffusedLighting(minDiffuseLighting);
     else dotLighting = 1.0f;
 
     /**

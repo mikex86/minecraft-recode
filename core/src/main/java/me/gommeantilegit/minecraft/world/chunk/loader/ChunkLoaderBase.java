@@ -16,9 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -43,6 +41,18 @@ public abstract class ChunkLoaderBase implements Tickable {
     @NotNull
     @ThreadSafe
     private final List<PlayerBase> viewers;
+
+    /**
+     * Executes the actions asynchronously
+     */
+    @NotNull
+    private final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), r -> {
+        Thread thread = new Thread(r, "ChunkLoader-Worker");
+        thread.setPriority(Thread.NORM_PRIORITY);
+        thread.setDaemon(true);
+        thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
+        return thread;
+    });
 
     /**
      * @param world sets {@link #world}
@@ -103,9 +113,7 @@ public abstract class ChunkLoaderBase implements Tickable {
     }
 
     protected void scheduleChunkActions(@NotNull Entity entity) {
-        CompletableFuture.runAsync(() -> {
-            performChunkActions(entity);
-        });
+        this.executorService.submit(() -> performChunkActions(entity));
     }
 
     protected void performChunkActions(@NotNull Entity entity) {
@@ -114,22 +122,22 @@ public abstract class ChunkLoaderBase implements Tickable {
         this.world.getChunkCreator().generateChunksAroundEntity(entity, chunkLoadingDistance);
         List<ChunkBase> loadedForEntity = getChunksLoadedFor(entity);
 
-        // load chunks
-        List<ChunkBase> toLoad = getLoadableChunks(chunk -> isInDistance(chunk, entity));
-        for (ChunkBase chunk : toLoad) {
-            load(chunk, entity);
-        }
-
         // unload chunks
         List<ChunkBase> toUnload = getUnloadableChunks(entity, loadedForEntity, chunk -> !isInDistance(chunk, entity));
         for (ChunkBase chunk : toUnload) {
             unload(chunk, entity);
         }
+
+        // load chunks
+        List<ChunkBase> toLoad = getLoadableChunks(chunk -> isInDistance(chunk, entity));
+        for (ChunkBase chunk : toLoad) {
+            load(chunk, entity);
+        }
         long end = System.currentTimeMillis();
 //            System.out.println("Chunk loading took: " + (end - start) + " ms");
     }
 
-    protected void load(@NotNull ChunkBase chunk, @NotNull Entity entity) {
+    protected synchronized void load(@NotNull ChunkBase chunk, @NotNull Entity entity) {
         if (chunk.isLoaded())
             return;
         List<ChunkBase> entityChunks = getChunksLoadedFor(entity);
@@ -138,7 +146,7 @@ public abstract class ChunkLoaderBase implements Tickable {
 //        System.out.println("load");
     }
 
-    protected void unload(@NotNull ChunkBase chunk, @NotNull Entity entity) {
+    protected synchronized void unload(@NotNull ChunkBase chunk, @NotNull Entity entity) {
         if (!chunk.isLoaded())
             throw new IllegalStateException("Tried to unload an unloaded or uninitialized chunk: " + chunk);
         List<ChunkBase> entityChunks = getChunksLoadedFor(entity);
@@ -242,5 +250,11 @@ public abstract class ChunkLoaderBase implements Tickable {
             unload(chunk, viewer);
         }
         this.viewers.remove(viewer);
+    }
+
+    public void trackChunkLoadingDistanceChange(int renderDistance) {
+        for (PlayerBase viewer : viewers) {
+            scheduleChunkActions(viewer);
+        }
     }
 }

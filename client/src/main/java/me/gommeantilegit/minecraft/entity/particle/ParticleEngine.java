@@ -40,7 +40,13 @@ public class ParticleEngine implements AsyncOperation, OpenGLOperation {
      * ExecutorService to build particle meshes
      */
     @NotNull
-    private final ExecutorService executorService = Executors.newFixedThreadPool(2, r -> new Thread(r, "ParticleEngine-PoolThread"));
+    private final ExecutorService executorService = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() / 3), r -> {
+        Thread thread = new Thread(r, "ParticleEngine-PoolThread");
+        thread.setDaemon(true);
+        thread.setPriority(Thread.MIN_PRIORITY);
+        thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
+        return thread;
+    });
 
     /**
      * Default constructor for a particle engine

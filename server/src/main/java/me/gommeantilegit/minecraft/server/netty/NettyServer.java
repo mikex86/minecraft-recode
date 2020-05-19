@@ -50,8 +50,8 @@ public class NettyServer extends Thread {
                             @Override
                             protected void initChannel(Channel ch) {
                                 ch.pipeline().
-                                        addLast("framer", new LengthFieldBasedFrameDecoder(65536, 0, 2, 0, 2)).
-                                        addLast("framer-prepender", new LengthFieldPrepender(2, false)).
+                                        addLast("framer", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4)).
+                                        addLast("framer-prepender", new LengthFieldPrepender(4, false)).
                                         addLast(
                                                 new ClientPacketDecoder(mc), // Ingoing packets are all client packets
                                                 new ServerPacketEncoder(), // Outgoing packets are all server packets

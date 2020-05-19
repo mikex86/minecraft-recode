@@ -1,17 +1,14 @@
 package me.gommeantilegit.minecraft;
 
 import me.gommeantilegit.minecraft.block.Blocks;
-import me.gommeantilegit.minecraft.block.state.palette.BlockStatePalette;
-import me.gommeantilegit.minecraft.block.state.storage.BlockStateStorage;
 import me.gommeantilegit.minecraft.logging.LogLevel;
 import me.gommeantilegit.minecraft.logging.Logger;
 import me.gommeantilegit.minecraft.logging.crash.CrashReport;
 import me.gommeantilegit.minecraft.logging.file.handler.LogFileHandler;
 import me.gommeantilegit.minecraft.timer.Timer;
 import me.gommeantilegit.minecraft.timer.api.Tickable;
-import me.gommeantilegit.minecraft.timer.tick.MinecraftThread;
-import me.gommeantilegit.minecraft.utils.Hardware;
-import me.gommeantilegit.minecraft.world.saveformat.ChunkSerializer;
+import me.gommeantilegit.minecraft.logging.Hardware;
+import me.gommeantilegit.minecraft.world.saveformat.ChunkFragmenter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,27 +32,9 @@ public abstract class AbstractMinecraft implements Tickable {
     private final Side side;
 
     /**
-     * The minecraft thread
-     */
-    @NotNull
-    private final MinecraftThread minecraftThread = createMinecraftThread();
-
-    /**
      * The id of the minecraft instance provided by the {@link MinecraftProvider}
      */
     private final long id;
-
-    /**
-     * Used for chunk data serialization
-     */
-    @Nullable
-    private ChunkSerializer chunkSerializer;
-
-    /**
-     * @return the minecraft thread to be used as initial value for {@link #minecraftThread}
-     */
-    @NotNull
-    protected abstract MinecraftThread createMinecraftThread();
 
     /**
      * Manages block instances
@@ -95,6 +74,8 @@ public abstract class AbstractMinecraft implements Tickable {
      */
     public static final char MINECRAFT_VERSION_PREFIX_CHAR = 'a';
 
+    protected ChunkFragmenter chunkFragmenter;
+
     protected AbstractMinecraft(@NotNull Side side) {
         Hardware.init();
         this.id = MinecraftProvider.createMinecraft(this);
@@ -120,7 +101,7 @@ public abstract class AbstractMinecraft implements Tickable {
      * Loads the game.
      * Super constructor must be called
      */
-    protected void loadGame(){
+    protected void loadGame() {
     }
 
     /**
@@ -129,8 +110,6 @@ public abstract class AbstractMinecraft implements Tickable {
     public abstract boolean isRunning();
 
     /**
-     * Timer instance for timing game logic.
-     */ /**
      * @return the tick timer of the minecraft instance
      */
     @NotNull
@@ -156,9 +135,7 @@ public abstract class AbstractMinecraft implements Tickable {
     /**
      * @return true, if this method was executed on the minecraft thread else false.
      */
-    public boolean isCallingFromMinecraftThread() {
-        return Thread.currentThread() == this.getMinecraftThread();
-    }
+    public abstract boolean isCallingFromMinecraftThread();
 
     /**
      * Shuts down minecraft
@@ -175,16 +152,6 @@ public abstract class AbstractMinecraft implements Tickable {
 
     public void setBlocks(@NotNull Blocks blocks) {
         this.blocks = blocks;
-        this.setChunkSerializer(new ChunkSerializer(blocks));
-    }
-
-    @NotNull
-    public ChunkSerializer getChunkSerializer() {
-        return Objects.requireNonNull(chunkSerializer, "ChunkSerializer not yet initialized!");
-    }
-
-    public void setChunkSerializer(@NotNull ChunkSerializer chunkSerializer) {
-        this.chunkSerializer = chunkSerializer;
     }
 
     /**
@@ -192,14 +159,6 @@ public abstract class AbstractMinecraft implements Tickable {
      */
     public long getId() {
         return id;
-    }
-
-    /**
-     * Minecraft thread instance
-     */
-    @NotNull
-    public MinecraftThread getMinecraftThread() {
-        return minecraftThread;
     }
 
     /**
@@ -212,6 +171,23 @@ public abstract class AbstractMinecraft implements Tickable {
 
     public void setTimer(@NotNull Timer timer) {
         this.timer = timer;
+    }
+
+    /**
+     * Called to update the tick game timer. This is called at rates not to be made any kind of assumption about
+     */
+    public void onUpdate() {
+        //Updating timer and ticks
+        this.timer.advanceTime();
+        for (int i = 0; i < this.timer.ticks; i++) {
+            this.tick(this.timer.partialTicks);
+            this.timer.tick(this.timer.partialTicks);
+        }
+    }
+
+    @NotNull
+    public ChunkFragmenter getChunkFragmenter() {
+        return Objects.requireNonNull(chunkFragmenter, "Chunk Fragmenter not yet initialized");
     }
 }
 

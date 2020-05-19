@@ -5,7 +5,10 @@ import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.utils.Clock;
 import me.gommeantilegit.minecraft.utils.MathHelper;
 import me.gommeantilegit.minecraft.world.WorldBase;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
 
 import static java.lang.Math.*;
 import static java.lang.StrictMath.max;
@@ -141,20 +144,17 @@ public class LivingEntity extends Entity {
         this.prevCameraPitch = this.cameraPitch;
 
         float f1 = (float) Math.sqrt(this.motionX * this.motionX + this.motionZ * this.motionZ);
-        float f = (float)Math.atan(-this.motionY * 0.20000000298023224D) * 15.0F; // this weired constant again
+        float f = (float) Math.atan(-this.motionY * 0.20000000298023224D) * 15.0F; // this weired constant again
 
-        if (f1 > 0.1F)
-        {
+        if (f1 > 0.1F) {
             f1 = 0.1F;
         }
 
-        if (!this.isOnGround() || this.getHealth() <= 0.0F)
-        {
+        if (!this.isOnGround() || this.getHealth() <= 0.0F) {
             f1 = 0.0F;
         }
 
-        if (this.isOnGround() || this.getHealth() <= 0.0F)
-        {
+        if (this.isOnGround() || this.getHealth() <= 0.0F) {
             f = 0.0F;
         }
 
@@ -246,24 +246,36 @@ public class LivingEntity extends Entity {
     private void updateYawOffset() {
         prevRenderYawOffset = renderYawOffset;
 
-        float offset = renderYawOffset;
+        float offset;
         {
             double dx = posX - lastPosX;
             double dz = posZ - lastPosZ;
             float distance = (float) sqrt(dx * dx + dz * dz);
-
-            if (distance > 0.03f)
-                offset = (float) toDegrees(atan2(dx, dz)) - 180;
-
-
+            float angle;
+            boolean isMoving = distance > 0.03f;
+            if (isMoving) {
+                offset = (float) toDegrees(atan2(dx, dz)) - 90;
+            } else {
+                offset = renderYawOffset;
+            }
             if (this.swingProgress > 0.0F) {
                 offset = this.rotationYaw;
             }
+            if (isMoving) {
+                angle = MathHelper.wrapToAngle((rotationYaw + 90) - offset - this.renderYawOffset);
+                float bound = 75;
+                this.renderYawOffset += angle * 0.2F;
+                renderYawOffset = max(-bound, min(renderYawOffset, bound));
+            } else {
+                float yawDif = this.lastRotationYaw - this.rotationYaw;
+                this.renderYawOffset += yawDif;
 
-            float bound = 75;
-            float angle = MathHelper.wrapToAngle(rotationYaw - offset - this.renderYawOffset);
-            this.renderYawOffset += angle * 0.2F;
-            renderYawOffset = max(-bound, min(renderYawOffset, bound));
+                if (yawDif != 0) {
+                    if (abs(this.renderYawOffset) > 25) {
+                        this.renderYawOffset = 0;
+                    }
+                }
+            }
         }
         while (this.rotationYaw - this.lastRotationYaw < -180.0F) {
             this.lastRotationYaw -= 360.0F;
@@ -396,14 +408,23 @@ public class LivingEntity extends Entity {
     }
 
     public void moveEntityInAir(float moveStrafing, float moveForward) {
+        if (this.currentChunk == null) {
+            return;
+        }
+
         float friction = 0.91F; // Default friction in air
 
 
-        IBlockState verticalCollision = this.world.getBlockState((int) floor(this.posX), (int) floor(this.getBoundingBox().y0) - 1, (int) floor(this.posZ));
+        IBlockState verticalCollision;
 
-        if (this.isOnGround() && verticalCollision != null && verticalCollision.getBlock() != null) {
+        {
+            ChunkBase chunk = this.world.getNearChunkFor(this.currentChunk, (int) floor(this.posX), (int) floor(this.posZ));
+            Objects.requireNonNull(chunk, "Could not find chunk for int floor x, z (vertical collision) " + this.posX + ", " + this.posZ);
+            verticalCollision = chunk.getBlockState((int) floor(this.posX), (int) floor(this.getBoundingBox().y0) - 1, (int) floor(this.posZ));
+        }
+        if (this.isOnGround() && verticalCollision != null) {
             friction = verticalCollision.getBlock().getSlipperiness() * 0.91f; // friction against vertically colliding block
-        } else if(isOnGround()){
+        } else if (isOnGround()) {
             friction = 0.54600006f; // Friction for air is 0.6 * 0.91f (eg if standing on another block but due to rounding the block below is air)
         }
 
@@ -438,7 +459,7 @@ public class LivingEntity extends Entity {
     /**
      * @return true if the entity should be rendered
      */
-    public boolean isVisible(){
+    public boolean isVisible() {
         return true;
     }
 

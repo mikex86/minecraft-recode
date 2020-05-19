@@ -1,5 +1,5 @@
 plugins {
-    java
+    `java-library`
     kotlin("jvm")
 }
 
@@ -13,8 +13,10 @@ repositories {
 }
 
 dependencies {
-    compile(project(":logging"))
-    compile(kotlin("stdlib-jdk8"))
-    compile("org.eclipse.collections:eclipse-collections:10.0.0.M2")
-    testCompile("junit", "junit", "4.12")
+    implementation(kotlin("stdlib-jdk8"))
+    implementation("org.eclipse.collections:eclipse-collections:10.0.0.M2")
+    testImplementation("junit", "junit", "4.12")
+    implementation("org.jetbrains:annotations:19.0.0")
+    implementation(project(":logging"))
+    implementation(project(":utils"))
 }

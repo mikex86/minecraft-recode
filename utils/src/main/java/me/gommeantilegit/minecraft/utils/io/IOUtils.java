@@ -30,41 +30,41 @@ public class IOUtils {
 
     /**
      * Compresses the given array
+     *
      * @param bytes the byte array to compress
      * @return the compressed version of the specified byte array
      */
     public static byte[] compress(byte[] bytes) {
         try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayOutputStream out = new ByteArrayOutputStream(bytes.length);
             DeflaterOutputStream compress = new DeflaterOutputStream(out);
             compress.write(bytes);
             compress.flush();
             compress.close();
             return out.toByteArray();
         } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(150);
-            return null;
+            throw new RuntimeException(e);
         }
+//        return bytes;
     }
 
     /**
      * Decompresses the given byte array
+     *
      * @param bytes the byte array to decompress
      * @return the decompressed version of the specified byte array
      */
     public static byte[] decompress(byte[] bytes) {
         try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayOutputStream out = new ByteArrayOutputStream(bytes.length);
             InflaterOutputStream decompress = new InflaterOutputStream(out);
             decompress.write(bytes);
             decompress.flush();
             decompress.close();
             return out.toByteArray();
         } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(150);
-            return null;
+            throw new RuntimeException(e);
         }
+//        return bytes;
     }
 }

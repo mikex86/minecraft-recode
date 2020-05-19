@@ -182,18 +182,17 @@ public class PlayerModel implements IEntityModel<PlayerBase, StdShader> {
             float f1 = (float) sin(f * (float) Math.PI);
             float f2 = (float) (sin(swingProgress * (float) Math.PI) * 0.75F);
             this.arm0.xRot = f1 * -60 - 5f;
-//            this.arm0.yRot -= this.body.yRot * 4.0F;
+            this.arm0.yRot -= this.body.yRot * 4.0F;
             this.arm0.zRot += toDegrees(sin(swingProgress * (float) Math.PI)) * -0.4F * 1.0f;
 
-            //Negate SOUND_RESOURCES
             {
                 this.arm0.xRot = -arm0.xRot;
                 this.arm0.yRot = -arm0.yRot;
-//                this.arm0.zRot = -arm0.zRot;
+                this.arm0.zRot = -arm0.zRot;
 
                 this.arm1.xRot = -arm1.xRot;
                 this.arm1.yRot = -arm1.yRot;
-//                this.arm1.zRot = -arm1.zRot;
+                this.arm1.zRot = -arm1.zRot;
             }
         }
         //Breathing
@@ -203,50 +202,8 @@ public class PlayerModel implements IEntityModel<PlayerBase, StdShader> {
             this.arm0.xRot += toDegrees(sin(entity.ticksExisted * 0.067F)) * 0.05F;
             this.arm1.xRot -= toDegrees(sin(entity.ticksExisted * 0.067F)) * 0.05F;
         }
-//
-//        if (this.isSneak)
-//        {
-//            this.body.xRot = 0.5F;
-//            this.arm0.xRot += 0.4F;
-//            this.arm1.xRot += 0.4F;
-//            this.bipedRightLeg.zRot = 4.0F;
-//            this.bipedLeftLeg.zRot = 4.0F;
-//            this.bipedRightLeg.rotationPointY = 9.0F;
-//            this.bipedLeftLeg.rotationPointY = 9.0F;
-//            this.head.rotationPointY = 1.0F;
-//        }
-//        else
-//        {
-//            this.body.xRot = 0.0F;
-//            this.bipedRightLeg.zRot = 0.1F;
-//            this.bipedLeftLeg.zRot = 0.1F;
-//            this.bipedRightLeg.rotationPointY = 12.0F;
-//            this.bipedLeftLeg.rotationPointY = 12.0F;
-//            this.head.rotationPointY = 0.0F;
-//        }
-//
-//        this.arm0.zRot += cos(ageInTicks * 0.09F) * 0.05F + 0.05F;
-//        this.arm1.zRot -= cos(ageInTicks * 0.09F) * 0.05F + 0.05F;
-//        this.arm0.xRot += sin(ageInTicks * 0.067F) * 0.05F;
-//        this.arm1.xRot -= sin(ageInTicks * 0.067F) * 0.05F;
-//
-//        if (this.aimedBow)
-//        {
-//            float f3 = 0.0F;
-//            float f4 = 0.0F;
-//            this.arm0.zRot = 0.0F;
-//            this.arm1.zRot = 0.0F;
-//            this.arm0.yRot = -(0.1F - f3 * 0.6F) + this.head.yRot;
-//            this.arm1.yRot = 0.1F - f3 * 0.6F + this.head.yRot + 0.4F;
-//            this.arm0.xRot = -((float)Math.PI / 2F) + this.head.xRot;
-//            this.arm1.xRot = -((float)Math.PI / 2F) + this.head.xRot;
-//            this.arm0.xRot -= f3 * 1.2F - f4 * 0.4F;
-//            this.arm1.xRot -= f3 * 1.2F - f4 * 0.4F;
-//            this.arm0.zRot += cos(ageInTicks * 0.09F) * 0.05F + 0.05F;
-//            this.arm1.zRot -= cos(ageInTicks * 0.09F) * 0.05F + 0.05F;
-//            this.arm0.xRot += sin(ageInTicks * 0.067F) * 0.05F;
-//            this.arm1.xRot -= sin(ageInTicks * 0.067F) * 0.05F;
-//        }
+        //TODO: SNEAKING
+
     }
 
 }

@@ -1,22 +1,15 @@
 package me.gommeantilegit.minecraft.world.chunk;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Mesh;
-import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
-import me.gommeantilegit.minecraft.ClientMinecraft;
-import me.gommeantilegit.minecraft.annotations.ThreadSafe;
+import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
-import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
 import me.gommeantilegit.minecraft.world.ClientWorld;
-import me.gommeantilegit.minecraft.world.WorldBase;
 import me.gommeantilegit.minecraft.world.chunk.builder.ChunkMeshRebuilder;
-import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkBase.CHUNK_SIZE;
@@ -29,18 +22,8 @@ public class ClientChunkSection extends ChunkSection {
     @Nullable
     private Mesh mesh;
 
-    /**
-     * State of the chunk needing to be rebuilt
-     */
-    private boolean needsRebuild = false;
-
     @NotNull
     private final ChunkMeshRebuilder chunkMeshRebuilder;
-
-    /**
-     * State whether the section should have a mesh
-     */
-    private boolean shouldHaveMesh = false;
 
     public ClientChunkSection(@NotNull ClientChunk parentChunk, int startHeight, @NotNull ChunkMeshRebuilder chunkMeshRebuilder) {
         super(parentChunk, startHeight);
@@ -48,50 +31,34 @@ public class ClientChunkSection extends ChunkSection {
     }
 
     /**
-     * Renders the chunk section, if it has a mesh
+     * Renders the chunk section, if it has a mesh. (synchronized with mesh setting... IF THIS ACCESSES DELETED BUFFERS THIS SEG FAULTS)
      *
      * @param shader the shader program to render it with
      */
     public int render(@NotNull StdShader shader) {
-        if (this.needsRebuild || this.mesh == null) {
-            boolean state = getParentChunk().getWorld().getRenderManager().canUpload();
-            if (state) {
-                long start = System.currentTimeMillis();
-                Optional<OptimizedMeshBuilder> result = this.chunkMeshRebuilder.pollMesh(this);
-                if (!result.isPresent()) {
-                    if (this.mesh == null) {
-                        return 0;
-                    }
-                } else {
-                    this.mesh = result.get().end();
-                    Objects.requireNonNull(this.mesh, "MeshBuilder built section mesh null!");
-                    this.needsRebuild = false;
-                    long end = System.currentTimeMillis();
-                    if ((end - start) > 0) {
-                        System.out.println("upload took: " + (end - start) + " ms");
-                    }
-                }
-            } else {
-                if (this.mesh == null) {
-                    return 0;
-                }
-            }
+        Mesh mesh = retrieveMesh();
+
+        if (mesh == null) {
+            return 0;
         }
 
         shader.pushMatrix();
         shader.translate(0, getStartHeight(), 0);
-        this.mesh.render(shader, GL_TRIANGLES);
+        mesh.render(shader, GL_TRIANGLES);
         shader.popMatrix();
         return 1;
+    }
+
+    @Nullable
+    private Mesh retrieveMesh() {
+        return this.mesh;
     }
 
     /**
      * Schedules a rebuild of the neighbor sections of this chunk sections (sections are in this and other chunks) and performs a chunk bake for affected chunks once all meshes have been built
      */
-    //TODO: ALSO DOESN'T SEEM THAT THREAD-SAFE TO ME... INVESTIGATE FURTHER
-    public void rebuildFor(@NotNull ClientMinecraft mc, boolean highPriority, int x, int y, int z) {
+    public void rebuildFor(int x, int y, int z) {
         ClientChunk parentChunk = getParentChunk();
-        parentChunk.unbake();
 
         ClientWorld world = parentChunk.getWorld();
         int startHeight = getStartHeight();
@@ -141,28 +108,8 @@ public class ClientChunkSection extends ChunkSection {
                 toRebuild.add(parentChunk.getChunkSection(startHeight + CHUNK_SECTION_SIZE));
             }
         }
-        AtomicInteger counter = new AtomicInteger();
         for (ClientChunkSection section : toRebuild) {
-            {
-                Set<ClientChunk> uniqueChunks = new HashSet<>();
-                for (ClientChunkSection chunkSection : toRebuild) {
-                    uniqueChunks.add(chunkSection.getParentChunk());
-                }
-                for (ClientChunk uniqueChunk : uniqueChunks) {
-                    uniqueChunk.unbake();
-                }
-            }
-            section.setNeedsRebuild(true, true, () -> {
-                if (counter.incrementAndGet() == toRebuild.size()) {
-                    Set<ClientChunk> uniqueChunks = new HashSet<>();
-                    for (ClientChunkSection chunkSection : toRebuild) {
-                        uniqueChunks.add(chunkSection.getParentChunk());
-                    }
-                    for (ClientChunk chunk : uniqueChunks) {
-                        chunk.bake();
-                    }
-                }
-            });
+            section.scheduleRebuild();
         }
     }
 
@@ -178,42 +125,23 @@ public class ClientChunkSection extends ChunkSection {
         this.mesh = mesh;
     }
 
-    /**
-     * Sets the state of the section needing a rebuild. This will schedule a chunk section rebuild on the ChunkRebuilder. If the supplied state is equal to the current state, the call will be ignored.
-     *
-     * @param needsRebuild the new state
-     * @param highPriority the state whether the chunk section should be added first in queue to be rebuilt
-     */
-    @ThreadSafe
-    public void setNeedsRebuild(boolean needsRebuild, boolean highPriority) {
-        if (this.needsRebuild == needsRebuild) return;
-        this.needsRebuild = needsRebuild;
-        if (needsRebuild)
-            this.chunkMeshRebuilder.scheduleSectionMeshRebuild(this, highPriority, null);
-    }
+
+//    private boolean needsRebuild = true;
 
     /**
-     * Sets the state of the section needing a rebuild. This will schedule a chunk section rebuild on the ChunkRebuilder. If the supplied state is equal to the current state, the call will be ignored.
-     *
-     * @param needsRebuild the new state
-     * @param highPriority the state whether the chunk section should be added first in queue to be rebuilt
-     * @param onMeshBuilt  invoked on a random thread when the mesh was built (this does not mean it is valid and on the gpu vram already) or null, if no listener is needed
+     * Schedules a chunk section rebuild on the ChunkRebuilder, if the block change has changed since last invocation
      */
-    @ThreadSafe
-    public void setNeedsRebuild(boolean needsRebuild, boolean highPriority, @NotNull Runnable onMeshBuilt) {
-        if (this.needsRebuild == needsRebuild) return;
-        this.needsRebuild = needsRebuild;
-        if (needsRebuild)
-            this.chunkMeshRebuilder.scheduleSectionMeshRebuild(this, highPriority, onMeshBuilt);
+    public void scheduleRebuild() {
+//        if (this.needsRebuild) {
+        this.chunkMeshRebuilder.scheduleSectionMeshRebuild(this);
+//            this.needsRebuild = false;
+//        }
     }
 
-    /**
-     * Sets the state of the section needing a rebuild. This will schedule a chunk section rebuild on the ChunkRebuilder. If the supplied state is equal to the current state, the call will be ignored.
-     *
-     * @param needsRebuild the new state
-     */
-    public void setNeedsRebuild(boolean needsRebuild) {
-        setNeedsRebuild(needsRebuild, false);
+    @Override
+    public void setBlockState(int x, int y, int z, @Nullable IBlockState blockState) {
+        super.setBlockState(x, y, z, blockState);
+//        this.needsRebuild = true;
     }
 
     /**
@@ -227,7 +155,6 @@ public class ClientChunkSection extends ChunkSection {
      * Deletes and disposes the mesh.
      * {@link #hasMesh()} will return false.
      */
-    @ThreadSafe
     public void deleteMesh() {
         setMesh(null);
     }
@@ -238,14 +165,11 @@ public class ClientChunkSection extends ChunkSection {
         return (ClientChunk) super.getParentChunk();
     }
 
-    /**
-     * @return true if the the section should have a mesh. if {@link #hasMesh()} is true, this should always return true. This is the state of the mesh actually containing a face even before it is uploaded to the GPU vRam and thus available in {@link #mesh}. This is instantly available after the mesh rebuild was performed (asynchronously)
-     */
-    public boolean shouldHaveMesh() {
-        return shouldHaveMesh;
+    public void onMeshBuildCancelled() {
     }
 
-    public void setShouldHaveMesh(boolean shouldHaveMesh) {
-        this.shouldHaveMesh = shouldHaveMesh;
+    public void onMeshBuildComplete() {
     }
+
+
 }

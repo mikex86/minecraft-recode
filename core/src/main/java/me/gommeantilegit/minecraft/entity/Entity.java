@@ -138,12 +138,19 @@ public class Entity {
     }
 
     /**
-     * @return a new position vector equal to vec3({@link #posX}, {@link #posY}, {@link #posZ})
-     * Please note, that changes made to this instance do not affect the instance in any way.
+     * A temp vector for {@link #getPositionVector()}
+     */
+    @NotNull
+    private final Vector3 positionVector = new Vector3();
+
+    /**
+     * @return a position vector equal to vec3({@link #posX}, {@link #posY}, {@link #posZ})
+     * Please note, that changes made to this instance do not affect the instance in any way, only the position vector observed only through this method.
+     * DO NOT MUTATE
      */
     @NotNull
     public Vector3 getPositionVector() {
-        return new Vector3(posX, posY, posZ);
+        return this.positionVector.set(posX, posY, posZ);
     }
 
     /**
@@ -233,7 +240,6 @@ public class Entity {
 
         setEntityRenderPosition();
 
-        //TODO: FIX?
         List<AxisAlignedBB> boundingBoxes = this.world.getBoundingBoxes(this.getBoundingBox().expand(-0.05f, -0.05f, -0.05f));
         for (AxisAlignedBB abb : boundingBoxes)
             this.world.collision(boundingBoxes, this, abb);
@@ -267,55 +273,59 @@ public class Entity {
      */
     public void moveEntity(float motionX, float motionY, float motionZ) {
         this.setPrevDistanceWalkedModified(this.getDistanceWalkedModified());
+
         float prevX = posX;
         float prevY = posY;
         float prevZ = posZ;
-        float xNew = motionX;
-        float yNew = motionY;
-        float zNew = motionZ;
+
+        float newX = motionX;
+        float newY = motionY;
+        float newZ = motionZ;
 
         // SNEAKING (SAFEWALK)
 
-        boolean safeWalk = this.isOnGround() && this instanceof PlayerBase && ((PlayerBase) this).isSneaking();
+        boolean safeWalk = shouldWalkSafely();
 
         if (safeWalk) {
-            double d6;
-
-            for (d6 = 0.05D; xNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(xNew, -1.0f, 0.0f)); ) {
-                if (xNew < d6 && xNew >= -d6) {
-                    xNew = 0.0f;
-                } else if (xNew > 0.0D) {
-                    xNew -= d6;
+            float tmp;
+            float eps = 0.0001f;
+            for (tmp = 0.05f; abs(motionX) > eps && this.world.getBoundingBoxes(this.getBoundingBox().cloneMove(motionX, -1.0f, 0.0f)).isEmpty(); newX = motionX) {
+                if (motionX < tmp && motionX >= -tmp) {
+                    motionX = 0.0f;
+                } else if (motionX > 0.0f) {
+                    motionX -= tmp;
                 } else {
-                    xNew += d6;
+                    motionX += tmp;
                 }
             }
 
-            for (; zNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(0.0f, -1.0f, zNew)); ) {
-                if (zNew < d6 && zNew >= -d6) {
-                    zNew = 0.0f;
-                } else if (zNew > 0.0D) {
-                    zNew -= d6;
+            for (; abs(motionZ) > eps && this.world.getBoundingBoxes(this.getBoundingBox().cloneMove(0.0f, -1.0f, motionZ)).isEmpty(); newZ = motionZ) {
+                if (motionZ < tmp && motionZ >= -tmp) {
+                    motionZ = 0.0f;
+                } else if (motionZ > 0.0f) {
+                    motionZ -= tmp;
                 } else {
-                    zNew += d6;
+                    motionZ += tmp;
                 }
             }
 
-            for (; xNew != 0.0D && zNew != 0.0D && this.world.isFree(this.getBoundingBox().cloneMove(xNew, -1.0f, zNew)); ) {
-                if (xNew < d6 && xNew >= -d6) {
-                    xNew = 0.0f;
-                } else if (xNew > 0.0D) {
-                    xNew -= d6;
+            for (; abs(motionX) > eps && abs(motionZ) > eps && this.world.getBoundingBoxes(this.getBoundingBox().cloneMove(motionX, -1.0f, motionZ)).isEmpty(); newZ = motionZ) {
+                if (motionX < tmp && motionX >= -tmp) {
+                    motionX = 0.0f;
+                } else if (motionX > 0.0f) {
+                    motionX -= tmp;
                 } else {
-                    xNew += d6;
+                    motionX += tmp;
                 }
 
-                if (zNew < d6 && zNew >= -d6) {
-                    zNew = 0.0f;
-                } else if (zNew > 0.0D) {
-                    zNew -= d6;
+                newX = motionX;
+
+                if (motionZ < tmp && motionZ >= -tmp) {
+                    motionZ = 0.0f;
+                } else if (motionZ > 0.0f) {
+                    motionZ -= tmp;
                 } else {
-                    zNew += d6;
+                    motionZ += tmp;
                 }
             }
         }
@@ -347,15 +357,15 @@ public class Entity {
         }
         this.getBoundingBox().move(0.0f, 0.0f, motionZ);
 
-        this.setCollidedHorizontally(xNew != motionX || zNew != motionZ);
-        this.setOnGround(yNew != motionY && yNew < 0.0f);
-        if (xNew != motionX) {
+        this.setCollidedHorizontally(newX != motionX || newZ != motionZ);
+        this.setOnGround(newY != motionY && newY < 0.0f);
+        if (newX != motionX) {
             this.motionX = 0.0f;
         }
-        if (yNew != motionY) {
+        if (newY != motionY) {
             this.motionY = 0.0f;
         }
-        if (zNew != motionZ) {
+        if (newZ != motionZ) {
             this.motionZ = 0.0f;
         }
         this.posX = (this.getBoundingBox().x0 + this.getBoundingBox().x1) / 2.0f;
@@ -372,11 +382,13 @@ public class Entity {
             this.setDistanceWalkedModified((float) ((double) this.getDistanceWalkedModified() + Math.sqrt(xDif * xDif + zDif * zDif) * 0.6D));
             this.setDistanceWalkedOnStepModified((float) ((double) this.getDistanceWalkedOnStepModified() + Math.sqrt(xDif * xDif + yDif * yDif + zDif * zDif) * 0.6D));
 
-            BlockPos standingOn = getPosStandingOn();
-            if (this.getDistanceWalkedOnStepModified() > (float) this.nextStepDistance && world.getBlockState(standingOn) != null) {
-                this.nextStepDistance = (int) this.getDistanceWalkedOnStepModified() + 1;
+            {
+                BlockPos standingOn = getPosStandingOn();
+                ChunkBase forPos = world.getNearChunkFor(this.currentChunk, standingOn.getX(), standingOn.getZ());
+                if (this.getDistanceWalkedOnStepModified() > (float) this.nextStepDistance && forPos.getBlockState(standingOn) != null) {
+                    this.nextStepDistance = (int) this.getDistanceWalkedOnStepModified() + 1;
 
-                //TODO: WHEN FLUIDS ARE IMPLEMENTED
+                    //TODO: WHEN FLUIDS ARE IMPLEMENTED
 
 //                    if (this.isInWater()) {
 //                        float f = (float) (Math.sqrt(this.motionX * this.motionX * 0.20000000298023224D + this.motionY * this.motionY + this.motionZ * this.motionZ * 0.20000000298023224D) * 0.35F);
@@ -388,10 +400,18 @@ public class Entity {
 //                        this.playSound(this.getSwimSound(), f, 1.0F + (this.rand.nextFloat() - this.rand.nextFloat()) * 0.4F);
 //                    }
 
-                this.playStepSound(standingOn);
+                    this.playStepSound(standingOn);
+                }
             }
         }
 //        }
+    }
+
+    /**
+     * @return if the entity should move safely across the blocks it is walking on. (used for sneaking)
+     */
+    protected boolean shouldWalkSafely() {
+        return false;
     }
 
     @NotNull

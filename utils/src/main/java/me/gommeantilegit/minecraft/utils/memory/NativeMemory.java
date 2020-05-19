@@ -48,6 +48,11 @@ public class NativeMemory implements IMemory {
         }
     }
 
+    private NativeMemory(long memory, int size) {
+        this.size = size;
+        this.memory = memory;
+    }
+
     private void check(int index) {
         if (index < 0 || index >= size)
             throw new IndexOutOfBoundsException("Index " + index + " is out of bounds for memory size " + size);
@@ -121,6 +126,14 @@ public class NativeMemory implements IMemory {
         for (int i = 0; i < size; i++) {
             setByte(i, data[i]);
         }
+    }
+
+    @NotNull
+    @Override
+    public IMemory copy() {
+        long memory = theUnsafe.allocateMemory(this.size);
+        theUnsafe.copyMemory(this.memory, memory, this.size);
+        return new NativeMemory(memory, this.size);
     }
 
     @Override

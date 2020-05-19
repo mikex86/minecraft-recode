@@ -96,6 +96,31 @@ public class WorldChunkHandlerBase {
         this.chunks.add(chunk);
         this.chunkMap.put(hash, chunk);
         this.uninitializedChunks.add(chunk);
+        initNeighbors(chunk);
+    }
+
+    private synchronized void initNeighbors(@NotNull ChunkBase chunk) {
+        ChunkBase neighbor;
+        neighbor = getChunkAt(chunk.getX(), chunk.getZ() + ChunkBase.CHUNK_SIZE);
+        if (neighbor != null) {
+            chunk.setNeighbor(0, neighbor);
+            neighbor.setNeighbor(1, chunk);
+        }
+        neighbor = getChunkAt(chunk.getX(), chunk.getZ() - ChunkBase.CHUNK_SIZE);
+        if (neighbor != null) {
+            chunk.setNeighbor(1, neighbor);
+            neighbor.setNeighbor(0, chunk);
+        }
+        neighbor = getChunkAt(chunk.getX() + ChunkBase.CHUNK_SIZE, chunk.getZ());
+        if (neighbor != null) {
+            chunk.setNeighbor(2, neighbor);
+            neighbor.setNeighbor(3, chunk);
+        }
+        neighbor = getChunkAt(chunk.getX() - ChunkBase.CHUNK_SIZE, chunk.getZ());
+        if (neighbor != null) {
+            chunk.setNeighbor(3, neighbor);
+            neighbor.setNeighbor(2, chunk);
+        }
     }
 
     @NotNull

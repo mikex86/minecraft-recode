@@ -16,7 +16,12 @@ import me.gommeantilegit.minecraft.server.netty.channel.ChannelData;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
 import me.gommeantilegit.minecraft.world.ServerWorld;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
+import me.gommeantilegit.minecraft.world.chunk.ServerChunk;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 import static me.gommeantilegit.minecraft.Side.SERVER;
 
@@ -30,6 +35,21 @@ public class ServerChunkLoader extends ChunkLoaderBase implements IPacketListene
     private final ServerMinecraft mc;
 
     /**
+     * Executor service for async chunk generation
+     */
+    @NotNull
+    private final ExecutorService service = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), new ThreadFactory() {
+        @Override
+        public Thread newThread(@NotNull Runnable runnable) {
+            Thread thread = new Thread(runnable, "ChunkLoadingWorker");
+            thread.setDaemon(true);
+            thread.setPriority(Thread.MAX_PRIORITY);
+            thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
+            return thread;
+        }
+    });
+
+    /**
      * @param world sets {@link #world}
      * @param mc    sets {@link #mc}
      */
@@ -38,7 +58,6 @@ public class ServerChunkLoader extends ChunkLoaderBase implements IPacketListene
         this.mc = mc;
     }
 
-
     @Override
     public int getChunkLoadingDistance(@NotNull Entity ent) {
         return ent instanceof EntityPlayerMP ? ((EntityPlayerMP) ent).getChannelData().getChunkLoadingDistance() : world.getChunkLoadingDistance();
@@ -46,66 +65,7 @@ public class ServerChunkLoader extends ChunkLoaderBase implements IPacketListene
 
     @Override
     public void tick(float partialTicks) {
-//        {
-//            Stream<Reference<ChunkBase>> unloadedChunks = this.world.getWorldChunkHandler().getLoadableChunks();
-//            List<ChunkBase> loadedChunks = this.world.getWorldChunkHandler().getLoadedChunks();
-//            List<PlayerBase> viewers = this.world.getChunkCreator().getViewers();
-//            if (viewers.isEmpty()) {
-//                for (ChunkBase loadedChunk : loadedChunks) {
-//                    System.out.println("Unloading server chunk");
-//                    loadedChunk.unload();
-//                }
-//                return;
-//            }
-//            for (PlayerBase viewer : viewers) {
-//                Vector2 playerPosition; //2D vector storing the viewers x and y coordinates
-//                {
-//                    Vector3 viewingPosition = viewer.getPositionVector();
-//                    playerPosition = new Vector2(viewingPosition.x, viewingPosition.z);
-//                }
-//                List<Reference<ChunkBase>> deletedReferences = new ArrayList<>();
-//                unloadedChunks.forEach(reference -> {
-//                    ChunkBase chunk = reference.get();
-//                    if (chunk == null) {
-//                        deletedReferences.add(reference);
-//                        return;
-//                    }
-//                    updateUnloadedChunk(chunk, playerPosition, viewer);
-//                });
-//                for (Reference<ChunkBase> deletedReference : deletedReferences) {
-////                    this.world.getWorldChunkHandler().reportDeletedChunkReference(deletedReference);
-//                }
-//            }
-//            for (ChunkBase chunk : loadedChunks) {
-//                // If chunk is loaded and no player is near it (in chunk loading distance of it) --> unload it
-//                boolean shouldUnload = true;
-//                for (PlayerBase viewer : viewers) {
-//                    Vector2 topDownPos = VectorUtils.xzTo2D(viewer.getPositionVector());
-//                    if (topDownPos.dst(chunk.getChunkOrigin().asLibGDXVec2D()) <= ((EntityPlayerMP) viewer).getChannelData().getChunkLoadingDistance()) {
-//                        shouldUnload = false;
-//                    }
-//                }
-//                if (shouldUnload) {
-//                    System.out.println("Unloading server chunk");
-//                    chunk.unload();
-//                }
-//            }
-//        }
     }
-
-//    private void updateUnloadedChunk(@NotNull ChunkBase chunk, @NotNull Vector2 playerPosition, @NotNull PlayerBase viewer) {
-//        double distance; // Distance for chunk to viewer
-//        {
-//            Vector2 chunkPosition = chunk.getChunkOrigin().asLibGDXVec2D();
-//            distance = playerPosition.dst(chunkPosition);
-//        }
-//        if (distance < ((EntityPlayerMP) viewer).getChannelData().getChunkLoadingDistance()) {
-//            if (!chunk.isLoaded()) {
-//                System.out.println("Loading server chunk");
-//                chunk.load();
-//            }
-//        }
-//    }
 
     @Override
     public void onPacketReceived(@NotNull ClientPacket packet, @NotNull Channel channel) {
@@ -114,15 +74,19 @@ public class ServerChunkLoader extends ChunkLoaderBase implements IPacketListene
         if (packet instanceof ClientRequestChunkDataPacket) { // Chunk Data Request
             Vector2 origin = ((ClientRequestChunkDataPacket) packet).getChunkOrigin();
             channelData.sendPacket(new ServerChunkRequestConfrimationPacket(null, origin));
-            ChunkBase chunk = world.getChunkAtOrigin((int) origin.x, (int) origin.y);
-            if (chunk != null) {
+            this.service.submit(() -> {
+                ServerChunk chunk = ((ServerWorld) world).getChunkCreator().tryCreateChunkFor(new Vec2i(origin));
+                // Waiting for world generation to finish as another thread has just requested this chunk before, which means it has invoke world generation. We want it too, so we wait
+                while (!chunk.isWorldGenerationFinished()) {
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
                 ServerChunkDataPacket chunkData = new ServerChunkDataPacket(null, chunk.getChunkOrigin().asLibGDXVec2D(), chunk);
                 channelData.sendPacket(chunkData);
-            } else {
-                chunk = world.getChunkCreator().tryCreateChunkFor(new Vec2i(origin));
-                ServerChunkDataPacket chunkData = new ServerChunkDataPacket(null, chunk.getChunkOrigin().asLibGDXVec2D(), chunk);
-                channelData.sendPacket(chunkData);
-            }
+            });
         }
     }
 }

@@ -1,6 +1,5 @@
 package me.gommeantilegit.minecraft.utils.palette;
 
-import me.gommeantilegit.minecraft.utils.MathHelper;
 import me.gommeantilegit.minecraft.utils.bitarray.BitArray;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -19,7 +18,12 @@ public class PaletteArray<T> {
     private final IPalette<T> palette;
 
     public PaletteArray(int size, @NotNull IPalette<T> palette) {
-        this.bitArray = new BitArray(size, MathHelper.getNeededBits(palette.getNumKeys()));
+        this.bitArray = new BitArray(size, Math.max(4, palette.getNeededKeyBits()));
+        this.palette = palette;
+    }
+
+    public PaletteArray(@NotNull BitArray bitArray, @NotNull IPalette<T> palette) {
+        this.bitArray = bitArray;
         this.palette = palette;
     }
 
@@ -49,5 +53,14 @@ public class PaletteArray<T> {
     @NotNull
     public byte[] getPaletteData() {
         return this.bitArray.getData();
+    }
+
+    public void delete() {
+        this.bitArray.delete();
+    }
+
+    @NotNull
+    public PaletteArray<T> copy() {
+        return new PaletteArray<>(this.bitArray.copy(), this.palette);
     }
 }

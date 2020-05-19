@@ -1,12 +1,15 @@
 package me.gommeantilegit.minecraft.world.chunk.creator;
 
 import me.gommeantilegit.minecraft.annotations.Unsafe;
-import me.gommeantilegit.minecraft.entity.Entity;
-import me.gommeantilegit.minecraft.entity.player.EntityPlayerMP;
+import me.gommeantilegit.minecraft.block.state.palette.IBlockStatePalette;
+import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
 import me.gommeantilegit.minecraft.world.ServerWorld;
+import me.gommeantilegit.minecraft.world.WorldBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
-import me.gommeantilegit.minecraft.world.chunk.world.WorldChunkHandlerBase;
+import me.gommeantilegit.minecraft.world.chunk.ServerChunk;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Objects;
 
 public class ServerChunkCreator extends ChunkCreatorBase {
 
@@ -15,14 +18,6 @@ public class ServerChunkCreator extends ChunkCreatorBase {
     }
 
     /**
-     * Adds the given chunk to the world instance.
-     * - Applies block state from saved world instance
-     * - Invokes the creator listener of {@link #world}
-     * - Adds the instance to {@link WorldChunkHandlerBase#collectChunks()} of {@link ServerWorld#getWorldChunkHandler()} of {@link #world}
-     * <p><br>
-     * NOTE: The listener is invoked before the chunk is added to the list. (If the listener is present meaning the field is not null)<br>
-     * ALSO NOTE: USE MINECRAFT THREAD ONLY<br>
-     *
      * @param chunk the chunk to be added
      * @see OnChunkCreationListener
      */
@@ -31,10 +26,34 @@ public class ServerChunkCreator extends ChunkCreatorBase {
         if (!this.world.getOnChunkCreationListeners().isEmpty()) {
             this.world.getOnChunkCreationListeners().forEach(l -> l.onChunkCreated(chunk));
         }
-
-        // IMPORTANT: Invoke terrain generation before adding it, because whether a chunk exists at a given origin is used to determine whether terrain generation should be invoked
-        if (((ServerWorld) world).getInvokeTerrainGenerationDecider().shouldInvokeTerrainGeneration(world, chunk))
-            ((ServerWorld) world).getWorldGenerator().onChunkCreated(chunk); // Invoking the terrain generation
         super.createChunk(chunk);
+    }
+
+    @NotNull
+    @Override
+    public ServerChunk tryCreateChunkFor(@NotNull Vec2i position) {
+        ServerChunk prev, chunk;
+        synchronized (this) { // synchronizing to prevent other threads from racing to create a "NON EXISTING" chunk multiple times
+            Vec2i origin = world.getChunkOrigin(position.getX(), position.getY());
+            prev = ((ServerWorld) world).getWorldChunkHandler().getChunkAt(origin.getX(), origin.getY());
+            chunk = Objects.requireNonNullElseGet(prev, () -> createChunk(origin));
+        }
+        if (prev == null) {
+            ((ServerWorld) world).getWorldGenerator().onChunkCreated(chunk); // Invoking the terrain generation
+            chunk.setWorldGenerationFinished(true);
+        }
+        return chunk;
+    }
+
+    @NotNull
+    @Override
+    public synchronized ServerChunk createChunk(@NotNull Vec2i origin) {
+        return (ServerChunk) super.createChunk(origin);
+    }
+
+    @NotNull
+    @Override
+    protected ServerChunk newChunkFor(int height, int chunkX, int chunkZ, WorldBase world, IBlockStatePalette blockStatePalette) {
+        return new ServerChunk(height, chunkX, chunkZ, world, blockStatePalette);
     }
 }

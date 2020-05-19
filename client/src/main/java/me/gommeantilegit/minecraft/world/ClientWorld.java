@@ -4,29 +4,29 @@ import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.annotations.ThreadSafe;
+import me.gommeantilegit.minecraft.block.state.palette.IBlockStatePalette;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.entity.particle.ParticleEngine;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.logging.crash.CrashReport;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadingDistanceChangePacket;
 import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
+import me.gommeantilegit.minecraft.world.change.ClientBlockStateSemaphore;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
 import me.gommeantilegit.minecraft.world.chunk.builder.ChunkMeshRebuilder;
 import me.gommeantilegit.minecraft.world.chunk.creator.ClientChunkCreator;
 import me.gommeantilegit.minecraft.world.chunk.creator.OnChunkCreationListener;
 import me.gommeantilegit.minecraft.world.chunk.loader.ClientChunkLoader;
-import me.gommeantilegit.minecraft.world.chunk.world.RenderManager;
 import me.gommeantilegit.minecraft.world.chunk.world.ClientWorldChunkHandler;
+import me.gommeantilegit.minecraft.world.chunk.world.RenderManager;
 import me.gommeantilegit.minecraft.world.renderer.WorldRenderer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
-import java.util.stream.Stream;
 
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 
@@ -51,17 +51,18 @@ public class ClientWorld extends WorldBase implements OpenGLOperation {
     @NotNull
     private final EntityPlayerSP viewer;
 
-    private ParticleEngine particleEngine;
+    @NotNull
+    private final ParticleEngine particleEngine;
 
-    public ClientWorld(@NotNull EntityPlayerSP viewer, @NotNull ClientMinecraft mc, int worldHeight) {
-        super(mc, worldHeight);
+    public ClientWorld(@NotNull EntityPlayerSP viewer, @NotNull ClientMinecraft mc, int worldHeight, @NotNull IBlockStatePalette blockStatePalette) {
+        super(mc, worldHeight, blockStatePalette, new ClientBlockStateSemaphore());
         this.worldRenderer = new WorldRenderer(this, viewer, mc, mc.shaderManager.stdShader, mc.textureManager, mc.entityRenderer);
         this.renderManager = new RenderManager(this);
         this.chunkCreator = new ClientChunkCreator(mc, this);
-        this.worldChunkHandler = new ClientWorldChunkHandler(chunkCreator, this, mc.blockRendererRegistry);
+        this.worldChunkHandler = new ClientWorldChunkHandler();
         this.chunkLoader = new ClientChunkLoader(this, mc);
-        this.chunkMeshRebuilder = new ChunkMeshRebuilder(this, mc.blockRendererRegistry);
-        this.setParticleEngine(new ParticleEngine(mc));
+        this.chunkMeshRebuilder = new ChunkMeshRebuilder(mc.thePlayer, mc.blockRendererRegistry);
+        this.particleEngine = new ParticleEngine(mc);
         this.viewer = viewer;
         this.modifyChunkLoadingDistance(mc.gameSettings.videoSettings.determineChunkLoadingDistance());
     }
@@ -69,7 +70,6 @@ public class ClientWorld extends WorldBase implements OpenGLOperation {
     @Override
     @NeedsOpenGLContext
     public void onOpenGLContext(float partialTicks) {
-        ((ClientWorldChunkHandler) this.worldChunkHandler).getChunkMeshRebuilder().onOpenGLContext(partialTicks);
         this.getParticleEngine().onOpenGLContext(partialTicks);
         this.worldRenderer.onOpenGLContext(partialTicks);
     }
@@ -94,7 +94,6 @@ public class ClientWorld extends WorldBase implements OpenGLOperation {
     @NeedsOpenGLContext
     public void render(float partialTicks) {
         this.worldRenderer.render(partialTicks);
-        this.chunkMeshRebuilder.onOpenGLContext(partialTicks); // TODO: REMOVE
     }
 
     @Override
@@ -102,31 +101,31 @@ public class ClientWorld extends WorldBase implements OpenGLOperation {
         super.tick(partialTicks);
     }
 
-//    /**
-//     * ForkJoin for chunk ticking
-//     */
-//    @NotNull
-//    private ForkJoinPool chunkTickPool = new ForkJoinPool(
-//            Runtime.getRuntime().availableProcessors(),
-//            pool -> {
-//                final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
-//                worker.setName("ChunkTickPoolWorker-" + worker.getPoolIndex());
-//                return worker;
-//            },
-//            (t, e) -> mc.getLogger().crash(new CrashReport("ChunkWorker " + t.getName() + " crashed with", e)),
-//            false
-//    );
+    // TODO: REPLACE OTHER EXECUTOR SERVICES WITH ForkJoinPools
+    /**
+     * ForkJoin for chunk ticking
+     */
+    @NotNull
+    private ForkJoinPool chunkTickPool = new ForkJoinPool(
+            Runtime.getRuntime().availableProcessors(),
+            pool -> {
+                final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+                worker.setName("ChunkTickPoolWorker-" + worker.getPoolIndex());
+                worker.setDaemon(true);
+                return worker;
+            },
+            (t, e) -> mc.getLogger().crash(new CrashReport("ChunkWorker " + t.getName() + " crashed with", e)),
+            false
+    );
 
     @Override
     protected void tickChunks(float partialTicks, @NotNull Collection<ChunkBase> chunks) {
-//        try {
-//            this.chunkTickPool.submit(() -> {
-//                Stream<ChunkBase> stream = chunks.parallelStream();
-//                stream.forEach(c -> c.tick(partialTicks));
-//            }).get();
-//        } catch (InterruptedException | ExecutionException e) {
-//            e.printStackTrace();
-//        }
+//        this.chunkTickPool.submit(() -> {
+//            Stream<ChunkBase> stream = chunks.parallelStream();
+//            stream.forEach(c -> c.tick(partialTicks));
+//        }).join();
+
+        // FIXME: 5/11/2020 ONLY TEMPORARY TO FIX CHUNK MESH BUILDING BUG
         for (ChunkBase chunk : chunks) {
             chunk.tick(partialTicks);
         }
@@ -193,8 +192,20 @@ public class ClientWorld extends WorldBase implements OpenGLOperation {
 
     @Nullable
     @Override
-    public ClientChunk getChunkFor(@NotNull Entity entity) {
-        return (ClientChunk) super.getChunkFor(entity);
+    public ClientChunk getNearChunkFor(@NotNull ChunkBase chunk, @NotNull Entity entity) {
+        return (ClientChunk) super.getNearChunkFor(chunk, entity);
+    }
+
+    @Override
+    @Nullable
+    public ClientChunk getNearChunkFor(@NotNull ChunkBase chunk, int x, int z) {
+        return (ClientChunk) super.getNearChunkFor(chunk, x, z);
+    }
+
+    @Nullable
+    @Override
+    public ClientChunk getAbsoluteChunkFor(@NotNull Entity entity) {
+        return (ClientChunk) super.getAbsoluteChunkFor(entity);
     }
 
     @Nullable
@@ -233,14 +244,14 @@ public class ClientWorld extends WorldBase implements OpenGLOperation {
     /**
      * Object used for spawning particle structures into the world.
      */
+    @NotNull
     public ParticleEngine getParticleEngine() {
         return particleEngine;
     }
 
-    public void setParticleEngine(ParticleEngine particleEngine) {
-        this.particleEngine = particleEngine;
-    }
-
-    public interface OnClientChunkCreationListener extends OnChunkCreationListener {
+    @NotNull
+    @Override
+    public ClientBlockStateSemaphore getBlockStateSemaphore() {
+        return (ClientBlockStateSemaphore) super.getBlockStateSemaphore();
     }
 }

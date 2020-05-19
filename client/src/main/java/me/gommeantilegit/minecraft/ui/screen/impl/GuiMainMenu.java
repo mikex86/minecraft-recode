@@ -218,7 +218,7 @@ public class GuiMainMenu extends GuiScreen {
             if (stoneBlockMesh == null) {
                 OptimizedMeshBuilder meshBuilder = new OptimizedMeshBuilder();
                 meshBuilder.begin(STD_VERTEX_ATTRIBUTES, GL_TRIANGLES);
-                Objects.requireNonNull(mc.blockRendererRegistry.getRenderer(mc.getBlocks().stone)).render(meshBuilder, 0, 0, 0, null, null, mc.getBlocks().stone.getDefaultBlockState(), true);
+                Objects.requireNonNull(mc.blockRendererRegistry.getRenderer(mc.getBlocks().stone)).render(meshBuilder, 0, 0, 0, null, mc.getBlocks().stone.getDefaultBlockState());
                 stoneBlockMesh = meshBuilder.end();
             }
 

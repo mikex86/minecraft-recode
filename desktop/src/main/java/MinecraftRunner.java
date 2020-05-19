@@ -1,8 +1,9 @@
-import com.badlogic.gdx.*;
+import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Files;
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Window;
-import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.utils.Array;
 import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.ClientMinecraft;
@@ -11,7 +12,6 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -44,6 +44,7 @@ public class MinecraftRunner {
                 new MinecraftApp(config);
             }
         };
+        openGLThread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
         openGLThread.setPriority(Thread.MAX_PRIORITY);
         openGLThread.start();
     }
@@ -61,7 +62,10 @@ public class MinecraftRunner {
                         Field windowsField = Lwjgl3Application.class.getDeclaredField("windows");
                         windowsField.setAccessible(true);
                         Array<Lwjgl3Window> windows = (Array<Lwjgl3Window>) windowsField.get(app);
-                        WINDOWS.addAll(Arrays.stream(windows.items).filter(Objects::nonNull).collect(Collectors.toList()));
+//                        WINDOWS.addAll(Arrays.stream(windows.items).filter(Objects::nonNull).collect(Collectors.toList()));
+                        for (int i = 0; i < windows.size; i++) {
+                            WINDOWS.add(windows.get(i));
+                        }
                     } catch (NoSuchFieldException | IllegalAccessException e) {
                         e.printStackTrace();
                     }

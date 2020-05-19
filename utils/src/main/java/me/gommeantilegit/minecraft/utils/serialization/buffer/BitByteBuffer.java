@@ -3,7 +3,6 @@ package me.gommeantilegit.minecraft.utils.serialization.buffer;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import io.netty.buffer.ByteBuf;
-import me.gommeantilegit.minecraft.util.block.position.BlockPos;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.BufferOverflowException;
@@ -274,27 +273,6 @@ public class BitByteBuffer {
         int ch3 = readByte() & 0xFF;
         int ch4 = readByte() & 0xFF;
         return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4));
-    }
-
-    /**
-     * Writes the given block pos to the buffer
-     *
-     * @param blockPos the block pos to be written
-     */
-    public void writeBlockPos(@NotNull BlockPos blockPos) {
-        this.writeInt(blockPos.getX());
-        this.writeInt(blockPos.getY());
-        this.writeInt(blockPos.getZ());
-    }
-
-    /**
-     * Reads 3 integer values to be returned as a blockPos
-     *
-     * @return the block pos read
-     */
-    @NotNull
-    public BlockPos readBlockPos() {
-        return new BlockPos(readInt(), readInt(), readInt());
     }
 
     /**

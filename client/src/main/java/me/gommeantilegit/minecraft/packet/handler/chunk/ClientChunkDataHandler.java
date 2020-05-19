@@ -6,10 +6,16 @@ import me.gommeantilegit.minecraft.packet.handler.NetHandlerPlayClient;
 import me.gommeantilegit.minecraft.packet.handler.PacketHandler;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadConfirmPacket;
 import me.gommeantilegit.minecraft.packet.packets.server.ServerChunkDataPacket;
+import me.gommeantilegit.minecraft.world.change.ClientBlockStateSemaphore;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
+import me.gommeantilegit.minecraft.world.chunk.ChunkSection;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
+import me.gommeantilegit.minecraft.world.chunk.change.BlockStateSemaphoreBase;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 import static me.gommeantilegit.minecraft.utils.io.IOUtils.decompress;
 
@@ -30,18 +36,19 @@ public class ClientChunkDataHandler extends PacketHandler<ServerChunkDataPacket>
         ClientChunk chunk = netHandlerPlayClient.mc.theWorld.getChunkAtOrigin((int) origin.x, (int) origin.y);
         if (chunk != null) {
             assert chunk.getHeight() == packet.getWorldHeight();
-            assert chunk.getChunkSections().size() == packet.getChunkSectionsSent().length;
-            CompletableFuture.runAsync(() -> {
-                try {
-                    chunk.setChunkData(decompress(packet.getChunkData()), packet.getChunkSectionsSent());
-//                    chunk.getChunkSections().forEach(s -> ((ClientChunkSection) s).deleteMesh());
-                    chunk.setDataReceived();
-                    chunk.load();
+            if (!chunk.isLoaded()) {
+                return;
+            }
+            BlockStateSemaphoreBase semaphoreBase = netHandlerPlayClient.mc.theWorld.getBlockStateSemaphore();
+
+            try {
+                semaphoreBase.writeSynchronized(chunk, () -> {
+                    chunk.setChunkData(decompress(packet.getChunkData()), packet.getFragmentsSent());
                     context.channel().writeAndFlush(new ClientChunkLoadConfirmPacket(null, origin));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 }

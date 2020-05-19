@@ -1,6 +1,5 @@
 package me.gommeantilegit.minecraft.rendering.mesh;
 
-import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.utils.async.AsyncExecutor;
 import me.gommeantilegit.minecraft.utils.async.AsyncResult;
@@ -15,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
  * To build the mesh call {@link #setupMeshAsync(Invokable)}} ()}
  * To finish the MeshBuilder into a mesh ready to be rendered call {@link #finishMesh()} on the OpenGL Context
  */
+//TODO: REMOVE
 public interface MeshBuilding {
 
     @NotNull

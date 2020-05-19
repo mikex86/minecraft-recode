@@ -1,11 +1,9 @@
 package me.gommeantilegit.minecraft.utils.async;
 
-import com.sun.jmx.snmp.ThreadContext;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingDeque;
 
 /**

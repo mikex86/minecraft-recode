@@ -1,12 +1,13 @@
 package me.gommeantilegit.minecraft.world.chunk;
 
 import com.badlogic.gdx.Gdx;
-import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.annotations.ThreadSafe;
-import me.gommeantilegit.minecraft.block.state.BlockState;
+import me.gommeantilegit.minecraft.annotations.Unsafe;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
+import me.gommeantilegit.minecraft.block.state.palette.IBlockStatePalette;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
+import me.gommeantilegit.minecraft.rendering.GLContext;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.world.ClientWorld;
 import me.gommeantilegit.minecraft.world.chunk.builder.ChunkMeshRebuilder;
@@ -14,21 +15,18 @@ import me.gommeantilegit.minecraft.world.renderer.WorldRenderer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 
-import static com.badlogic.gdx.graphics.GL20.*;
+import static com.badlogic.gdx.graphics.GL20.GL_CULL_FACE;
+import static com.badlogic.gdx.graphics.GL20.GL_FRONT;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
 public class ClientChunk extends ChunkBase {
 
     /**
-     * State whether the server has sent the initial data for the given chunk
+     * State whether the chunk has received any block storage data.
      */
-    public boolean dataReceived = false;
+    private boolean dataReceived = false;
 
     /**
      * The chunk rebuilder used to build chunk section meshes
@@ -38,17 +36,9 @@ public class ClientChunk extends ChunkBase {
 
     /**
      * Stores the sections of the chunk that are renderable.
-     * Null, if the chunk is not baked.
+     * Null, if the chunk is not baked. The elements are never null. Fuck you Jetbrains annotations. See bug https://youtrack.jetbrains.com/issue/IDEA-176629
      */
-    @Nullable
     private ClientChunkSection[] renderableSections = null;
-
-    /**
-     * State of the chunk being baked.
-     *
-     * @see #renderableSections
-     */
-    private boolean baked = false;
 
     /**
      * Default constructor of a ChunkBase object
@@ -58,17 +48,61 @@ public class ClientChunk extends ChunkBase {
      * @param z                  startZ position where the region managed by the chunk starts
      * @param world              the parent world
      * @param chunkMeshRebuilder the chunk mesh rebuilder used to build chunk section meshes
+     * @param blockStatePalette  the block state palette used to store the chunk
      */
-    public ClientChunk(int height, int x, int z, @NotNull ClientWorld world, @NotNull ChunkMeshRebuilder chunkMeshRebuilder) {
-        super(height, x, z, world, new ArrayList<>(height / CHUNK_SECTION_SIZE));
+    public ClientChunk(int height, int x, int z, @NotNull ClientWorld world, @NotNull ChunkMeshRebuilder chunkMeshRebuilder, @NotNull IBlockStatePalette blockStatePalette) {
+        super(height, x, z, world, new ArrayList<>(height / CHUNK_SECTION_SIZE), blockStatePalette);
         this.chunkMeshRebuilder = chunkMeshRebuilder;
         this.initChunkSections(); // accesses #chunkMeshRebuilder
     }
 
     @Override
     protected void changeBlock(int x, int y, int z, @Nullable IBlockState blockState) {
-        super.changeBlock(x, y, z, blockState);
+        {
+            super.changeBlock(x, y, z, blockState);
+        }
         rebuildFor(x, y, z);
+    }
+
+    @Unsafe
+    @Override
+    public void setChunkData(@NotNull byte[] bytes, @NotNull BitSet chunkFragmentsSent) {
+        super.setChunkData(bytes, chunkFragmentsSent);
+        this.setDataReceived();
+        this.scheduleChunkMeshTasks(true);
+    }
+
+    /**
+     * Schedules the rebuild tasks that arise from a chunk block state change.
+     * (Rebuilds neighboring chunks, if this chunk is now the final needed neighbor to build it etc.)
+     */
+    public void scheduleChunkMeshTasks(boolean descent) {
+        // asserts this chunk is locked
+        // Make sure all neighbor chunks exist
+        ChunkBase[] neighbors = this.getAllNeighbors();
+
+        boolean shouldBuild = true;
+        for (ChunkBase chunk : neighbors) {
+            ClientChunk neighbor = (ClientChunk) chunk;
+            if (neighbor == null || !neighbor.isLoaded() || !neighbor.hasReceivedData()) {
+                shouldBuild = false;
+                break;
+            }
+        }
+        if (shouldBuild) {
+            for (ChunkSection section : this.getChunkSections()) {
+                ClientChunkSection clientChunkSection = (ClientChunkSection) section;
+                clientChunkSection.scheduleRebuild();
+            }
+        }
+        // check for mesh build on chunks which set of complete neighbors is not becoming complete
+        if (descent) {
+            for (ChunkBase chunk : neighbors) {
+                if (chunk == null)
+                    continue;
+                ((ClientChunk) chunk).scheduleChunkMeshTasks(false);
+            }
+        }
     }
 
     @Override
@@ -82,8 +116,15 @@ public class ClientChunk extends ChunkBase {
         return new ClientChunkSection(this, startHeight, chunkMeshRebuilder);
     }
 
+    @Override
+    @Nullable
+    public ClientChunk getNeighbor(int neighborIndex) {
+        return (ClientChunk) super.getNeighbor(neighborIndex);
+    }
+
     @NotNull
-    protected ClientChunkSection getChunkSection(int y) {
+    @Unsafe
+    public ClientChunkSection getChunkSection(int y) {
         return (ClientChunkSection) super.getChunkSection(y);
     }
 
@@ -109,21 +150,11 @@ public class ClientChunk extends ChunkBase {
         shader.translate(x, 0, z);
 
         int drawCalls = 0;
-        if (this.baked) {
-            ClientChunkSection[] renderableSections = getRenderableSections();
+        List<ChunkSection> renderableSections = getChunkSections();
 
-            for (ClientChunkSection chunkSection : renderableSections) {
-                if (worldRenderer.isChunkInCameraFrustum(chunkSection)) {
-                    drawCalls += chunkSection.render(shader);
-                }
-            }
-        } else {
-            List<ChunkSection> renderableSections = getChunkSections();
-
-            for (ChunkSection chunkSection : renderableSections) {
-                if (worldRenderer.isChunkInCameraFrustum(chunkSection)) {
-                    drawCalls += ((ClientChunkSection) chunkSection).render(shader);
-                }
+        for (ChunkSection chunkSection : renderableSections) {
+            if (worldRenderer.isChunkInCameraFrustum(chunkSection)) {
+                drawCalls += ((ClientChunkSection) chunkSection).render(shader);
             }
         }
         shader.popMatrix();
@@ -142,46 +173,18 @@ public class ClientChunk extends ChunkBase {
      */
     public void rebuildFor(int x, int y, int z) {
         ClientChunkSection section = getChunkSection(y);
-        section.rebuildFor((ClientMinecraft) mc, true, x, y, z); // auto bakes the chunk
+        section.rebuildFor(x, y, z); // auto bakes the chunk
     }
 
     /**
      * Rebuilds the chunk mesh
      */
     public void rebuild() {
-        //TODO: CHUNK ENTITY TRANSFER AND CHUNK REBUILDING ARE SOURCES OF LAG
-        int nSections = this.getChunkSections().size();
-        AtomicInteger sectionCounter = new AtomicInteger(0);
         for (ChunkSection chunkSection : this.getChunkSections()) {
             if (chunkSection instanceof ClientChunkSection) {
-                ((ClientChunkSection) chunkSection).setNeedsRebuild(true, true, () -> {
-                    if (sectionCounter.incrementAndGet() >= nSections) {
-                        ((ClientMinecraft) mc).runOnGLContext(new FutureTask<Void>(() -> {
-                            this.bake();
-                            return null;
-                        }));
-                    }
-                });
+                ((ClientChunkSection) chunkSection).scheduleRebuild();
             }
         }
-    }
-
-    /**
-     * Bakes the chunk changes
-     */
-    public void bake() {
-        List<ChunkSection> sections = this.getChunkSections();
-        List<ClientChunkSection> toRender = new ArrayList<>();
-        for (ChunkSection chunkSection : sections) {
-            if (!(chunkSection instanceof ClientChunkSection)) {
-                throw new IllegalStateException();
-            }
-            if (((ClientChunkSection) chunkSection).shouldHaveMesh()) {
-                toRender.add((ClientChunkSection) chunkSection);
-            }
-        }
-        this.renderableSections = toRender.toArray(new ClientChunkSection[0]);
-        this.baked = true;
     }
 
     /**
@@ -206,13 +209,39 @@ public class ClientChunk extends ChunkBase {
     @Override
     @ThreadSafe
     public void load() {
-        super.load();
+        {
+            super.load();
+        }
     }
 
-    @ThreadSafe
+    @Override
+    public void unload() {
+        {
+            {
+                this.dataReceived = false;
+            }
+            for (ChunkSection chunkSection : getChunkSections()) {
+                ClientChunkSection section = (ClientChunkSection) chunkSection;
+                getWorld().getChunkMeshRebuilder().cancelRebuildTask(section);
+                GLContext.getGlContext().runOnGLContext(section::deleteMesh);
+            }
+            // canceling build tasks of direct neighbors to prevent mesh corruption
+            for (ChunkBase neighbor : this.getPresentNeighbors()) {
+                for (ChunkSection chunkSection : neighbor.getChunkSections()) {
+                    ClientChunkSection section = (ClientChunkSection) chunkSection;
+                    getWorld().getChunkMeshRebuilder().cancelRebuildTask(section);
+                    GLContext.getGlContext().runOnGLContext(section::deleteMesh);
+                }
+            }
+            super.unload();
+        }
+    }
+
+    @Unsafe
     public void setDataReceived() {
-        this.dataReceived = true;
-        rebuild();
+        {
+            this.dataReceived = true;
+        }
     }
 
     @NotNull
@@ -220,7 +249,10 @@ public class ClientChunk extends ChunkBase {
         return Objects.requireNonNull(renderableSections, "Tried to access renderable chunk sections! Chunk is not baked.");
     }
 
-    public void unbake() {
-        this.baked = false;
+    /**
+     * State whether the server has sent the initial data for the given chunk
+     */
+    public boolean hasReceivedData() {
+        return dataReceived;
     }
 }

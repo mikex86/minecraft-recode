@@ -58,6 +58,7 @@ public class AxisAlignedBB {
         return new AxisAlignedBB(_x0, _y0, _z0, _x1, _y1, _z1);
     }
 
+    @NotNull
     public AxisAlignedBB grow(float xa, float ya, float za) {
         float _x0 = this.x0 - xa;
         float _y0 = this.y0 - ya;
@@ -68,11 +69,12 @@ public class AxisAlignedBB {
         return new AxisAlignedBB(_x0, _y0, _z0, _x1, _y1, _z1);
     }
 
+    @NotNull
     public AxisAlignedBB cloneMove(float xa, float ya, float za) {
-        return new AxisAlignedBB(this.x0 + za, this.y0 + ya, this.z0 + za, this.x1 + xa, this.y1 + ya, this.z1 + za);
+        return new AxisAlignedBB(this.x0 + xa, this.y0 + ya, this.z0 + za, this.x1 + xa, this.y1 + ya, this.z1 + za);
     }
 
-    public float clipXCollide(AxisAlignedBB c, float xa) {
+    public float clipXCollide(@NotNull AxisAlignedBB c, float xa) {
         float max;
         if (c.y1 <= this.y0 || c.y0 >= this.y1) {
             return xa;

@@ -1,11 +1,18 @@
 package me.gommeantilegit.minecraft.world.chunk.world;
 
-import me.gommeantilegit.minecraft.world.chunk.creator.ChunkCreatorBase;
-import org.jetbrains.annotations.NotNull;
+import me.gommeantilegit.minecraft.world.chunk.ServerChunk;
+import org.jetbrains.annotations.Nullable;
 
 public class ServerWorldChunkHandler extends WorldChunkHandlerBase {
 
-    public ServerWorldChunkHandler(@NotNull ChunkCreatorBase creatorBase) {
+    public ServerWorldChunkHandler() {
         super();
     }
+
+    @Nullable
+    @Override
+    public ServerChunk getChunkAt(int originX, int originZ) {
+        return (ServerChunk) super.getChunkAt(originX, originZ);
+    }
+
 }

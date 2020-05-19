@@ -1,6 +1,7 @@
 package me.gommeantilegit.minecraft.utils.bitarray;
 
 import me.gommeantilegit.minecraft.utils.MathHelper;
+import me.gommeantilegit.minecraft.utils.memory.HeapMemory;
 import me.gommeantilegit.minecraft.utils.memory.IMemory;
 import me.gommeantilegit.minecraft.utils.memory.NativeMemory;
 import org.jetbrains.annotations.NotNull;
@@ -39,18 +40,56 @@ public class BitArray {
     private final int byteSize;
 
     /**
-     * @param numElements the number of nibbles the nibble array should be able to store. Must be positive and event
-     * @throws IllegalStateException if #size is not positive or not even
+     * @param numElements the number of elements the array should be able to store. Must be positive and event
+     * @param bits        the number of bits each element of the array uses
+     * @throws IllegalStateException if #size is not positive or not even or if bits is less than 4
      */
     public BitArray(int numElements, int bits) {
         if (numElements <= 0 || numElements % 2 == 1) {
             throw new IllegalArgumentException("NibbleArray must be supplied with a positive, even size");
+        }
+        if (bits < 4) {
+            throw new IllegalStateException("Elements bits must be greater or equal to 4");
         }
         this.byteSize = MathHelper.iceil(bits * numElements, Byte.SIZE);
         this.memory = new NativeMemory(byteSize, true);
         this.numElements = numElements;
         this.elementMaxValue = (1L << bits) - 1L;
         this.bits = bits;
+    }
+
+    /**
+     * @param bytes the bytes to be used as the backing bytes to be interpreted as an array of bits size of #bits
+     * @param bits  the number of bits each element of the array uses or if bits is less than 4
+     */
+    public BitArray(byte[] bytes, int bits) {
+        int numElements = bytes.length / bits;
+        if (numElements <= 0 || numElements % 2 == 1) {
+            throw new IllegalArgumentException("NibbleArray must be supplied with a positive, even size");
+        }
+        if (bits < 4) {
+            throw new IllegalStateException("Elements bits must be greater or equal to 4");
+        }
+        this.byteSize = bytes.length;
+        this.memory = new NativeMemory(byteSize, false);
+        this.memory.set(bytes);
+        this.numElements = numElements;
+        this.bits = bits;
+        this.elementMaxValue = (1L << bits) - 1L;
+    }
+
+    private BitArray(@NotNull IMemory memory, int numElements, int bits) {
+        if (numElements <= 0 || numElements % 2 == 1) {
+            throw new IllegalArgumentException("NibbleArray must be supplied with a positive, even size");
+        }
+        if (bits < 4) {
+            throw new IllegalStateException("Elements bits must be greater or equal to 4");
+        }
+        this.byteSize = MathHelper.iceil(numElements * bits, Byte.SIZE);
+        this.memory = memory;
+        this.numElements = numElements;
+        this.bits = bits;
+        this.elementMaxValue = (1L << bits) - 1L;
     }
 
     /**
@@ -149,5 +188,18 @@ public class BitArray {
         ByteBuffer buffer = ByteBuffer.wrap(array);
         this.memory.dump(buffer);
         return array;
+    }
+
+    public int getNumElements() {
+        return numElements;
+    }
+
+    public int getBits() {
+        return bits;
+    }
+
+    @NotNull
+    public BitArray copy() {
+        return new BitArray(this.memory.copy(), this.numElements, this.bits);
     }
 }

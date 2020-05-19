@@ -1,6 +1,9 @@
 package me.gommeantilegit.minecraft.timer;
 
 import me.gommeantilegit.minecraft.timer.api.Tickable;
+import me.gommeantilegit.minecraft.utils.data.DataCollector;
+import me.gommeantilegit.minecraft.utils.stream.streamer.impl.FloatDataStreamer;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Object for timing the minecraft tick
@@ -11,6 +14,8 @@ public class Timer implements Tickable {
      * Ticks per second / TPS rate (eg. 20TPS = invoking game tick 20 times per seconds)
      */
     private final float ticksPerSecond;
+
+
     private long lastTime;
 
     /**
@@ -22,6 +27,7 @@ public class Timer implements Tickable {
      * Amount of ticks already performed
      */
     public long performedTicks;
+
     /**
      * Relative time between ticks
      */
@@ -44,7 +50,7 @@ public class Timer implements Tickable {
     private int secondTicks = 0;
 
     /**
-     * MS resolution timestamp to compiute {@link #currentTicksPerSecond}
+     * MS resolution timestamp to compute {@link #currentTicksPerSecond}
      */
     private long secondTimer = System.currentTimeMillis();
 
@@ -58,6 +64,12 @@ public class Timer implements Tickable {
      * as they are performed
      */
     private float ticksLeft = 0.0f;
+
+    /**
+     * Collects tps data
+     */
+    @NotNull
+    private final DataCollector<Float> tpsDataCollector = new DataCollector<>(new FloatDataStreamer());
 
     public Timer(float ticksPerSecond) {
         this.ticksPerSecond = ticksPerSecond;
@@ -84,15 +96,16 @@ public class Timer implements Tickable {
     }
 
     public void tick(float partialTicks) {
-        performedTicks++;
-        secondTicks++;
+        this.performedTicks++;
+        this.secondTicks++;
         long now = System.currentTimeMillis();
         if (now - secondTimer > 1000) {
             currentTicksPerSecond = secondTicks / ((now - secondTimer) / 1000.0f);
             if (currentTicksPerSecond < ticksPerSecond - 1)
                 System.out.println("TPS dropped to " + currentTicksPerSecond + "!");
-            secondTicks = 0;
-            secondTimer = now;
+            this.secondTicks = 0;
+            this.secondTimer = now;
+            this.tpsDataCollector.collectAsync(getCurrentTicksPerSecond());
         }
     }
 
@@ -102,6 +115,11 @@ public class Timer implements Tickable {
 
     public float getTicksPerSecond() {
         return ticksPerSecond;
+    }
+
+    @NotNull
+    public DataCollector<Float> getTpsDataCollector() {
+        return tpsDataCollector;
     }
 }
 

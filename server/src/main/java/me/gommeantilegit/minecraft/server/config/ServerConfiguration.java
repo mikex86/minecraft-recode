@@ -20,18 +20,55 @@ public class ServerConfiguration {
     private static final int DEFAULT_MAX_RENDER_DISTANCE = 512;
 
     /**
+     * The default web-ui port to use
+     */
+    private static final int DEFAULT_WEB_UI_PORT = 37767;
+
+    /**
+     * The default number of idle ticks the server performs per second
+     */
+    private static final int DEFAULT_IDLE_TICKS = 100;
+
+    /**
      * The file that stores the configuration content
      */
     @NotNull
-    private final File configurationFile = new File("config.json");
+    private static final File configurationFile = new File("config.json");
+
+    /**
+     * The gson instance
+     */
+    @NotNull
+    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
     /**
      * The maximum render distance that a player is allowed to have
      */
     private final int maxChunkLoadingDistance;
 
-    public ServerConfiguration(@NotNull ServerMinecraft mc) throws IOException {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    /**
+     * The webui port
+     */
+    private final int webUIPort;
+
+    /**
+     * The amount of idle ticks per second should be performed to remain at a steady timer tick speed.
+     * Increasing this value will reduce fluctuation of the tps value while most likely increasing cpu usage.
+     */
+    private final int idleTicks;
+
+    public ServerConfiguration(int maxChunkLoadingDistance, int webUIPort, int idleTicks) {
+        this.maxChunkLoadingDistance = maxChunkLoadingDistance;
+        this.webUIPort = webUIPort;
+        this.idleTicks = idleTicks;
+    }
+
+    public ServerConfiguration() {
+        this(DEFAULT_MAX_RENDER_DISTANCE, DEFAULT_WEB_UI_PORT, DEFAULT_IDLE_TICKS);
+    }
+
+    @NotNull
+    public static ServerConfiguration loadServerConfiguration(@NotNull ServerMinecraft mc) throws IOException {
         if (!configurationFile.exists()) {
             try {
                 configurationFile.createNewFile();
@@ -44,8 +81,7 @@ public class ServerConfiguration {
             writer.close();
         }
         try {
-            JsonObject object = gson.fromJson(new BufferedReader(new FileReader(configurationFile)), JsonObject.class);
-            this.maxChunkLoadingDistance = object.get("maxChunkLoadingDistance").getAsInt();
+            return gson.fromJson(new BufferedReader(new FileReader(configurationFile)), ServerConfiguration.class);
         } catch (JsonSyntaxException | ClassCastException | NullPointerException e) {
             mc.getLogger().crash("Your json file is formatted incorrectly! If you cannot fix this problem, delete the config.json file in your server directory", e);
             System.exit(0);
@@ -61,14 +97,20 @@ public class ServerConfiguration {
      * @return the json object of the servers default settings
      */
     @NotNull
-    private JsonObject getDefaultConfigurationSettings() {
-        JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("maxChunkLoadingDistance", DEFAULT_MAX_RENDER_DISTANCE);
-        return jsonObject;
+    private static JsonObject getDefaultConfigurationSettings() {
+        return gson.toJsonTree(new ServerConfiguration()).getAsJsonObject();
     }
 
     @NotNull
     public File getConfigurationFile() {
         return configurationFile;
+    }
+
+    public int getWebUIPort() {
+        return webUIPort;
+    }
+
+    public int getIdleTicks() {
+        return idleTicks;
     }
 }

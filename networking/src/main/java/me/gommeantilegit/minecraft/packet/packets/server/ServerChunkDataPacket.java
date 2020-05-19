@@ -4,6 +4,7 @@ import com.badlogic.gdx.math.Vector2;
 import io.netty.channel.Channel;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
+import me.gommeantilegit.minecraft.block.state.palette.GlobalBlockStatePalette;
 import me.gommeantilegit.minecraft.packet.ServerPacket;
 import me.gommeantilegit.minecraft.packet.annotations.PacketID;
 import me.gommeantilegit.minecraft.packet.annotations.PacketInfo;
@@ -13,11 +14,15 @@ import me.gommeantilegit.minecraft.packet.proc.PacketDecoder;
 import me.gommeantilegit.minecraft.packet.proc.PacketEncoder;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkSection;
+import me.gommeantilegit.minecraft.world.saveformat.ChunkFragmenter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.*;
+import java.util.BitSet;
 import java.util.List;
 
+import static me.gommeantilegit.minecraft.utils.MathHelper.humanReadableByteCount;
 import static me.gommeantilegit.minecraft.utils.io.IOUtils.compress;
 import static me.gommeantilegit.minecraft.world.chunk.ChunkSection.CHUNK_SECTION_SIZE;
 
@@ -44,7 +49,7 @@ public class ServerChunkDataPacket extends ServerPacket {
      * is full air.
      */
     @NotNull
-    private final boolean[] chunkSectionsSent;
+    private final BitSet fragmentsSent;
 
     /**
      * Chunk Origin
@@ -59,39 +64,34 @@ public class ServerChunkDataPacket extends ServerPacket {
     @NotNull
     private final byte[] chunkData;
 
-    /**
-     * @param serverChannel the server channel that sent this packet
-     * @param chunkOrigin   chunk origin position of the chunk
-     * @param chunkBase     the chunk which data should be sent
-     */
+    // TODO: RE-WORK WITH CACHE FOR SERIALIZED DATA (CHANGE ON MARK DIRTY)
     public ServerChunkDataPacket(@Nullable Channel serverChannel, @NotNull Vector2 chunkOrigin, @NotNull ChunkBase chunkBase) {
         super(PACKET_ID, serverChannel);
         this.worldHeight = chunkBase.getHeight();
         this.chunkOrigin = chunkOrigin;
         List<ChunkSection> sections = chunkBase.getChunkSections();
         assert sections.size() == chunkBase.getHeight() / CHUNK_SECTION_SIZE;
-        this.chunkSectionsSent = new boolean[sections.size()];
-        for (int i = 0; i < sections.size(); i++) {
-            chunkSectionsSent[i] = !sections.get(i).isEmpty();
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        try {
+            // FIXME: 5/10/2020 THIS IS UGLY
+            this.fragmentsSent = chunkBase.getWorld().mc.getChunkFragmenter().fragmentChunk(chunkBase.getBlockStatePalette(), chunkBase, stream);
+        } catch (IOException e) {
+            throw new RuntimeException(e); // Will never happen on ByteArrayOutputStream
         }
-        BitByteBuffer buf = new BitByteBuffer();
-        chunkBase.mc.getChunkSerializer().serialize(chunkBase, buf);
-        this.chunkData = compress(buf.retrieveBytes());
+        this.chunkData = compress(stream.toByteArray());
     }
 
-    /**
-     * @param serverChannel     the server channel that sent this packet
-     * @param origin            chunk origin position of the chunk
-     * @param worldHeight       the height of the world and thus of the chunk
-     * @param chunkSectionsSent the states if a given chunk region is sent
-     * @param chunkData         the chunk data that represents the chunk data for the specified chunk
-     */
-    public ServerChunkDataPacket(@Nullable Channel serverChannel, @NotNull Vector2 origin, int worldHeight, boolean[] chunkSectionsSent, @NotNull byte[] chunkData) {
+    public ServerChunkDataPacket(@Nullable Channel serverChannel, @NotNull Vector2 origin, int worldHeight, @NotNull BitSet fragmentsSent, @NotNull byte[] chunkData) {
         super(PACKET_ID, serverChannel);
         this.chunkOrigin = origin;
         this.worldHeight = worldHeight;
-        this.chunkSectionsSent = chunkSectionsSent;
+        this.fragmentsSent = fragmentsSent;
         this.chunkData = chunkData;
+    }
+
+    @NotNull
+    public BitSet getFragmentsSent() {
+        return fragmentsSent;
     }
 
     @NotNull
@@ -108,11 +108,6 @@ public class ServerChunkDataPacket extends ServerPacket {
         return worldHeight;
     }
 
-    @NotNull
-    public boolean[] getChunkSectionsSent() {
-        return chunkSectionsSent;
-    }
-
     @SideOnly(side = Side.SERVER)
     public static class Encoder extends PacketEncoder<ServerChunkDataPacket> {
 
@@ -120,13 +115,13 @@ public class ServerChunkDataPacket extends ServerPacket {
         public void serialize(@NotNull ServerChunkDataPacket packet, @NotNull BitByteBuffer buf) {
             buf.writeInt(packet.worldHeight); // Writing world height
             buf.writeVector2(packet.chunkOrigin); // Writing chunk origin position
-            buf.writeInt(packet.chunkSectionsSent.length);
-            buf.useBits();
-            for (int i = 0; i < packet.chunkSectionsSent.length; i++) {
-                buf.writeBit(packet.chunkSectionsSent[i] ? 1 : 0);
-            }
-            buf.useBytes();
-            buf.writeBytes(packet.getChunkData());
+            byte[] bitSetBytes = packet.fragmentsSent.toByteArray();
+            buf.writeInt(bitSetBytes.length);
+            buf.writeBytes(bitSetBytes);
+            byte[] chunkData = packet.getChunkData();
+            buf.writeInt(chunkData.length);
+            buf.writeBytes(chunkData);
+//            System.out.println("Chunk Data packet: " + humanReadableByteCount(buf.getWritingBitIndex() / Byte.SIZE, true));
         }
 
     }
@@ -144,18 +139,12 @@ public class ServerChunkDataPacket extends ServerPacket {
         public ServerChunkDataPacket deserialize(@NotNull BitByteBuffer buffer, @Nullable Channel channel) throws PacketDecodingException {
             int worldHeight = buffer.readInt();
             Vector2 origin = buffer.readVector2();
-            int chunkSectionsLength = buffer.readInt();
-            assert chunkSectionsLength == worldHeight / CHUNK_SECTION_SIZE;
-            boolean[] chunkSectionsSent = new boolean[chunkSectionsLength];
-            buffer.useBits();
-            for (int i = 0; i < chunkSectionsSent.length; i++) {
-                chunkSectionsSent[i] = buffer.readBit() == 1;
-            }
-            buffer.useBytes();
-            int readIndex = (buffer.getReadingBitIndex() / 8);
-            int maxIndex = buffer.bytes();
-            byte[] chunkData = buffer.readBytes(maxIndex - readIndex);
-            return new ServerChunkDataPacket(channel, origin, worldHeight, chunkSectionsSent, chunkData);
+            int numBitSetBytes = buffer.readInt();
+            byte[] bitSetBytes = buffer.readBytes(numBitSetBytes);
+            BitSet fragmentsSent = BitSet.valueOf(bitSetBytes);
+            int chunkDataLength = buffer.readInt();
+            byte[] chunkData = buffer.readBytes(chunkDataLength);
+            return new ServerChunkDataPacket(channel, origin, worldHeight, fragmentsSent, chunkData);
         }
     }
 }

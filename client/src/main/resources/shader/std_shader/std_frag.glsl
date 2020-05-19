@@ -1,4 +1,4 @@
-#version 320 es
+#version 150
 
 /* Default precisions */
 precision mediump int;

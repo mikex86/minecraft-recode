@@ -3,17 +3,20 @@ package me.gommeantilegit.minecraft.world;
 import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.ServerMinecraft;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
+import me.gommeantilegit.minecraft.block.state.palette.IBlockStatePalette;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.logging.crash.CrashReport;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
+import me.gommeantilegit.minecraft.world.chunk.change.BlockStateSemaphoreBase;
 import me.gommeantilegit.minecraft.world.chunk.creator.ServerChunkCreator;
 import me.gommeantilegit.minecraft.world.chunk.loader.ServerChunkLoader;
 import me.gommeantilegit.minecraft.world.chunk.world.ServerWorldChunkHandler;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
+import me.gommeantilegit.minecraft.world.saveformat.WorldSaver;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.util.Collection;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.stream.Stream;
@@ -36,20 +39,21 @@ public class ServerWorld extends WorldBase {
     private Vector3 spawnPoint = new Vector3(0, 255, 0);
 
     /**
-     * The listener that decides whether terrain generation should be invoked for a specified chunk
+     * Saves the world
      */
     @NotNull
-    private InvokeTerrainGenerationDecider invokeTerrainGenerationDecider = (world, chunk) -> true;
+    private final WorldSaver worldSaver;
 
     /**
      * ForkJoin for chunk ticking
      */
     @NotNull
-    private ForkJoinPool chunkTickPool = new ForkJoinPool(
+    private final ForkJoinPool chunkTickPool = new ForkJoinPool(
             Runtime.getRuntime().availableProcessors(),
             pool -> {
                 final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
                 worker.setName("ChunkTickPoolWorker-" + worker.getPoolIndex());
+                worker.setDaemon(true);
                 return worker;
             },
             (t, e) -> mc.getLogger().crash(new CrashReport("ChunkWorker " + t.getName() + " crashed with", e)),
@@ -60,28 +64,43 @@ public class ServerWorld extends WorldBase {
     /**
      * Default world constructor
      *
-     * @param mc             Minecraft instance
-     * @param worldGenerator world generator for world generation
-     * @param height         block height of the world
+     * @param mc                Minecraft instance
+     * @param worldGenerator    world generator for world generation
+     * @param worldDirectory    the directory to save the minecraft world into
+     * @param height            block height of the world
+     * @param blockStatePalette the block state palette used for block storage
      */
-    public ServerWorld(@NotNull ServerMinecraft mc, @NotNull WorldGenerator worldGenerator, int height) {
-        super(mc, height);
+    public ServerWorld(@NotNull ServerMinecraft mc, @NotNull WorldGenerator worldGenerator, @NotNull File worldDirectory, int height, @NotNull IBlockStatePalette blockStatePalette) {
+        super(mc, height, blockStatePalette, new BlockStateSemaphoreBase());
         this.worldGenerator = worldGenerator;
         this.chunkCreator = new ServerChunkCreator(this);
-        this.worldChunkHandler = new ServerWorldChunkHandler(chunkCreator); // after #chunkCreator
+        this.worldChunkHandler = new ServerWorldChunkHandler(); // after #chunkCreator
         this.chunkLoader = new ServerChunkLoader(this, mc);
+        this.worldSaver = new WorldSaver(this, worldDirectory);
     }
 
     /**
-     * @see #ServerWorld(ServerMinecraft, WorldGenerator, int)
+     * @see #ServerWorld(ServerMinecraft, WorldGenerator, File, int, IBlockStatePalette)
      */
-    public ServerWorld(@NotNull ServerMinecraft serverMinecraft, WorldGenerator worldGenerator) {
-        this(serverMinecraft, worldGenerator, STANDARD_WORLD_HEIGHT);
+    public ServerWorld(@NotNull ServerMinecraft serverMinecraft, @NotNull WorldGenerator worldGenerator, @NotNull File worldDirectory, @NotNull IBlockStatePalette blockStatePalette) {
+        this(serverMinecraft, worldGenerator, worldDirectory, STANDARD_WORLD_HEIGHT, blockStatePalette);
     }
 
     @Override
-    public void spawnEntityInWorld(Entity entity) {
+    public void spawnEntityInWorld(@NotNull Entity entity) {
         super.spawnEntityInWorld(entity);
+    }
+
+    @NotNull
+    @Override
+    public ServerWorldChunkHandler getWorldChunkHandler() {
+        return (ServerWorldChunkHandler) super.getWorldChunkHandler();
+    }
+
+    @NotNull
+    @Override
+    public ServerChunkCreator getChunkCreator() {
+        return (ServerChunkCreator) super.getChunkCreator();
     }
 
     @Override
@@ -91,14 +110,10 @@ public class ServerWorld extends WorldBase {
 
     @Override
     protected void tickChunks(float partialTicks, @NotNull Collection<ChunkBase> chunks) {
-        try {
-            this.chunkTickPool.submit(() -> {
-                Stream<ChunkBase> stream = chunks.parallelStream();
-                stream.forEach(c -> c.tick(partialTicks));
-            }).get();
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
+        this.chunkTickPool.submit(() -> {
+            Stream<ChunkBase> stream = chunks.parallelStream();
+            stream.forEach(c -> c.tick(partialTicks));
+        }).join();
     }
 
     /**
@@ -124,27 +139,12 @@ public class ServerWorld extends WorldBase {
         this.spawnPoint = spawnPoint;
     }
 
-    public interface InvokeTerrainGenerationDecider {
-
-        /**
-         * Method decides whether terrain generation for the given chunk should be invoked or not
-         *
-         * @param world the world
-         * @param chunk the chunk
-         * @return true if terrain generation should be invoked for the chunk
-         */
-        boolean shouldInvokeTerrainGeneration(@NotNull WorldBase world, @NotNull ChunkBase chunk);
+    /**
+     * Saves the world
+     */
+    public void save() {
+        this.worldSaver.saveAllChunks();
     }
-
-    public void setInvokeTerrainGenerationDecider(@NotNull InvokeTerrainGenerationDecider invokeTerrainGenerationDecider) {
-        this.invokeTerrainGenerationDecider = invokeTerrainGenerationDecider;
-    }
-
-    @NotNull
-    public InvokeTerrainGenerationDecider getInvokeTerrainGenerationDecider() {
-        return invokeTerrainGenerationDecider;
-    }
-
 
     @NotNull
     public WorldGenerator getWorldGenerator() {

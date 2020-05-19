@@ -4,6 +4,8 @@ import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.utils.async.SchedulableThread;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.locks.LockSupport;
+
 public class MinecraftThread extends SchedulableThread {
 
     /**
@@ -13,28 +15,35 @@ public class MinecraftThread extends SchedulableThread {
     private final AbstractMinecraft mc;
 
     /**
-     * State whether or not the game ticks should be performed
+     * The amount of idle ticks per second should be performed to remain at a steady timer tick speed.
+     * Increasing this value will reduce fluctuation of the tps value while most likely increasing cpu usage.
      */
-    private boolean enableMinecraftTick = false;
+    private final int idleTicks;
 
     public MinecraftThread(@NotNull AbstractMinecraft mc) {
+        this(mc, 100);
+    }
+
+    public MinecraftThread(@NotNull AbstractMinecraft mc, int idleTicks) {
         super("Minecraft-Thread");
         this.mc = mc;
+        this.idleTicks = idleTicks;
         this.setDaemon(true);
         this.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
+        this.setPriority(Thread.MAX_PRIORITY);
     }
 
     @Override
     public void run() {
         try {
             while (mc.isRunning()) {
-                long start = System.currentTimeMillis();
+                long start = System.nanoTime();
                 onUpdate();
-                long end = System.currentTimeMillis();
-                Thread.sleep(Math.max(0, (long) (1000 / mc.getTimer().getTicksPerSecond()) - (end - start)));
+                long end = System.nanoTime();
+                LockSupport.parkNanos((long) (1_000_000_000 / (mc.getTimer().getTicksPerSecond() + idleTicks)) - (end - start));
             }
-        } catch (InterruptedException e) {
-            onInterrupted();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -47,20 +56,6 @@ public class MinecraftThread extends SchedulableThread {
      */
     public void onUpdate() {
         updateTasks();
-        //Updating timer and ticks
-        if (enableMinecraftTick) {
-            mc.getTimer().advanceTime();
-            for (int i = 0; i < mc.getTimer().ticks; i++) {
-                mc.tick(mc.getTimer().partialTicks);
-                mc.getTimer().tick(mc.getTimer().partialTicks);
-            }
-        }
-    }
-
-    /**
-     * Activates the repeating tick of the game
-     */
-    public void startMinecraftGameLogic() {
-        this.enableMinecraftTick = true;
+        mc.onUpdate();
     }
 }

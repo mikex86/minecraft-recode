@@ -28,6 +28,7 @@ public class AsyncExecutor {
                 new LinkedBlockingQueue<>(), r -> {
             Thread thread = new Thread(r, "AsyncExecutor-Thread");
             thread.setDaemon(true);
+            thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
             return thread;
         });
     }

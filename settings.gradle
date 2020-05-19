@@ -6,4 +6,5 @@ include 'server'
 include 'networking'
 include 'logging'
 include 'utils'
+include 'webui'
 

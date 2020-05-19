@@ -1,19 +1,13 @@
 package me.gommeantilegit.minecraft.block.state.storage;
 
-import me.gommeantilegit.minecraft.block.Blocks;
+import me.gommeantilegit.minecraft.block.access.IWritableBlockStateAccess;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
-import me.gommeantilegit.minecraft.block.state.palette.BlockStatePalette;
+import me.gommeantilegit.minecraft.block.state.palette.IBlockStatePalette;
 import me.gommeantilegit.minecraft.utils.palette.PaletteArray;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
-import java.util.Objects;
-
-public class BlockStateStorage {
-
-    @Nullable
-    private static BlockStatePalette BLOCK_STATE_PALETTE;
+public class BlockStateStorage implements IWritableBlockStateAccess {
 
     /**
      * The size of the store
@@ -26,36 +20,32 @@ public class BlockStateStorage {
     @NotNull
     private final PaletteArray<IBlockState> array;
 
-    /**
-     * Called to initialize {@link #BLOCK_STATE_PALETTE}
-     *
-     * @param blocks the minecraft blocks instance
-     */
-    public static void initPalette(@NotNull Blocks blocks) {
-        BLOCK_STATE_PALETTE = new BlockStatePalette(blocks);
-    }
-
-    public BlockStateStorage(int width, int height, int depth) {
+    public BlockStateStorage(int width, int height, int depth, @NotNull IBlockStatePalette palette) {
         this.width = width;
         this.height = height;
         this.depth = depth;
-        this.array = new PaletteArray<>(width * height * depth, getPalette());
+        this.array = new PaletteArray<>(width * height * depth, palette);
+    }
+
+    public BlockStateStorage(int width, int height, int depth, @NotNull PaletteArray<IBlockState> paletteArray) {
+        this.width = width;
+        this.height = height;
+        this.depth = depth;
+        this.array = paletteArray;
     }
 
     @Nullable
+    @Override
     public IBlockState getBlockState(int x, int y, int z) {
         return this.array.get(index(x, y, z));
     }
 
-    @NotNull
-    private BlockStatePalette getPalette() {
-        return Objects.requireNonNull(BLOCK_STATE_PALETTE, "BlockStatePalette not initialized!");
-    }
-
+    @Override
     public void set(int relX, int relY, int relZ, @Nullable IBlockState blockState) {
         this.array.set(index(relX, relY, relZ), blockState);
     }
 
+    // todo: investigate if this is safe
     private int index(int x, int y, int z) {
         return x + width * (y + depth * z);
     }
@@ -64,17 +54,24 @@ public class BlockStateStorage {
         this.array.clear();
     }
 
-    @NotNull
-    public byte[] apply(@NotNull byte[] chunkData) {
-        //TODO: THIS IS UGLY
+    public void apply(@NotNull byte[] data) {
         int byteSize = this.array.getByteSize();
-        byte[] data = Arrays.copyOfRange(chunkData, 0, byteSize);
+        if (byteSize != data.length)
+            throw new IllegalArgumentException("Cannot apply block storage data of invalid length. Required: " + byteSize + ", Received: " + data.length);
         this.array.setData(data);
-        return Arrays.copyOfRange(chunkData, byteSize, chunkData.length);
     }
 
     @NotNull
     public byte[] getPaletteData() {
         return this.array.getPaletteData();
+    }
+
+    public void delete() {
+        this.array.delete();
+    }
+
+    @NotNull
+    public BlockStateStorage copy() {
+        return new BlockStateStorage(this.width, this.height, this.depth, this.array.copy());
     }
 }

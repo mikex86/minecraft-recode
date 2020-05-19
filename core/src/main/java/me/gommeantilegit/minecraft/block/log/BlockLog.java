@@ -13,8 +13,8 @@ public class BlockLog extends Block {
     @NotNull
     public static final EnumBlockStateProperty<LogFacing> LOG_FACING = new EnumBlockStateProperty<>("facing", LogFacing.class, LogFacing.NONE);
 
-    public BlockLog(@NotNull String name, int id) {
-        super(name, id, Materials.wood);
+    public BlockLog(@NotNull String name) {
+        super(1, 5, name, Materials.wood);
         this.setHardness(2.0f);
     }
 

@@ -4,6 +4,7 @@ import io.netty.channel.Channel;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerMP;
 import me.gommeantilegit.minecraft.packet.ServerPacket;
 import me.gommeantilegit.minecraft.packet.packets.server.ServerForceClientChunkLoadingDistanceChangePacket;
+import me.gommeantilegit.minecraft.utils.Clock;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -29,6 +30,12 @@ public class ChannelData {
      */
     private EntityPlayerMP playerMP;
 
+    /**
+     * Tracks how long the player has been online
+     */
+    @NotNull
+    private Clock onlineTimer = new Clock(false);
+
     public ChannelData(@NotNull Channel parentChannel) {
         this.parentChannel = parentChannel;
     }
@@ -40,6 +47,7 @@ public class ChannelData {
      */
     public void setHasValidSession(boolean state) {
         this.hasValidSession = true;
+        this.onlineTimer.reset();
     }
 
     public void setPlayerMP(@NotNull EntityPlayerMP playerMP) {
@@ -96,5 +104,12 @@ public class ChannelData {
     public void setChunkLoadingDistance(int chunkLoadingDistance) {
         modifyChunkLoadingDistance(chunkLoadingDistance);
         sendPacket(new ServerForceClientChunkLoadingDistanceChangePacket(null, chunkLoadingDistance));
+    }
+
+    /**
+     * @see #onlineTimer
+     */
+    public long getTimeOnline() {
+        return this.onlineTimer.getTimePassed();
     }
 }

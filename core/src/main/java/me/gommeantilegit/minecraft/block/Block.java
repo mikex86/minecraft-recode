@@ -15,8 +15,6 @@ import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
 import me.gommeantilegit.minecraft.raytrace.RayTracer;
 import me.gommeantilegit.minecraft.util.block.facing.EnumFacing;
 import me.gommeantilegit.minecraft.util.block.position.BlockPos;
-import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
-import me.gommeantilegit.minecraft.utils.serialization.exception.DeserializationException;
 import me.gommeantilegit.minecraft.world.WorldBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -26,6 +24,11 @@ import java.util.Collection;
 import java.util.List;
 
 public class Block {
+
+    /**
+     * A unique identifier of the block
+     */
+    private final int id;
 
     /**
      * Universal bounding box min values
@@ -51,10 +54,7 @@ public class Block {
      */
     protected float blockResistance;
 
-    /**
-     * State if the block's texture is transparent.
-     */
-    public boolean transparent = false;
+    private boolean transparent = false;
 
     /**
      * The maximum amount of blockStates which can be stored in one stack.
@@ -68,11 +68,6 @@ public class Block {
      */
     @NotNull
     private final String unlocalizedName;
-
-    /**
-     * ID of Block
-     */
-    private final int id;
 
     /**
      * State if the block can be collided with
@@ -107,9 +102,21 @@ public class Block {
     @NotNull
     private final List<IBlockState> blockStates;
 
-    public Block(@NotNull String unlocalizedName, int id, @NotNull Material blockMaterial) {
-        this.unlocalizedName = unlocalizedName;
+    /**
+     * The initial version that the block appeared in
+     */
+    private final int initialVersion;
+
+    /**
+     * @param firstPaletteVersion  the first block state palette version that the block appeared in
+     * @param id the id of the block
+     * @param unlocalizedName the unlocalized translation string of the block
+     * @param blockMaterial   the material of the block
+     */
+    public Block(int firstPaletteVersion, int id, @NotNull String unlocalizedName, @NotNull Material blockMaterial) {
         this.id = id;
+        this.initialVersion = firstPaletteVersion;
+        this.unlocalizedName = unlocalizedName;
         this.slipperiness = 0.6f;
         this.blockMaterial = blockMaterial;
         this.setShape(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
@@ -151,31 +158,31 @@ public class Block {
                 }
             }
 
-            @Override
-            public void serialize(@NotNull BitByteBuffer buffer) {
-                super.serialize(buffer);
-                for (BlockStateProperty<?> property : properties) {
-                    serializeProperty(buffer, property);
-                }
-            }
-
-            @NotNull
-            @Override
-            public BlockState deserialize(@NotNull BitByteBuffer buffer, @NotNull Blocks blocks) throws DeserializationException {
-                BlockState blockState = super.deserialize(buffer, blocks);
-                for (BlockStateProperty<?> property : properties) {
-                    deserializeProperty(blockState, buffer, property);
-                }
-                return blockState;
-            }
-
-            private <T> void deserializeProperty(@NotNull BlockState blockState, @NotNull BitByteBuffer buffer, @NotNull BlockStateProperty<T> property) {
-                blockState.setValue(property, property.deserialize(buffer));
-            }
-
-            private <T> void serializeProperty(@NotNull BitByteBuffer buffer, @NotNull BlockStateProperty<T> property) {
-                property.serialize(buffer, getPropertyValue(property));
-            }
+//            @Override
+//            public void serialize(@NotNull BitByteBuffer buffer) {
+//                super.serialize(buffer);
+//                for (BlockStateProperty<?> property : properties) {
+//                    serializeProperty(buffer, property);
+//                }
+//            }
+//
+//            @NotNull
+//            @Override
+//            public BlockState deserialize(@NotNull BitByteBuffer buffer, @NotNull Blocks blocks) throws DeserializationException {
+//                BlockState blockState = super.deserialize(buffer, blocks);
+//                for (BlockStateProperty<?> property : properties) {
+//                    deserializeProperty(blockState, buffer, property);
+//                }
+//                return blockState;
+//            }
+//
+//            private <T> void deserializeProperty(@NotNull BlockState blockState, @NotNull BitByteBuffer buffer, @NotNull BlockStateProperty<T> property) {
+//                blockState.setValue(property, property.deserialize(buffer));
+//            }
+//
+//            private <T> void serializeProperty(@NotNull BitByteBuffer buffer, @NotNull BlockStateProperty<T> property) {
+//                property.serialize(buffer, getPropertyValue(property));
+//            }
 
             private <T> void addProperty(@NotNull BlockStatePropertyMap.Builder builder, @NotNull BlockStateProperty<T> property) {
                 builder.withProperty(property, property.getDefaultValue());
@@ -233,7 +240,7 @@ public class Block {
      * @see #transparent
      */
     public void setTransparent() {
-        transparent = true;
+        setTransparent(true);
     }
 
     /**
@@ -303,17 +310,17 @@ public class Block {
             EnumFacing facing = BlockPos.getFacing(intersectionVector, pos);
             return new RayTracer.RayTraceResult(intersectionVector, pos, RayTracer.RayTraceResult.EnumResultType.BLOCK, facing);
         } else {
-            Vector3 vec = start.cpy().add(direction.cpy().scl(range, range, range));
+            // Declaring the vector copies in clearly defined scope to help gc
+            Vector3 startCopy = start.cpy();
+            Vector3 directionCopy = direction.cpy();
+
+            Vector3 vec = startCopy.add(directionCopy.scl(range, range, range));
             return new RayTracer.RayTraceResult(vec, new BlockPos(vec), RayTracer.RayTraceResult.EnumResultType.MISS, null);
         }
     }
 
     public float getSlipperiness() {
         return slipperiness;
-    }
-
-    public int getId() {
-        return id;
     }
 
     @NotNull
@@ -323,6 +330,10 @@ public class Block {
 
     public String getSoundType() {
         return soundType;
+    }
+
+    public int getInitialVersion() {
+        return initialVersion;
     }
 
     private boolean isCollidable() {
@@ -336,5 +347,20 @@ public class Block {
     @NotNull
     public Collection<? extends IBlockState> getPossibleBlockStates() {
         return this.blockStates;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    /**
+     * State if the block's texture is transparent.
+     */
+    public boolean isTransparent() {
+        return transparent;
+    }
+
+    public void setTransparent(boolean transparent) {
+        this.transparent = transparent;
     }
 }

@@ -1,26 +1,26 @@
 package me.gommeantilegit.minecraft;
 
 import com.badlogic.gdx.math.Vector3;
+import me.gommeantilegit.craftingboard.WebUI;
 import me.gommeantilegit.minecraft.block.Blocks;
-import me.gommeantilegit.minecraft.block.state.storage.BlockStateStorage;
+import me.gommeantilegit.minecraft.data.ServerDataProvider;
 import me.gommeantilegit.minecraft.server.config.ServerConfiguration;
 import me.gommeantilegit.minecraft.server.console.ConsoleReader;
 import me.gommeantilegit.minecraft.server.netty.NettyServer;
 import me.gommeantilegit.minecraft.timer.tick.MinecraftThread;
 import me.gommeantilegit.minecraft.utils.Clock;
-import me.gommeantilegit.minecraft.utils.async.AsyncResult;
 import me.gommeantilegit.minecraft.world.ServerWorld;
+import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
 import me.gommeantilegit.minecraft.world.generation.generator.options.WorldGenerationOptions;
+import me.gommeantilegit.minecraft.world.saveformat.ChunkFragmenter;
 import me.gommeantilegit.minecraft.world.saveformat.WorldLoader;
-import me.gommeantilegit.minecraft.world.saveformat.WorldSaver;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
-import java.util.Random;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.zip.ZipOutputStream;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static me.gommeantilegit.minecraft.Side.SERVER;
 
@@ -32,11 +32,11 @@ public class ServerMinecraft extends AbstractMinecraft {
     @NotNull
     private static final String SERVER_WORLD_NAME = "world";
 
-    /**
-     * File extension for world files
-     */
-    @NotNull
-    private static final String WORLD_FILE_EXT = ".lvl";
+//    /**
+//     * File extension for world files
+//     */
+//    @NotNull
+//    private static final String WORLD_FILE_EXT = ".lvl";
 
     /**
      * Server world instance
@@ -63,6 +63,16 @@ public class ServerMinecraft extends AbstractMinecraft {
      */
     @NotNull
     private final File worldsDirectory = new File("./worlds/");
+
+    /**
+     * The web-ui of the minecraft server
+     */
+    private WebUI webUI;
+
+    /**
+     * The thread the minecraft tick is performed on
+     */
+    private MinecraftThread minecraftThread;
 
     public ServerMinecraft() {
         super(SERVER);
@@ -95,9 +105,8 @@ public class ServerMinecraft extends AbstractMinecraft {
     }
 
     @NotNull
-    @Override
     protected MinecraftThread createMinecraftThread() {
-        return new MinecraftThread(this) {
+        return new MinecraftThread(this, configuration.getIdleTicks()) {
 
             /**
              * Timer instance to time world autosaving
@@ -137,7 +146,7 @@ public class ServerMinecraft extends AbstractMinecraft {
 
         // Server properties
         try {
-            this.configuration = new ServerConfiguration(this);
+            this.configuration = ServerConfiguration.loadServerConfiguration(this);
         } catch (IOException e) {
             getLogger().crash("Failed to log server configuration!", e);
         }
@@ -145,32 +154,56 @@ public class ServerMinecraft extends AbstractMinecraft {
         // Blocks init
         this.setBlocks(new Blocks(this));
         this.getBlocks().init();
-        BlockStateStorage.initPalette(this.getBlocks());
+
+        this.chunkFragmenter = new ChunkFragmenter(this);
 
         {
-            File worldFile = new File(this.worldsDirectory, SERVER_WORLD_NAME + WORLD_FILE_EXT);
-            if (!worldFile.exists()) {
+            File worldDir = new File(this.worldsDirectory, SERVER_WORLD_NAME);
+            if (!worldDir.exists()) {
                 this.getLogger().info("Creating world...");
-                WorldGenerator worldGenerator = new WorldGenerator("Glacier".hashCode(), WorldGenerator.WorldType.OVERWORLD, this, new WorldGenerationOptions(false));
-                this.theWorld = new ServerWorld(this, worldGenerator);
-                this.theWorld.setChunkLoadingDistance(configuration.getMaxChunkLoadingDistance() + 16); // Setting chunk loading distance to configuration max + 16 blocks
+                WorldGenerator worldGenerator = new WorldGenerator(this, new WorldGenerationOptions("Glacier".hashCode(), WorldGenerationOptions.WorldType.OVERWORLD, false));
+                this.theWorld = new ServerWorld(this, worldGenerator, worldDir, this.getBlocks().getGlobalPalette());
+                this.theWorld.setChunkLoadingDistance(configuration.getMaxChunkLoadingDistance()); // Setting chunk loading distance to configuration max
                 this.getLogger().info("Preparing spawn area...");
-                this.theWorld.getChunkCreator().generateChunksAroundPosition(new Vector3(0, 0, 0), 16);
-                this.theWorld.defineSpawnPosition();
+                // Prepare spawn area
+                {
+                    ExecutorService generationSwarm = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), r -> {
+                        Thread thread = new Thread(r, "SpawnAreaGeneration-Worker");
+                        thread.setPriority(Thread.NORM_PRIORITY);
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+                    AtomicInteger i = new AtomicInteger();
+                    int maxDistance = ChunkBase.CHUNK_SIZE * 3;
+                    int expectedNumChunks = (maxDistance * 2 * maxDistance * 2) / (ChunkBase.CHUNK_SIZE * ChunkBase.CHUNK_SIZE); // approximation
+                    List<Future<ChunkBase>> futures = this.theWorld.getChunkCreator().generateChunksAroundPositionAsync(generationSwarm, new Vector3(0, 0, 0), maxDistance, created -> {
+                        if (i.get() % 10 == 0) {
+                            float percent = i.get() / (float) expectedNumChunks;
+                            percent = Math.min(percent, 1);
+                            this.getLogger().info("Preparing spawn area: " + (int) (percent * 100) + "%");
+                        }
+                        i.incrementAndGet();
+                    });
+                    for (Future<ChunkBase> future : futures) {
+                        try {
+                            future.get();
+                        } catch (InterruptedException | ExecutionException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    generationSwarm.shutdownNow();
+                    this.theWorld.defineSpawnPosition();
+                }
                 this.getLogger().info("Spawn area prepared");
             } else {
+                this.getLogger().info("Loading world...");
+                WorldLoader worldLoader = new WorldLoader(new File(worldDir, SERVER_WORLD_NAME), this);
                 try {
-                    this.getLogger().info("Loading world...");
-                    WorldLoader worldLoader = new WorldLoader(new File(this.worldsDirectory, SERVER_WORLD_NAME + WORLD_FILE_EXT), this);
-                    try {
-                        this.theWorld = worldLoader.loadWorld();
-                    } catch (Exception e) {
-                        this.getLogger().crash("Loading of world failed. (NBT Reading)", e);
-                    }
-                    this.getLogger().info("World loading complete.");
-                } catch (IOException e) {
-                    this.getLogger().crash("Level file not found!", e);
+                    this.theWorld = worldLoader.loadWorld();
+                } catch (Exception e) {
+                    this.getLogger().crash("Loading of world failed. (NBT Reading)", e);
                 }
+                this.getLogger().info("World loading complete.");
             }
         }
 
@@ -178,22 +211,19 @@ public class ServerMinecraft extends AbstractMinecraft {
         this.nettyServer = new NettyServer(STD_PORT, this);
         this.nettyServer.start();
 
+        // Starting the minecraft thread
+        this.minecraftThread = createMinecraftThread();
+        this.minecraftThread.start();
+
         // Console command reader init
         this.consoleReader = new ConsoleReader(this);
         this.consoleReader.start();
 
-        // Starting the minecraft thread
-        this.getMinecraftThread().startMinecraftGameLogic(); // Enabling the game logic before the thread is even started
-        this.getMinecraftThread().start();
+        this.getLogger().info("Starting WebUI...");
+        this.webUI = new WebUI(new ServerDataProvider(this), this.configuration.getWebUIPort()); // starts a thread
+        this.getLogger().info("WebUI started on " + this.webUI.getURL());
 
         this.getLogger().info("Server loaded!");
-
-        try {
-            // Waiting for the minecraft thread to terminate
-            this.getMinecraftThread().join();
-        } catch (InterruptedException e) {
-            getLogger().info("Minecraft Thread interrupted");
-        }
     }
 
     /**
@@ -204,18 +234,7 @@ public class ServerMinecraft extends AbstractMinecraft {
         return CompletableFuture.runAsync(() -> {
             try {
                 getLogger().info("Saving world...");
-                WorldSaver worldSaver = new WorldSaver(theWorld);
-                worldsDirectory.mkdirs();
-                ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-                ZipOutputStream zipOut = new ZipOutputStream(bytesOut);
-                worldSaver.save(zipOut);
-
-                FileOutputStream fileOutputStream = new FileOutputStream(new File(worldsDirectory, SERVER_WORLD_NAME + WORLD_FILE_EXT));
-                fileOutputStream.write(bytesOut.toByteArray());
-                fileOutputStream.close();
-
-                getLogger().info("Invoking Garbage collection after saving world...");
-                System.gc();
+                this.theWorld.save();
                 getLogger().info("Saved world!");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -252,14 +271,19 @@ public class ServerMinecraft extends AbstractMinecraft {
         } catch (Throwable e) {
             this.getLogger().exceptionFatal("Unexpected Throwable caught", e);
         }
-        this.getMinecraftThread().interrupt();
+        this.minecraftThread.interrupt();
         this.nettyServer.interrupt();
         this.consoleReader.interrupt();
     }
 
     @Override
     public boolean isRunning() {
-        return this.getMinecraftThread().getState() == Thread.State.NEW || this.getMinecraftThread().isAlive();
+        return this.minecraftThread != null && this.minecraftThread.getState() == Thread.State.NEW || (this.minecraftThread != null && this.minecraftThread.isAlive());
+    }
+
+    @Override
+    public boolean isCallingFromMinecraftThread() {
+        return Thread.currentThread() == this.minecraftThread;
     }
 
     @Override
@@ -269,5 +293,10 @@ public class ServerMinecraft extends AbstractMinecraft {
 
     public boolean isShutdownPlanned() {
         return this.getLogger().isShutdownPlanned();
+    }
+
+    @NotNull
+    public MinecraftThread getMinecraftThread() {
+        return minecraftThread;
     }
 }

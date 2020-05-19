@@ -99,7 +99,7 @@ public class MathHelper {
      * @return the number of bits needed to represent the given value
      */
     public static int getNeededBits(long value) {
-        int count = 1;
+        int count = 0;
         while (value > 0) {
             count++;
             value = value >> 1;
@@ -110,4 +110,10 @@ public class MathHelper {
     public static int iceil(int x, int y) {
         return x / y + ((x % y > 0) ? 1 : 0);
     }
+
+    public static int nearestInt(double value) {
+        int i = (int) value;
+        return value < (double) i ? i - 1 : i;
+    }
+
 }

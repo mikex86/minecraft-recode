@@ -4,26 +4,18 @@ import com.badlogic.gdx.math.Vector3;
 import me.gommeantilegit.minecraft.ServerMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.nbt.NBTStreamReader;
-import me.gommeantilegit.minecraft.nbt.impl.NBTArray;
-import me.gommeantilegit.minecraft.nbt.impl.NBTFloat;
-import me.gommeantilegit.minecraft.packet.exception.PacketDecodingException;
-import me.gommeantilegit.minecraft.packet.packets.server.ServerChunkDataPacket;
+import me.gommeantilegit.minecraft.gmcdata.GMC;
+import me.gommeantilegit.minecraft.gmcdata.SerializedProperty;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec2i;
-import me.gommeantilegit.minecraft.utils.collections.LongHashMap;
-import me.gommeantilegit.minecraft.utils.io.IOUtils;
-import me.gommeantilegit.minecraft.utils.serialization.buffer.BitByteBuffer;
 import me.gommeantilegit.minecraft.world.ServerWorld;
 import me.gommeantilegit.minecraft.world.WorldBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.generation.generator.WorldGenerator;
+import me.gommeantilegit.minecraft.world.generation.generator.options.WorldGenerationOptions;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-
-import static me.gommeantilegit.minecraft.utils.io.IOUtils.decompress;
+import java.util.BitSet;
 
 @SideOnly(side = Side.SERVER)
 public class WorldLoader {
@@ -32,88 +24,97 @@ public class WorldLoader {
     private final ServerMinecraft mc;
 
     /**
-     * NBT array representing the {@link WorldGenerator} instance of the world
+     * The world directory containing all the world files (and chunk data)
      */
     @NotNull
-    private final NBTArray worldGeneratorOptions;
+    private final File worldDir;
 
     /**
-     * Stores a hash of the chunk origin and the parent chunk data packet
+     * The file containing the serialized {@link WorldGenerationOptions}
      */
     @NotNull
-    private final LongHashMap<ServerChunkDataPacket> chunkData = new LongHashMap<>();
+    private final File worldGenOptionsFile;
 
     /**
-     * NBT array storing world meta data such as the spawn point
+     * The file containing the serialized {@link WorldOptions}
      */
     @NotNull
-    private final NBTArray worldData;
+    private final File worldOptionsFile;
 
     /**
-     * @param worldFile the world file
-     * @param mc        the Minecraft instance
+     * The directory storing chunks data
      */
-    public WorldLoader(@NotNull File worldFile, @NotNull ServerMinecraft mc) throws IOException {
-        FileInputStream fileInputStream = new FileInputStream(worldFile);
-        ByteArrayOutputStream fileData = new ByteArrayOutputStream();
-        IOUtils.io(fileInputStream, fileData);
-        ZipInputStream zipInputStream = new ZipInputStream(new ByteArrayInputStream(fileData.toByteArray()));
+    @NotNull
+    private final File chunksDirectory;
+
+    @NotNull
+    private final GMC gmc = new GMC();
+
+    /**
+     * @param worldDir the world directory
+     * @param mc       the Minecraft instance
+     */
+    public WorldLoader(@NotNull File worldDir, @NotNull ServerMinecraft mc) {
         this.mc = mc;
-        ZipEntry currentEntry;
-        ByteArrayOutputStream worldGenerationDataBytes = null, worldDataBytes = null;
-        ServerChunkDataPacket.Decoder decoder = new ServerChunkDataPacket.Decoder();
-        while ((currentEntry = zipInputStream.getNextEntry()) != null) {
-            if (currentEntry.getName().equals("worldData")) {
-                worldDataBytes = new ByteArrayOutputStream();
-                IOUtils.io(zipInputStream, worldDataBytes);
-            } else if (currentEntry.getName().equals("worldGeneratorOptions")) {
-                worldGenerationDataBytes = new ByteArrayOutputStream();
-                IOUtils.io(zipInputStream, worldGenerationDataBytes);
-            } else if (currentEntry.getName().startsWith("chunk_")) {
-                String[] chunkOriginArgs = currentEntry.getName().substring(6).split("_");
-                assert chunkOriginArgs.length == 2;
-                int x = Integer.parseInt(chunkOriginArgs[0]);
-                int z = Integer.parseInt(chunkOriginArgs[1]);
-                long hash = Vec2i.hash64(x, z);
-                ByteArrayOutputStream packetByteOut = new ByteArrayOutputStream();
-                IOUtils.io(zipInputStream, packetByteOut);
-                BitByteBuffer buf = new BitByteBuffer(packetByteOut.toByteArray(), Integer.MAX_VALUE);
-                buf.useBytes();
-                try {
-                    ServerChunkDataPacket packet = decoder.deserialize(buf, null);
-                    chunkData.put(hash, packet);
-                } catch (PacketDecodingException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        assert worldGenerationDataBytes != null;
-        assert worldDataBytes != null;
-        this.worldData = new NBTStreamReader(new DataInputStream(new ByteArrayInputStream(worldDataBytes.toByteArray()))).readObject(NBTArray.class);
-        this.worldGeneratorOptions = new NBTStreamReader(new DataInputStream(new ByteArrayInputStream(worldGenerationDataBytes.toByteArray()))).readObject(NBTArray.class);
+        this.worldDir = worldDir;
+        this.worldGenOptionsFile = new File(worldDir, "world_gen_options.gmc");
+        this.worldOptionsFile = new File(worldDir, "world_options.gmc");
+        this.chunksDirectory = new File(worldDir, "chunks");
     }
 
     /**
      * @return the created world instance
      */
     @NotNull
-    public ServerWorld loadWorld() {
-        ServerWorld world = new ServerWorld(this.mc, WorldGenerator.NBT_CONVERTER.fromNBTData(this.worldGeneratorOptions, this.mc));
-        world.setSpawnPoint(new Vector3(((NBTFloat) this.worldData.getValue()[0]).getValue(), ((NBTFloat) this.worldData.getValue()[1]).getValue(), ((NBTFloat) this.worldData.getValue()[2]).getValue()));
-        world.setInvokeTerrainGenerationDecider(WorldLoader.this::shouldInvokedTerrainGeneration);
-        world.addOnChunkCreationListener(WorldLoader.this::applyBlockStates);
+    public ServerWorld loadWorld() throws IOException {
+        WorldGenerationOptions generationOptions = this.gmc.fromGMC(new BufferedInputStream(new FileInputStream(this.worldGenOptionsFile)), WorldGenerationOptions.class);
+        WorldOptions worldOptions = this.gmc.fromGMC(new BufferedInputStream(new FileInputStream(this.worldOptionsFile)), WorldOptions.class);
+        ServerWorld world = new ServerWorld(this.mc, new WorldGenerator(mc, generationOptions), this.worldDir, worldOptions.getHeight(), this.mc.getBlocks().getGlobalPalette());
+        world.setSpawnPoint(worldOptions.getSpawnPoint());
+        world.addOnChunkCreationListener(WorldLoader.this::onChunkCreation);
         return world;
     }
 
     /**
+     * Called on chunk creation
      * Restores the chunk to it's saved state
      *
      * @param chunk the given chunk
      */
-    private void applyBlockStates(@NotNull ChunkBase chunk) {
-        ServerChunkDataPacket packet = chunkData.get(chunk.getChunkOrigin().hash64());
-        if (packet != null)
-            chunk.setChunkData(decompress(packet.getChunkData()), packet.getChunkSectionsSent());
+    private void onChunkCreation(@NotNull ChunkBase chunk) {
+        ChunkInfo info = getChunkInfo(chunk);
+        BitSet savedFragments = info.getSavedFragments();
+        //TODO: IMPLEMENT SAVING LOGIC
+    }
+
+    @NotNull
+    private ChunkInfo getChunkInfo(@NotNull ChunkBase chunk) {
+        File chunkDirectory = getChunkDirectory(chunk);
+        if (!chunkDirectory.exists())
+            throw new RuntimeException(new FileNotFoundException("Chunk file " + chunkDirectory.getPath() + " not found, after requested to restored it's saved state."));
+        File chunkInfoFile = getChunkInfoFile(chunkDirectory);
+        if (!chunkInfoFile.exists())
+            throw new RuntimeException(new FileNotFoundException("Chunk info file " + chunkInfoFile.getPath() + " not found, after requested to restored it's saved state."));
+        try {
+            return this.gmc.fromGMC(new BufferedInputStream(new FileInputStream(chunkInfoFile)), ChunkInfo.class);
+        } catch (IOException e) {
+            throw new RuntimeException("ChunkInfo file magically disappeared", e);
+        }
+    }
+
+    @NotNull
+    private File getChunkInfoFile(@NotNull File chunkDirectory) {
+        return new File(chunkDirectory, "chunk_info.json");
+    }
+
+    @NotNull
+    private File getChunkDataFile(@NotNull File chunkDirectory) {
+        return new File(chunkDirectory, "block_storage.bsa");
+    }
+
+    @NotNull
+    private File getChunkDirectory(@NotNull ChunkBase chunk) {
+        return new File(this.chunksDirectory, "chunk_" + chunk.getX() + "_" + chunk.getZ());
     }
 
     /**
@@ -122,7 +123,64 @@ public class WorldLoader {
      * @return true if terrain generation should be invoked for the given chunk
      */
     private boolean shouldInvokedTerrainGeneration(@NotNull WorldBase world, @NotNull ChunkBase chunk) {
-        return !world.getWorldChunkHandler().chunkExistsAtOrigin(chunk.getChunkOrigin()); // Asserts that the chunk gets added after terrain generation has finished
+        return !world.getWorldChunkHandler().chunkExistsAtOrigin(chunk.getChunkOrigin());
     }
 
+    public static class WorldOptions {
+
+        @NotNull
+        @SerializedProperty("spawn_point")
+        private final Vector3 spawnPoint;
+
+        @SerializedProperty("world_height")
+        private final int height;
+
+        public WorldOptions(@NotNull Vector3 spawnPoint, int height) {
+            this.spawnPoint = spawnPoint;
+            this.height = height;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        @NotNull
+        public Vector3 getSpawnPoint() {
+            return spawnPoint;
+        }
+    }
+
+    public static class ChunkInfo {
+
+        @NotNull
+        @SerializedProperty("chunk_origin")
+        private final Vec2i origin;
+
+        @SerializedProperty("palette_version")
+        private final int paletteVersion;
+
+        @NotNull
+        @SerializedProperty("saved_fragments")
+        private final BitSet savedFragments;
+
+        public ChunkInfo(@NotNull Vec2i origin, int paletteVersion, @NotNull BitSet savedFragments) {
+            this.origin = origin;
+            this.paletteVersion = paletteVersion;
+            this.savedFragments = savedFragments;
+        }
+
+        @NotNull
+        public Vec2i getOrigin() {
+            return origin;
+        }
+
+        public int getPaletteVersion() {
+            return paletteVersion;
+        }
+
+        @NotNull
+        public BitSet getSavedFragments() {
+            return savedFragments;
+        }
+    }
 }

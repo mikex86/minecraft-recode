@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Craftingboard</title>
+    <link href="lib/mdc/material-components-web.min.css" rel="stylesheet">
+    <script src="lib/mdc/material-components-web.min.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <script src="lib/chartjs/Chart.min.js"></script>
+    <style>
+        @font-face {
+            font-family: Roboto;
+            src: url(fonts/Roboto-Regular.ttf);
+        }
+
+        .online_players_heading {
+            margin-top: 2vh;
+            margin-left: 2vh;
+            font-family: "Roboto", serif;
+        }
+    </style>
+    <script>
+        'use strict';
+
+        window.chartColors = {
+            red: 'rgb(255, 99, 132)',
+            orange: 'rgb(255, 159, 64)',
+            yellow: 'rgb(255, 205, 86)',
+            green: 'rgb(75, 192, 192)',
+            blue: 'rgb(54, 162, 235)',
+            purple: 'rgb(153, 102, 255)',
+            grey: 'rgb(201, 203, 207)'
+        };
+
+        (function (global) {
+            var MONTHS = [
+                'January',
+                'February',
+                'March',
+                'April',
+                'May',
+                'June',
+                'July',
+                'August',
+                'September',
+                'October',
+                'November',
+                'December'
+            ];
+
+            var COLORS = [
+                '#4dc9f6',
+                '#f67019',
+                '#f53794',
+                '#537bc4',
+                '#acc236',
+                '#166a8f',
+                '#00a950',
+                '#58595b',
+                '#8549ba'
+            ];
+
+            var Samples = global.Samples || (global.Samples = {});
+            var Color = Chart.helpers.color;
+
+            Samples.utils = {
+                // Adapted from http://indiegamr.com/generate-repeatable-random-numbers-in-js/
+                srand: function (seed) {
+                    this._seed = seed;
+                },
+
+                rand: function (min, max) {
+                    var seed = this._seed;
+                    min = min === undefined ? 0 : min;
+                    max = max === undefined ? 1 : max;
+                    this._seed = (seed * 9301 + 49297) % 233280;
+                    return min + (this._seed / 233280) * (max - min);
+                },
+
+                numbers: function (config) {
+                    var cfg = config || {};
+                    var min = cfg.min || 0;
+                    var max = cfg.max || 1;
+                    var from = cfg.from || [];
+                    var count = cfg.count || 8;
+                    var decimals = cfg.decimals || 8;
+                    var continuity = cfg.continuity || 1;
+                    var dfactor = Math.pow(10, decimals) || 0;
+                    var data = [];
+                    var i, value;
+
+                    for (i = 0; i < count; ++i) {
+                        value = (from[i] || 0) + this.rand(min, max);
+                        if (this.rand() <= continuity) {
+                            data.push(Math.round(dfactor * value) / dfactor);
+                        } else {
+                            data.push(null);
+                        }
+                    }
+
+                    return data;
+                },
+
+                labels: function (config) {
+                    var cfg = config || {};
+                    var min = cfg.min || 0;
+                    var max = cfg.max || 100;
+                    var count = cfg.count || 8;
+                    var step = (max - min) / count;
+                    var decimals = cfg.decimals || 8;
+                    var dfactor = Math.pow(10, decimals) || 0;
+                    var prefix = cfg.prefix || '';
+                    var values = [];
+                    var i;
+
+                    for (i = min; i < max; i += step) {
+                        values.push(prefix + Math.round(dfactor * i) / dfactor);
+                    }
+
+                    return values;
+                },
+
+                months: function (config) {
+                    var cfg = config || {};
+                    var count = cfg.count || 12;
+                    var section = cfg.section;
+                    var values = [];
+                    var i, value;
+
+                    for (i = 0; i < count; ++i) {
+                        value = MONTHS[Math.ceil(i) % 12];
+                        values.push(value.substring(0, section));
+                    }
+
+                    return values;
+                },
+
+                color: function (index) {
+                    return COLORS[index % COLORS.length];
+                },
+
+                transparentize: function (color, opacity) {
+                    var alpha = opacity === undefined ? 0.5 : 1 - opacity;
+                    return Color(color).alpha(alpha).rgbString();
+                }
+            };
+
+            // DEPRECATED
+            window.randomScalingFactor = function () {
+                return Math.round(Samples.utils.rand(-100, 100));
+            };
+
+            // INITIALIZATION
+
+            Samples.utils.srand(Date.now());
+
+        }(this));
+    </script>
+    <style>
+        canvas {
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+        }
+
+        .chartjs-tooltip {
+            opacity: 1;
+            position: absolute;
+            background: rgba(0, 0, 0, .7);
+            color: white;
+            border-radius: 3px;
+            -webkit-transition: all .1s ease;
+            transition: all .1s ease;
+            pointer-events: none;
+            -webkit-transform: translate(-50%, 0);
+            transform: translate(-50%, 0);
+            padding: 4px;
+        }
+
+        .chartjs-tooltip-key {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+        }
+    </style>
+</head>
+<body>
+<aside class="mdc-drawer mdc-drawer--dismissible">
+    <div class="mdc-drawer__content">
+        <nav class="mdc-list">
+            <a class="mdc-list-item mdc-list-item--activated" href="#" aria-current="page">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">inbox</i>
+                <span class="mdc-list-item__text">Inbox</span>
+            </a>
+            <a class="mdc-list-item" href="#">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">star</i>
+                <span class="mdc-list-item__text">Star</span>
+            </a>
+            <a class="mdc-list-item" href="#">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">send</i>
+                <span class="mdc-list-item__text">Sent Mail</span>
+            </a>
+            <a class="mdc-list-item" href="#">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">drafts</i>
+                <span class="mdc-list-item__text">Drafts</span>
+            </a>
+
+            <hr class="mdc-list-divider">
+            <h6 class="mdc-list-group__subheader">Labels</h6>
+            <a class="mdc-list-item" href="#">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">bookmark</i>
+                <span class="mdc-list-item__text">Family</span>
+            </a>
+            <a class="mdc-list-item" href="#">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">bookmark</i>
+                <span class="mdc-list-item__text">Friends</span>
+            </a>
+            <a class="mdc-list-item" href="#">
+                <i class="material-icons mdc-list-item__graphic" aria-hidden="true">bookmark</i>
+                <span class="mdc-list-item__text">Work</span>
+            </a>
+        </nav>
+    </div>
+</aside>
+
+<div class="mdc-drawer-app-content">
+    <header class="mdc-top-app-bar app-bar" id="app-bar">
+        <div class="mdc-top-app-bar__row">
+            <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-start">
+                <button class="material-icons mdc-top-app-bar__navigation-icon mdc-icon-button">menu</button>
+                <span class="mdc-top-app-bar__title">Craftingboard</span>
+            </section>
+        </div>
+    </header>
+
+    <main class="main-content" id="main-content">
+        <div class="mdc-top-app-bar--fixed-adjust">
+            <h1 class="online_players_heading">Online Players</h1>
+            <div class="vbox">
+                <div class="mdc-data-table">
+                    <table class="mdc-data-table__table" aria-label="Dessert calories">
+                        <thead>
+                        <tr class="mdc-data-table__header-row">
+                            <th class="mdc-data-table__header-cell" role="columnheader" scope="col">Player</th>
+                            <th class="mdc-data-table__header-cell" role="columnheader" scope="col">Time online</th>
+                        </tr>
+                        </thead>
+                        <tbody class="mdc-data-table__content" id="online_players_table_body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <h1 class="online_players_heading">Server ticks per second</h1>
+            <div class="vbox">
+                <div id="canvas-holder1" style="width:100vh;">
+                    <canvas id="chart1"></canvas>
+                    <div class="chartjs-tooltip" style="display: none;" id="tooltip-0"></div>
+                    <div class="chartjs-tooltip" style="display: none;" id="tooltip-1"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<style>
+    * {
+        margin: 0;
+    }
+
+    body {
+        display: flex;
+    }
+
+    .vbox {
+        padding-top: 2vh;
+        padding-left: 2vh;
+    }
+
+    .vbox > * {
+        /*margin-bottom: 5vh;*/
+    }
+
+    .mdc-drawer-app-content {
+        flex: auto;
+        overflow: auto;
+        position: relative;
+    }
+
+    .main-content {
+        overflow: auto;
+        height: 100%;
+    }
+
+    .app-bar {
+        position: absolute;
+    }
+
+    .mdc-top-app-bar {
+        z-index: 7;
+    }
+</style>
+
+<script>
+    const drawer = mdc.drawer.MDCDrawer.attachTo(document.querySelector('.mdc-drawer'));
+    const topAppBar = mdc.topAppBar.MDCTopAppBar.attachTo(document.getElementById('app-bar'));
+    topAppBar.setScrollTarget(document.getElementById('main-content'));
+    topAppBar.listen('MDCTopAppBar:nav', () => {
+        drawer.open = !drawer.open;
+    });
+</script>
+<script>
+    const customTooltips = function (tooltip) {
+        $(this._chart.canvas).css('cursor', 'pointer');
+
+        const positionY = this._chart.canvas.offsetTop;
+        const positionX = this._chart.canvas.offsetLeft;
+
+        $('.chartjs-tooltip').css({
+            opacity: 0,
+        });
+
+        if (!tooltip || !tooltip.opacity) {
+            return;
+        }
+
+        if (tooltip.dataPoints.length > 0) {
+            tooltip.dataPoints.forEach(function (dataPoint) {
+                const content = [dataPoint.label, dataPoint.value].join(': ');
+                const $tooltip = $('#tooltip-' + dataPoint.datasetIndex);
+
+                $tooltip.html(content);
+                $tooltip.css({
+                    display: "inline",
+                    opacity: 1,
+                    top: positionY + dataPoint.y + 'px',
+                    left: positionX + dataPoint.x + 'px',
+                    fontFamily: "Roboto"
+                });
+            });
+        }
+    };
+    const color = Chart.helpers.color;
+    const lineChartData = {
+        labels: [],
+        datasets: [{
+            backgroundColor: color(window.chartColors.red).alpha(0.2).rgbString(),
+            borderColor: window.chartColors.red,
+            pointBackgroundColor: window.chartColors.red,
+            data: []
+        }]
+    };
+
+    let chart;
+    window.onload = function () {
+        const chartEl = document.getElementById('chart1');
+        chart = new Chart(chartEl, {
+            type: 'line',
+            data: lineChartData,
+            options: {
+                title: {
+                    display: false,
+                },
+                tooltips: {
+                    enabled: false,
+                    mode: 'index',
+                    intersect: false,
+                    custom: customTooltips
+                },
+                legend: {
+                    display: false
+                },
+                scales: {
+                    yAxes: [{
+                        display: true,
+                        ticks: {
+                            suggestedMin: 0,
+                            max: 21,
+                            beginAtZero: true
+                        }
+                    }]
+                },
+                elements: {
+                    point: {
+                        radius: 0
+                    }
+                }
+            }
+        });
+    };
+</script>
+<script>
+    ENDPOINT_URL = "api";
+
+    function httpPostAsync(theUrl, callback, json) {
+        const xmlHttp = new XMLHttpRequest();
+        xmlHttp.onreadystatechange = function () {
+            if (xmlHttp.readyState === 4 && xmlHttp.status === 200)
+                callback(xmlHttp.responseText);
+        };
+        xmlHttp.open("POST", theUrl, true);
+        xmlHttp.send(JSON.stringify(json));
+    }
+
+    let tpsData = [];
+    const numDataPoints = 100;
+
+    function onData(serverData) {
+        let players = serverData["onlinePlayers"];
+        let playerTableBody = document.getElementById("online_players_table_body");
+        playerTableBody.innerHTML = "";
+        for (let player of players) {
+            playerTableBody.innerHTML += "<tr class=\"mdc-data-table__row\">\n" +
+                "                        <td class=\"mdc-data-table__cell\">" + player["name"] + "</td>\n" +
+                "                        <td class=\"mdc-data-table__cell\" style='text-align: center;'>" + millisecondsToString(player["playTime"]) + "</td>\n" +
+                "                    </tr>";
+        }
+        let receivedData = serverData["tps"];
+        if (receivedData.length > 0) {
+            tpsData = tpsData.concat(receivedData);
+            if (tpsData.length > numDataPoints) {
+                tpsData = tpsData.slice(tpsData.length - numDataPoints, tpsData.length);
+            }
+        }
+        let labels = [];
+        for (let i = 0; i < tpsData.length; i++) {
+            labels.push(tpsData.length - i);
+        }
+        chart.data.datasets[0].data = tpsData;
+        chart.data.labels = labels;
+        chart.update(50);
+        lastUpdated = Date.now();
+    }
+
+    function millisecondsToString(seconds) {
+        seconds /= 1000;
+        const numyears = Math.floor(seconds / 31536000);
+        const numdays = Math.floor((seconds % 31536000) / 86400);
+        const numhours = Math.floor(((seconds % 31536000) % 86400) / 3600);
+        const numminutes = Math.floor((((seconds % 31536000) % 86400) % 3600) / 60);
+        const numseconds = (((seconds % 31536000) % 86400) % 3600) % 60;
+        let str = "";
+        if (numyears > 0) {
+            str += Math.floor(numyears) + " years ";
+        }
+        if (numdays > 0) {
+            str += Math.floor(numdays) + " days ";
+        }
+        if (numhours > 0) {
+            str += Math.floor(numhours) + " hours ";
+        }
+        if (numminutes > 0) {
+            str += Math.floor(numminutes) + " minutes ";
+        }
+        if (numseconds > 0) {
+            str += Math.floor(numseconds) + " seconds";
+        }
+        return str;
+    }
+
+    let lastUpdated = Date.now();
+
+    function pollData() {
+        httpPostAsync(ENDPOINT_URL, (responseString) => {
+            let serverData = JSON.parse(responseString);
+            onData(serverData);
+        }, {
+            "range": [
+                lastUpdated.valueOf() - 1000 * 1000,
+                lastUpdated.valueOf(),
+            ],
+        });
+    }
+
+    function updateData() {
+        let now = Date.now();
+        httpPostAsync(ENDPOINT_URL, (responseString) => {
+            let serverData = JSON.parse(responseString);
+            onData(serverData);
+        }, {
+            "range": [
+                lastUpdated.valueOf(),
+                now
+            ]
+        });
+    }
+
+    pollData();
+    setInterval(updateData, 1000);
+</script>
+</body>
+</html>
