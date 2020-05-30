@@ -174,24 +174,29 @@ public class ServerMinecraft extends AbstractMinecraft {
                         return thread;
                     });
                     AtomicInteger i = new AtomicInteger();
-                    int maxDistance = ChunkBase.CHUNK_SIZE * 3;
+                    int maxDistance = ChunkBase.CHUNK_SIZE * 15;
                     int expectedNumChunks = (maxDistance * 2 * maxDistance * 2) / (ChunkBase.CHUNK_SIZE * ChunkBase.CHUNK_SIZE); // approximation
-                    List<Future<ChunkBase>> futures = this.theWorld.getChunkCreator().generateChunksAroundPositionAsync(generationSwarm, new Vector3(0, 0, 0), maxDistance, created -> {
-                        if (i.get() % 10 == 0) {
-                            float percent = i.get() / (float) expectedNumChunks;
-                            percent = Math.min(percent, 1);
-                            this.getLogger().info("Preparing spawn area: " + (int) (percent * 100) + "%");
+                    {
+                        long start = System.nanoTime();
+                        List<Future<ChunkBase>> futures = this.theWorld.getChunkCreator().generateChunksAroundPositionAsync(generationSwarm, new Vector3(0, 0, 0), maxDistance, created -> {
+                            if (i.get() % 10 == 0) {
+                                float percent = i.get() / (float) expectedNumChunks;
+                                percent = Math.min(percent, 1);
+                                this.getLogger().info("Preparing spawn area: " + (int) (percent * 100) + "%");
+                            }
+                            i.incrementAndGet();
+                        });
+                        for (Future<ChunkBase> future : futures) {
+                            try {
+                                future.get();
+                            } catch (InterruptedException | ExecutionException e) {
+                                e.printStackTrace();
+                            }
                         }
-                        i.incrementAndGet();
-                    });
-                    for (Future<ChunkBase> future : futures) {
-                        try {
-                            future.get();
-                        } catch (InterruptedException | ExecutionException e) {
-                            e.printStackTrace();
-                        }
+                        long end = System.nanoTime();
+                        this.getLogger().info("Spawn Area Generation took: " + (end - start) / 1E6f + " ms");
+                        generationSwarm.shutdownNow();
                     }
-                    generationSwarm.shutdownNow();
                     this.theWorld.defineSpawnPosition();
                 }
                 this.getLogger().info("Spawn area prepared");

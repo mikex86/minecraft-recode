@@ -15,11 +15,6 @@ public interface IBlockState {
     @NotNull
     Block getBlock();
 
-    /**
-     * Sets the block of the state
-     */
-    void setBlock(@NotNull Block block);
-
     @Override
     String toString();
 

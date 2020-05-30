@@ -223,27 +223,22 @@ public class EntityPlayerSP extends PlayerBase {
             playerController.onPlayerBlockDamage();
             this.packetSender.sendMovePackets();
         }
-//
-//        motionY *= 0;
-//        if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
-//            motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
-//            motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
-////            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
-////            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
-//        }
-//
-//        if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
-//            motionY = 1;
-//        }
-//        if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
-//            motionY = -1;
-//        }
-        updatedPositionVector.set(posX, posY, posZ);
-    }
 
-    @Override
-    protected boolean shouldWalkSafely() {
-        return this.isSneaking();
+        motionY *= 0;
+        if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
+            motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
+            motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
+//            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+//            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+        }
+
+        if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
+            motionY = 1;
+        }
+        if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
+            motionY = -1;
+        }
+        updatedPositionVector.set(posX, posY, posZ);
     }
 
     @Override

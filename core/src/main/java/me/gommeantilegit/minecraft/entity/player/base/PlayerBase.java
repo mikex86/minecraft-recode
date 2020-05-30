@@ -43,6 +43,21 @@ public class PlayerBase extends LivingEntity {
         this.skin = skin;
     }
 
+    @Override
+    public void moveEntity(float motionX, float motionY, float motionZ) {
+        if (isSneaking()) {
+            double scl = 0.800000011920929D;
+            motionX *= scl;
+            motionZ *= scl;
+        }
+        super.moveEntity(motionX, motionY, motionZ);
+    }
+
+    @Override
+    protected boolean shouldWalkSafely() {
+        return this.isSneaking() && isOnGround();
+    }
+
     public float getEyeHeight() {
         float f = DEFAULT_EYE_HEIGHT;
 

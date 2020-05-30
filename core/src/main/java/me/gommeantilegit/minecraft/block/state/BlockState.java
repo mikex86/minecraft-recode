@@ -69,11 +69,6 @@ public class BlockState implements IBlockState {
     }
 
     @Override
-    public void setBlock(@NotNull Block block) {
-        this.block = block;
-    }
-
-    @Override
     public String toString() {
         return "BlockState{blockName: " + block.getUnlocalizedName() + "}";
     }

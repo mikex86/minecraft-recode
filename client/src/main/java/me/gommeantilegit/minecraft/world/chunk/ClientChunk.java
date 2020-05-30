@@ -61,7 +61,19 @@ public class ClientChunk extends ChunkBase {
         {
             super.changeBlock(x, y, z, blockState);
         }
-        rebuildFor(x, y, z);
+    }
+
+    @Override
+    public void setRelativeBlockState(int x, int y, int z, @Nullable IBlockState blockState) {
+        this.blockStateSemaphore.writeSynchronized(this, () -> {
+            writeBlockChange(x, y, z, blockState);
+            rebuildFor(x, y, z);
+        });
+    }
+
+    @Override
+    public void writeBlockChange(int x, int y, int z, @Nullable IBlockState blockState) {
+        super.writeBlockChange(x, y, z, blockState);
     }
 
     @Unsafe
