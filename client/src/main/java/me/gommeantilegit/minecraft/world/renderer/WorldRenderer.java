@@ -11,7 +11,6 @@ import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.texture.manager.TextureManager;
-import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
 import me.gommeantilegit.minecraft.world.ClientWorld;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ChunkSection;
@@ -29,7 +28,7 @@ import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBU
 import static me.gommeantilegit.minecraft.util.RenderUtils.rect;
 
 @SideOnly(side = CLIENT)
-public class WorldRenderer implements OpenGLOperation {
+public class WorldRenderer {
 
     private static final float CLOUD_LEVEL = 127;
 
@@ -458,10 +457,6 @@ public class WorldRenderer implements OpenGLOperation {
     @NotNull
     public ClientWorld getWorld() {
         return world;
-    }
-
-    @Override
-    public void onOpenGLContext(float partialTicks) {
     }
 
     public void setEnableFog(boolean enableFog) {

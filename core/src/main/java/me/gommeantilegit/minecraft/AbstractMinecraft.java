@@ -32,11 +32,6 @@ public abstract class AbstractMinecraft implements Tickable {
     private final Side side;
 
     /**
-     * The id of the minecraft instance provided by the {@link MinecraftProvider}
-     */
-    private final long id;
-
-    /**
      * Manages block instances
      */
     @Nullable
@@ -78,7 +73,6 @@ public abstract class AbstractMinecraft implements Tickable {
 
     protected AbstractMinecraft(@NotNull Side side) {
         Hardware.init();
-        this.id = MinecraftProvider.createMinecraft(this);
 
         this.side = side;
         try {
@@ -121,13 +115,6 @@ public abstract class AbstractMinecraft implements Tickable {
     public Side getSide() {
         return side;
     }
-
-    @Override
-    protected void finalize() throws Throwable {
-        MinecraftProvider.removeMinecraft(getId());
-        super.finalize();
-    }
-
     static {
         CrashReport.init();
     }
@@ -152,13 +139,6 @@ public abstract class AbstractMinecraft implements Tickable {
 
     public void setBlocks(@NotNull Blocks blocks) {
         this.blocks = blocks;
-    }
-
-    /**
-     * ID of the minecraft instance in the minecraft provider
-     */
-    public long getId() {
-        return id;
     }
 
     /**

@@ -59,7 +59,7 @@ public class ServerDataProvider implements IDataProvider {
             int startIndex = (int) (Instant.now().getEpochSecond() - end.getEpochSecond());
             List<Float> data;
             try {
-                data = collector.getData(-startIndex, -endIndex);
+                data = collector.getData(startIndex, endIndex);
             } catch (IOException e) {
                 throw new RuntimeException("Failed to retrieve data from data collector", e);
             }

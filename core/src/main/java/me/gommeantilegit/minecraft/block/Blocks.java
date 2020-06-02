@@ -51,8 +51,6 @@ public class Blocks {
         this.mc = mc;
     }
 
-    // TODO: RE-ADD IDS FOR SORTING OF REGISTERED BLOCKS SO THAT THE GLOBAL BLOCK-STATE PALETTE ISN'T RANDOMLY ORDERED DEPENDING ON THE ORDER OF REGISTRATION
-
     /**
      * Initializes blockStates and Builds texture map
      */

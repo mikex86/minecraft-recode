@@ -1,24 +1,13 @@
 package me.gommeantilegit.minecraft.rendering.mesh;
 
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
-import me.gommeantilegit.minecraft.utils.async.AsyncExecutor;
-import me.gommeantilegit.minecraft.utils.async.AsyncResult;
-import me.gommeantilegit.minecraft.utils.async.Invokable;
-import me.gommeantilegit.minecraft.utils.async.ListenableFuture;
 import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Represents an object that has a mesh that has to be built asynchronously
- * <p>
- * To build the mesh call {@link #setupMeshAsync(Invokable)}} ()}
- * To finish the MeshBuilder into a mesh ready to be rendered call {@link #finishMesh()} on the OpenGL Context
+ * Represents an object that has a mesh that needs to be built
  */
-//TODO: REMOVE
 public interface MeshBuilding {
-
-    @NotNull
-    AsyncExecutor asyncExecutor = new AsyncExecutor(32);
 
     /**
      * Called to build the mesh
@@ -34,17 +23,6 @@ public interface MeshBuilding {
      * @param meshBuilder the just built mesh-builder
      */
     void storeBuildMesh(@NotNull OptimizedMeshBuilder meshBuilder);
-
-    /**
-     * Called to set up the mesh builder that is later converted into a mesh.
-     * Works asynchronously
-     */
-    default AsyncResult<Void> setupMeshAsync(@NotNull Invokable<ListenableFuture<Void>> invokable) {
-        return asyncExecutor.submit(() -> {
-            storeBuildMesh(buildMesh());
-            return null;
-        }, invokable);
-    }
 
     /**
      * Sets up the mesh synchronously

@@ -1,7 +1,8 @@
-package me.gommeantilegit.minecraft.entity.player;
+package me.gommeantilegit.minecraft.entity.player.controller;
 
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.block.sound.BlockSoundType;
+import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import org.jetbrains.annotations.NotNull;
 
 import me.gommeantilegit.minecraft.block.Block;
@@ -54,7 +55,7 @@ public class PlayerController {
     /**
      * Updating the damage applied to the block which the player faces.
      */
-    void onPlayerBlockDamage() {
+    public void onPlayerBlockDamage() {
         if (blockHitDelay > 0) {
             blockHitDelay--;
             return;
@@ -64,7 +65,7 @@ public class PlayerController {
         BlockPos pos = result.getBlockPos();
         if (pos != null) {
             assert result.hitSide != null;
-            if (player.breakingBlocks && (breakingPos == null || pos.equals(breakingPos))) {
+            if (player.isBreakingBlocks() && (breakingPos == null || pos.equals(breakingPos))) {
                 player.swingItem();
 
                 breakingPos = pos;
@@ -100,7 +101,7 @@ public class PlayerController {
     /**
      * Called when the player aborts block breaking
      */
-    void onBlockBreakingAbort() {
+    public void onBlockBreakingAbort() {
         this.currentBlockDamage = 0;
         this.stepSoundTickCounter = 0;
         this.blockHitDelay = 0;

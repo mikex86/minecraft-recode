@@ -6,7 +6,6 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import me.gommeantilegit.minecraft.annotations.AndroidOnly;
-import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
@@ -28,8 +27,6 @@ import me.gommeantilegit.minecraft.shader.ShaderManager;
 import me.gommeantilegit.minecraft.sound.SoundResource;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.texture.manager.TextureManager;
-import me.gommeantilegit.minecraft.timer.Timer;
-import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
 import me.gommeantilegit.minecraft.ui.UIManager;
 import me.gommeantilegit.minecraft.ui.screen.impl.GuiMainMenu;
 import me.gommeantilegit.minecraft.utils.OpenGLUtils;
@@ -43,7 +40,7 @@ import static com.badlogic.gdx.graphics.GL20.GL_NO_ERROR;
 import static java.lang.Integer.min;
 
 @SideOnly(side = Side.CLIENT)
-public abstract class ClientMinecraft extends AbstractMinecraft implements ApplicationListener, OpenGLOperation {
+public abstract class ClientMinecraft extends AbstractMinecraft implements ApplicationListener {
 
     /**
      * Shader manager instance
@@ -89,12 +86,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
      * Profiler object for profiling the tick update.
      */
     private Profiler startupProfiler;
-
-    /**
-     * Timer instance for time OpenGL Context calls
-     */
-    @NotNull
-    public Timer openGLOperationsTimer = new Timer(10.0f);
 
     /**
      * Object for rendering entities
@@ -330,22 +321,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
         }
     }
 
-    /**
-     * Called on OpenGL Context to update timer
-     */
-    @Override
-    @NeedsOpenGLContext
-    public void onOpenGLContext(float partialTicks) {
-        if (theWorld != null) {
-            try {
-                this.theWorld.onOpenGLContext(partialTicks);
-            } catch (Throwable t) {
-                this.getLogger().crash("Failed to update World (OpenGL-Thread)", t);
-            }
-        }
-    }
-
-
     @Override
     public void render() {
         if (this.startUpThread == null || this.startUpThread.isAlive() || this.startUpThread.getState() == Thread.State.NEW) {
@@ -411,15 +386,6 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 if (thePlayer != null && theWorld != null)
                     this.ingameHud.render();
                 this.uiManager.render();
-            }
-
-            //TODO: REMOVE
-            //Updating timer and ticks
-            {
-                openGLOperationsTimer.advanceTime();
-                for (int i = 0; i < openGLOperationsTimer.ticks; i++) {
-                    onOpenGLContext(openGLOperationsTimer.partialTicks);
-                }
             }
 
 //            long frameEnd = System.nanoTime();

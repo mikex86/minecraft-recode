@@ -10,8 +10,6 @@ import java.util.stream.Collectors;
 
 public class GMC {
 
-    //TODO: UNIT TEST
-
     public void toGMC(@NotNull OutputStream stream, @NotNull Object source) throws IOException {
         DataOutputStream dataOut = new DataOutputStream(stream);
         Class<?> type = source.getClass();

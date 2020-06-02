@@ -23,7 +23,7 @@ public class ServerDataApi implements Route {
     }
 
     @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked"})
     public Object handle(spark.Request request, spark.Response response) {
         String body = request.body();
         Gson gson = new GsonBuilder().setPrettyPrinting().create();

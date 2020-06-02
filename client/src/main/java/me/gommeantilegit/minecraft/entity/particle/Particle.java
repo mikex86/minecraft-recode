@@ -1,12 +1,15 @@
 package me.gommeantilegit.minecraft.entity.particle;
 
 import com.badlogic.gdx.graphics.Mesh;
-import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.entity.Entity;
+import me.gommeantilegit.minecraft.entity.IRenderableEntity;
+import me.gommeantilegit.minecraft.entity.renderer.model.IEntityModel;
+import me.gommeantilegit.minecraft.entity.renderer.model.impl.ParticleModel;
 import me.gommeantilegit.minecraft.rendering.mesh.MeshBuilding;
+import me.gommeantilegit.minecraft.shader.api.CommonShader;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.world.ClientWorld;
@@ -19,18 +22,18 @@ import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBU
 import static me.gommeantilegit.minecraft.util.RenderUtils.rect;
 
 @SideOnly(side = Side.CLIENT)
-public class Particle extends Entity implements MeshBuilding {
+public class Particle extends Entity implements MeshBuilding, IRenderableEntity<CommonShader, Particle> {
+
+    @NotNull
+    private static final ParticleModel PARTICLE_MODEL = new ParticleModel();
 
     /**
      * Particle motion values
      */
     private float xSpeed, ySpeed, zSpeed;
 
-    /**
-     * The texture applied to the particle rectangle.
-     */
     @NotNull
-    public final CustomTexture texture;
+    private final CustomTexture texture;
 
     /**
      * The region of the texture that should be applied to the particle.
@@ -53,17 +56,20 @@ public class Particle extends Entity implements MeshBuilding {
      */
     private float size;
 
-    /**
-     * The particles mesh
-     */
     @Nullable
-    public Mesh mesh;
+    private Mesh mesh;
 
     /**
      * Meshbuilder used to build the particles mesh
      */
     @Nullable
     public OptimizedMeshBuilder meshbuilder;
+
+    /**
+     * The model of the particle
+     */
+    @NotNull
+    private final IEntityModel<CommonShader, Particle> model;
 
     /**
      * Default constructor creating a particle
@@ -83,6 +89,7 @@ public class Particle extends Entity implements MeshBuilding {
         super(world);
         this.texture = texture;
         this.textureRegion = textureRegion;
+        this.model = PARTICLE_MODEL;
 
         //Initializing particle SOUND_RESOURCES
         {
@@ -121,10 +128,10 @@ public class Particle extends Entity implements MeshBuilding {
         v0 += vOffset;
 
         {
-            u0 /= texture.getWidth();
-            uWidth /= texture.getWidth();
-            v0 /= texture.getHeight();
-            vHeight /= texture.getHeight();
+            u0 /= getTexture().getWidth();
+            uWidth /= getTexture().getWidth();
+            v0 /= getTexture().getHeight();
+            vHeight /= getTexture().getHeight();
         }
 
         float u1 = u0 + uWidth, v1 = v0 + vHeight;
@@ -153,7 +160,7 @@ public class Particle extends Entity implements MeshBuilding {
     @NeedsOpenGLContext
     @Override
     public void finishMesh(@NotNull OptimizedMeshBuilder meshBuilder) {
-        mesh = meshBuilder.end();
+        setMesh(meshBuilder.end());
     }
 
     @NeedsOpenGLContext
@@ -183,6 +190,30 @@ public class Particle extends Entity implements MeshBuilding {
             this.xSpeed *= 0.7f;
             this.zSpeed *= 0.7f;
         }
+    }
+
+    /**
+     * The texture applied to the particle rectangle.
+     */
+    public CustomTexture getTexture() {
+        return texture;
+    }
+
+    @NotNull
+    @Override
+    public IEntityModel<CommonShader, Particle> getModel() {
+        return this.model;
+    }
+
+    /**
+     * The particles mesh
+     */
+    public Mesh getMesh() {
+        return mesh;
+    }
+
+    public void setMesh(Mesh mesh) {
+        this.mesh = mesh;
     }
 }
 

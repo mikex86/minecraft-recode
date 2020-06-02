@@ -57,15 +57,15 @@ public class ClientChunkSection extends ChunkSection {
     /**
      * Schedules a rebuild of the neighbor sections of this chunk sections (sections are in this and other chunks) and performs a chunk bake for affected chunks once all meshes have been built
      */
-    public void rebuildFor(int x, int y, int z) {
+    public void rebuildRelative(int x, int y, int z) {
         ClientChunk parentChunk = getParentChunk();
 
         ClientWorld world = parentChunk.getWorld();
         int startHeight = getStartHeight();
         int chunkX = parentChunk.getX(), chunkZ = parentChunk.getZ();
-        x -= chunkX;
+
         y -= startHeight;
-        z -= chunkZ;
+
         List<ClientChunkSection> toRebuild = new ArrayList<>(6);
         toRebuild.add(this);
 

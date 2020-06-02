@@ -76,23 +76,21 @@ public class DataCollector<T> {
     }
 
     /**
-     * @param start the start index (negative index means index = size - index - 1)
-     * @param end   the end index exclusive (negative index means index = size - index)
+     * @param start the start index (means index = size - index - 1)
+     * @param end   the end index exclusive (index = size - index)
      * @return the data slice from the specified region. Size is limited so that out of bounds indices are ignored (size cap)
      */
     @NotNull
     public List<T> getData(int start, int end) throws IOException {
-        if (start < 0) {
-            start = this.stream.size() - start - 1;
-        }
-        if (end < 0) {
-            end = this.stream.size() - end - 1;
-        }
-        start = Math.max(start, 0);
-        int length = Math.max(0, Math.min(this.stream.size() - start, (end - start)));
+        // Reversing the indices in the array means reversing the chronology
+        int startIndex = this.stream.size() - end;
+        int endIndex = this.stream.size() - start;
+
+        startIndex = Math.max(startIndex, 0);
+        int length = endIndex - startIndex;
         List<T> array = new ArrayList<>(length);
         for (int i = 0; i < length; i++) {
-            array.add(get(start + i));
+            array.add(get(startIndex + i));
         }
         return array;
     }

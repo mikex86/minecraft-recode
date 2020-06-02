@@ -2,18 +2,18 @@ package me.gommeantilegit.minecraft.entity.renderer.model.impl;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
+import me.gommeantilegit.minecraft.entity.player.RenderablePlayer;
 import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
 import me.gommeantilegit.minecraft.entity.renderer.model.IEntityModel;
 import me.gommeantilegit.minecraft.rendering.Cube;
 import me.gommeantilegit.minecraft.shader.api.CommonShader;
-import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.utils.MathHelper;
 import org.jetbrains.annotations.NotNull;
 
 import static java.lang.Math.*;
 
-public class PlayerModel implements IEntityModel<PlayerBase, StdShader> {
+public class PlayerModel implements IEntityModel<CommonShader, RenderablePlayer> {
 
     public Cube head;
     public Cube body;
@@ -24,7 +24,7 @@ public class PlayerModel implements IEntityModel<PlayerBase, StdShader> {
 
     private static final float SIZE = 0.058333334f;
 
-    public PlayerModel(CustomTexture texture) {
+    public PlayerModel(@NotNull CustomTexture texture) {
         this.head = new Cube(0, 0, -4.0f, -8.0f, -4.0f,
                 8, 8, 8, 8, 8, 8, texture);
         this.body = new Cube(16, 16, -4.0f, 0.0f, -2.0f,
@@ -54,7 +54,7 @@ public class PlayerModel implements IEntityModel<PlayerBase, StdShader> {
     }
 
     @Override
-    public void render(float partialTicks, @NotNull PlayerBase entity, @NotNull StdShader shaderProgram) {
+    public void render(float partialTicks, @NotNull RenderablePlayer entity, @NotNull CommonShader shaderProgram) {
 
         Gdx.gl.glDisable(GL20.GL_CULL_FACE);
         float height = this.body.height + this.leg0.height;

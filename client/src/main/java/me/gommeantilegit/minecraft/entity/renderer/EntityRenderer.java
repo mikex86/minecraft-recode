@@ -1,31 +1,26 @@
 package me.gommeantilegit.minecraft.entity.renderer;
 
-import me.gommeantilegit.minecraft.entity.Entity;
+import me.gommeantilegit.minecraft.entity.IRenderableEntity;
 import me.gommeantilegit.minecraft.entity.particle.Particle;
-import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
+import me.gommeantilegit.minecraft.entity.player.RenderablePlayer;
 import me.gommeantilegit.minecraft.entity.renderer.impl.ParticleRenderer;
 import me.gommeantilegit.minecraft.entity.renderer.impl.PlayerRenderer;
-import me.gommeantilegit.minecraft.shader.programs.StdShader;
+import me.gommeantilegit.minecraft.shader.api.CommonShader;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Class for rendering entities
  */
-public class EntityRenderer implements IEntityRenderer<Entity, StdShader> {
+public class EntityRenderer {
 
     public EntityRenderer() {
         this.playerRenderer = new PlayerRenderer();
         this.particleRenderer = new ParticleRenderer();
     }
 
-    /**
-     * Renders the specified entity
-     *
-     * @param entity the entity to render
-     */
-    public void renderEntity(@NotNull Entity entity, float partialTicks, @NotNull StdShader shader) {
-        if (entity instanceof PlayerBase) {
-            this.playerRenderer.renderEntity((PlayerBase) entity, partialTicks, shader);
+    public void renderEntity(@NotNull IRenderableEntity<?, ?> entity, float partialTicks, @NotNull CommonShader shader) {
+        if (entity instanceof RenderablePlayer) {
+            this.playerRenderer.renderEntity((RenderablePlayer) entity, partialTicks, shader);
         } else if (entity instanceof Particle) {
             this.particleRenderer.renderEntity((Particle) entity, partialTicks, shader);
         }

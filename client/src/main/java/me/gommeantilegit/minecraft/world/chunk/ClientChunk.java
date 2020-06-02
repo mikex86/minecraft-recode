@@ -6,6 +6,7 @@ import me.gommeantilegit.minecraft.annotations.Unsafe;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.block.state.palette.IBlockStatePalette;
 import me.gommeantilegit.minecraft.entity.Entity;
+import me.gommeantilegit.minecraft.entity.IRenderableEntity;
 import me.gommeantilegit.minecraft.entity.renderer.EntityRenderer;
 import me.gommeantilegit.minecraft.rendering.GLContext;
 import me.gommeantilegit.minecraft.shader.programs.StdShader;
@@ -67,7 +68,7 @@ public class ClientChunk extends ChunkBase {
     public void setRelativeBlockState(int x, int y, int z, @Nullable IBlockState blockState) {
         this.blockStateSemaphore.writeSynchronized(this, () -> {
             writeBlockChange(x, y, z, blockState);
-            rebuildFor(x, y, z);
+            rebuildRelative(x, y, z);
         });
     }
 
@@ -183,9 +184,9 @@ public class ClientChunk extends ChunkBase {
      * @param y change y coordinate
      * @param z change z coordinate
      */
-    public void rebuildFor(int x, int y, int z) {
+    public void rebuildRelative(int x, int y, int z) {
         ClientChunkSection section = getChunkSection(y);
-        section.rebuildFor(x, y, z); // auto bakes the chunk
+        section.rebuildRelative(x, y, z);
     }
 
     /**
@@ -207,7 +208,9 @@ public class ClientChunk extends ChunkBase {
     private void renderEntities(@NotNull StdShader shader, @NotNull EntityRenderer entityRenderer, float partialTicks) {
         for (Entity entity : entities) {
             if (entity != null) {
-                entityRenderer.renderEntity(entity, partialTicks, shader);
+                if (entity instanceof IRenderableEntity) {
+                    entityRenderer.renderEntity((IRenderableEntity<?, ?>) entity, partialTicks, shader);
+                }
             }
         }
     }

@@ -1,10 +1,10 @@
 package me.gommeantilegit.minecraft.entity.renderer.model;
 
-import me.gommeantilegit.minecraft.entity.Entity;
-import me.gommeantilegit.minecraft.shader.api.CommonShader;
+import com.badlogic.gdx.graphics.glutils.ShaderProgram;
+import me.gommeantilegit.minecraft.entity.IRenderableEntity;
 import org.jetbrains.annotations.NotNull;
 
-public interface IEntityModel<T extends Entity, S extends CommonShader> {
+public interface IEntityModel<S extends ShaderProgram, T extends IRenderableEntity<S, T>> {
 
     void render(float partialTicks, @NotNull T entity, @NotNull S shader);
 

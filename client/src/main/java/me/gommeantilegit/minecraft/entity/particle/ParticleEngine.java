@@ -2,39 +2,24 @@ package me.gommeantilegit.minecraft.entity.particle;
 
 import com.badlogic.gdx.math.Vector2;
 import me.gommeantilegit.minecraft.ClientMinecraft;
-import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
+import me.gommeantilegit.minecraft.rendering.GLContext;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.timer.api.AsyncOperation;
-import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.NoSuchElementException;
-import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingDeque;
 
-public class ParticleEngine implements AsyncOperation, OpenGLOperation {
+public class ParticleEngine implements AsyncOperation {
 
     /**
      * The parent world that the particle engine spawns the new particles into.
      */
     @NotNull
     private final ClientMinecraft mc;
-
-    /**
-     * Queue of particles to be spawned
-     */
-    @NotNull
-    private final Queue<Particle> scheduledParticles = new LinkedBlockingDeque<>();
-
-    /**
-     * Current state of any particles being in the spawn queue
-     */
-    private boolean particlesToSpawn = false;
 
     /**
      * ExecutorService to build particle meshes
@@ -108,32 +93,12 @@ public class ParticleEngine implements AsyncOperation, OpenGLOperation {
     @ThreadSafe
     private void scheduleParticle(@NotNull Particle particle) {
         this.executorService.submit(() -> {
-            particle.setupMesh();
-            particlesToSpawn = true;
-            scheduledParticles.add(particle);
+            particle.setupMesh(); // Mesh building complete before it gets added to the queue
+            GLContext.getGlContext().runOnGLContext(() -> {
+                particle.finishMesh();
+                this.mc.theWorld.spawnEntityInWorld(particle); // Mesh initialized before it gets spawned into the world and thus before it is rendered
+            });
         });
-    }
-
-    /**
-     * Spawns the particles on OpenGL Context
-     *
-     * @param partialTicks timer partial ticks
-     */
-    @Override
-    @NeedsOpenGLContext
-    public void onOpenGLContext(float partialTicks) {
-        if (particlesToSpawn) {
-            while (!this.scheduledParticles.isEmpty()) {
-                try {
-                    Particle particle = this.scheduledParticles.remove();
-                    particle.finishMesh();
-                    this.mc.theWorld.spawnEntityInWorld(particle);
-                } catch (NoSuchElementException ignored) {
-                    this.scheduledParticles.clear();
-                }
-            }
-            particlesToSpawn = false;
-        }
     }
 
     @Override

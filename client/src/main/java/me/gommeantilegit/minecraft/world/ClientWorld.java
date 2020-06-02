@@ -10,13 +10,11 @@ import me.gommeantilegit.minecraft.entity.particle.ParticleEngine;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.logging.crash.CrashReport;
 import me.gommeantilegit.minecraft.packet.packets.client.ClientChunkLoadingDistanceChangePacket;
-import me.gommeantilegit.minecraft.timer.api.OpenGLOperation;
 import me.gommeantilegit.minecraft.world.change.ClientBlockStateSemaphore;
 import me.gommeantilegit.minecraft.world.chunk.ChunkBase;
 import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
 import me.gommeantilegit.minecraft.world.chunk.builder.ChunkMeshRebuilder;
 import me.gommeantilegit.minecraft.world.chunk.creator.ClientChunkCreator;
-import me.gommeantilegit.minecraft.world.chunk.creator.OnChunkCreationListener;
 import me.gommeantilegit.minecraft.world.chunk.loader.ClientChunkLoader;
 import me.gommeantilegit.minecraft.world.chunk.world.ClientWorldChunkHandler;
 import me.gommeantilegit.minecraft.world.chunk.world.RenderManager;
@@ -31,7 +29,7 @@ import java.util.concurrent.ForkJoinWorkerThread;
 import static me.gommeantilegit.minecraft.Side.CLIENT;
 
 @SideOnly(side = CLIENT)
-public class ClientWorld extends WorldBase implements OpenGLOperation {
+public class ClientWorld extends WorldBase {
 
     /**
      * Object for rendering the world
@@ -65,13 +63,6 @@ public class ClientWorld extends WorldBase implements OpenGLOperation {
         this.particleEngine = new ParticleEngine(mc);
         this.viewer = viewer;
         this.modifyChunkLoadingDistance(mc.gameSettings.videoSettings.determineChunkLoadingDistance());
-    }
-
-    @Override
-    @NeedsOpenGLContext
-    public void onOpenGLContext(float partialTicks) {
-        this.getParticleEngine().onOpenGLContext(partialTicks);
-        this.worldRenderer.onOpenGLContext(partialTicks);
     }
 
     /**

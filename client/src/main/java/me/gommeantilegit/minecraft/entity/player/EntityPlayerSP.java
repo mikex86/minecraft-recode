@@ -12,7 +12,7 @@ import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.Block;
 import me.gommeantilegit.minecraft.block.sound.BlockSoundType;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
-import me.gommeantilegit.minecraft.entity.player.base.PlayerBase;
+import me.gommeantilegit.minecraft.entity.player.controller.PlayerController;
 import me.gommeantilegit.minecraft.entity.player.packet.PacketSender;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
 import me.gommeantilegit.minecraft.gamesettings.settingtypes.KeyBindSetting;
@@ -43,7 +43,7 @@ import static java.lang.StrictMath.max;
 import static java.lang.StrictMath.min;
 
 @SideOnly(side = Side.CLIENT)
-public class EntityPlayerSP extends PlayerBase {
+public class EntityPlayerSP extends RenderablePlayer {
 
     /**
      * Controller object for player logic such as block breaking
@@ -55,55 +55,9 @@ public class EntityPlayerSP extends PlayerBase {
     public final ClientMinecraft mc;
 
     /**
-     * Object that sends packets to the server about the player's state
-     */
-    @NotNull
-    private final PacketSender packetSender = new PacketSender(this);
-
-    /**
-     * State whether the player has spawned in the world
-     */
-    public boolean spawned = false;
-
-    /**
-     * A 3D vector instance which values are updated to the player's {@link #posX}, {@link #posY} and {@link #posZ} every tick
-     */
-    @NotNull
-    private Vector3 updatedPositionVector = new Vector3();
-
-
-    /**
-     * Enum representing all camera modes
-     */
-    public enum CameraMode {
-        FIRST_PERSON, THIRD_PERSON;
-
-        public EntityPlayerSP.CameraMode next() {
-            return values()[(Arrays.asList(values()).indexOf(this) + 1) % values().length];
-        }
-    }
-
-    /**
-     * Camera mode
-     */
-    @NotNull
-    private EntityPlayerSP.CameraMode cameraMode = EntityPlayerSP.CameraMode.FIRST_PERSON;
-
-    /**
      * Ray-tracing utility.
      */
     public final RayTracer rayTracer;
-
-    /**
-     * Virtual Camera position
-     */
-    @NotNull
-    private final Vector3 cameraPosition = new Vector3();
-
-    /**
-     * State whether the player has already received a PositionSetPacket
-     */
-    private boolean posPacketReceived = false;
 
     /**
      * Player perspective camera operating with position zero.
@@ -124,7 +78,7 @@ public class EntityPlayerSP extends PlayerBase {
             float aspect = viewportWidth / viewportHeight;
 
             far = 512;
-            projection.setToProjection(Math.abs(near), Math.abs(far), fieldOfView, aspect);
+            projection.setToProjection(abs(near), abs(far), fieldOfView, aspect);
 
             view.setToLookAt(position, positionCopy.set(position).add(direction), Vector3.Y);
             combined.set(projection);
@@ -132,7 +86,21 @@ public class EntityPlayerSP extends PlayerBase {
         }
 
     };
-
+    /**
+     * Input processor for controlling the player
+     */
+    @NotNull
+    public final EntityPlayerSP.PlayerInputAdapter camController = getCamController();
+    /**
+     * Object that sends packets to the server about the player's state
+     */
+    @NotNull
+    private final PacketSender packetSender = new PacketSender(this);
+    /**
+     * Virtual Camera position
+     */
+    @NotNull
+    private final Vector3 cameraPosition = new Vector3();
     /**
      * Virtual camera operating with the virtual camera position.
      * Used when the correct camera frustum is needed.
@@ -159,7 +127,7 @@ public class EntityPlayerSP extends PlayerBase {
             this.position.set(cameraPosition);
 
             float aspect = viewportWidth / viewportHeight;
-            projection.setToProjection(Math.abs(near), Math.abs(far), fieldOfView, aspect);
+            projection.setToProjection(abs(near), abs(far), fieldOfView, aspect);
             view.setToLookAt(position, positionCopy.set(position).add(direction), up);
             combined.set(projection);
             Matrix4.mul(combined.val, view.val);
@@ -169,12 +137,44 @@ public class EntityPlayerSP extends PlayerBase {
             frustum.update(invProjectionView);
         }
     };
-
     /**
-     * Input processor for controlling the player
+     * The tick to frame interpolated position vector of the entity
      */
     @NotNull
-    public final EntityPlayerSP.PlayerInputAdapter camController = getCamController();
+    private final Vector3 interpolatedEntityPosition = new Vector3();
+    /**
+     * The position offset the view-bobbing occurs in relation to
+     */
+    @NotNull
+    private final Vector3 viewBobPosOffset = new Vector3();
+    /**
+     * Camera direction temp vector for {@link #setupViewBobbing(float)}
+     */
+    @NotNull
+    private final Vector3 cameraDirectionTmp = new Vector3();
+    /**
+     * Clock instance used to determine, if the player has stopped walking and quickly started again so sprinting can be toggled.
+     */
+    private final Clock sprintingStartClock = new Clock(false);
+    /**
+     * State whether the player has spawned in the world
+     */
+    public boolean spawned = false;
+    /**
+     * A 3D vector instance which values are updated to the player's {@link #posX}, {@link #posY} and {@link #posZ} every tick
+     */
+    @NotNull
+    private Vector3 updatedPositionVector = new Vector3();
+    /**
+     * Camera mode
+     */
+    @NotNull
+    private EntityPlayerSP.CameraMode cameraMode = CameraMode.FIRST_PERSON;
+    /**
+     * State whether the player has already received a PositionSetPacket
+     */
+    private boolean posPacketReceived = false;
+    private boolean breakingBlocks = false;
 
     public EntityPlayerSP(@Nullable ClientWorld world, @NotNull ClientMinecraft mc, @NotNull String username, @NotNull ClientSkin skin) {
         super(world, 20, username, skin);
@@ -220,24 +220,24 @@ public class EntityPlayerSP extends PlayerBase {
         }
         if (posPacketReceived) {
             super.tick();
-            playerController.onPlayerBlockDamage();
+            this.playerController.onPlayerBlockDamage();
             this.packetSender.sendMovePackets();
         }
 
-        motionY *= 0;
-        if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
-            motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
-            motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
-//            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
-//            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
-        }
-
-        if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
-            motionY = 1;
-        }
-        if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
-            motionY = -1;
-        }
+//        motionY *= 0;
+//        if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
+//            motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
+//            motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
+////            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+////            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+//        }
+//
+//        if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
+//            motionY = 1;
+//        }
+//        if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
+//            motionY = -1;
+//        }
         updatedPositionVector.set(posX, posY, posZ);
     }
 
@@ -306,9 +306,9 @@ public class EntityPlayerSP extends PlayerBase {
         switch (Gdx.app.getType()) {
             case Android:
             case iOS:
-                return new EntityPlayerSP.MobilePlayerController(this, mc);
+                return new MobilePlayerController(this, mc);
             case Desktop:
-                return new EntityPlayerSP.DesktopPlayerController(this);
+                return new DesktopPlayerController(this);
             default:
                 throw new IllegalStateException("Unsupported platform: " + Gdx.app.getType());
         }
@@ -321,12 +321,6 @@ public class EntityPlayerSP extends PlayerBase {
     private boolean keyDown(int key) {
         return camController.key(key);
     }
-
-    /**
-     * The tick to frame interpolated position vector of the entity
-     */
-    @NotNull
-    private final Vector3 interpolatedEntityPosition = new Vector3();
 
     /**
      * Updates the camera's position according to the players position
@@ -396,18 +390,6 @@ public class EntityPlayerSP extends PlayerBase {
 //        }
     }
 
-    /**
-     * The position offset the view-bobbing occurs in relation to
-     */
-    @NotNull
-    private final Vector3 viewBobPosOffset = new Vector3();
-
-    /**
-     * Camera direction temp vector for {@link #setupViewBobbing(float)}
-     */
-    @NotNull
-    private final Vector3 cameraDirectionTmp = new Vector3();
-
     public void setupViewBobbing(float partialTicks) {
 //        if (!onGround) return;
         float f = getDistanceWalkedModified() - getPrevDistanceWalkedModified();
@@ -430,11 +412,11 @@ public class EntityPlayerSP extends PlayerBase {
         );
 
         Vector3 direction = camera.direction;
-        stdShader.rotate(direction.x * -1, 0, direction.z * -1, (float) (Math.sin(f1 * (float) Math.PI) * f2 * 3.0F));
+        stdShader.rotate(direction.x * -1, 0, direction.z * -1, (float) (sin(f1 * (float) PI) * f2 * 3.0F));
 
         direction = this.cameraDirectionTmp.set(camera.direction).rotate(90, 0, -1, 0);
 
-        stdShader.rotate(direction.x, 0, direction.z, (float) (Math.abs(Math.cos(f1 * (float) Math.PI - 0.2F) * f2) * 5.0F));
+        stdShader.rotate(direction.x, 0, direction.z, (float) (abs(cos(f1 * (float) PI - 0.2F) * f2) * 5.0F));
 
         direction = this.cameraDirectionTmp.set(camera.direction).rotate(90, 0, -1, 0);
         stdShader.rotate(direction.x, 0, direction.z, f3);
@@ -445,7 +427,6 @@ public class EntityPlayerSP extends PlayerBase {
 //        stdShader.rotate(1, 0, 0, (float) (Math.abs(Math.cos(f1 * (float) Math.PI - 0.2F) * f2) * 5.0F));
 //        stdShader.rotate(1, 0, 0, f3);
     }
-
 
     @NotNull // TODO: REMOVE
     public Vector3 getUpdatedPositionVector() {
@@ -462,10 +443,99 @@ public class EntityPlayerSP extends PlayerBase {
      * @param block           the block broken
      * @param pos             the position of the block broken
      * @param facingDirection rayTraceResult side hit direction.
-     * @see me.gommeantilegit.minecraft.raytrace.RayTracer.RayTraceResult#hitSide
+     * @see RayTracer.RayTraceResult#hitSide
      */
-    void onBlockBroken(@NotNull Block block, @NotNull BlockPos pos, @NotNull EnumFacing facingDirection) {
+    public void onBlockBroken(@NotNull Block block, @NotNull BlockPos pos, @NotNull EnumFacing facingDirection) {
         this.breakMouseOver();
+    }
+
+    /**
+     * Invoked when a key is pressed
+     *
+     * @param keyCode the key-code that was just pressed down
+     */
+    private void onKeyDown(int keyCode) {
+        if (keyCode == mc.gameSettings.keyBindings.keyBindForward.getValue()) {
+            if (sprintingStartClock.getTimePassed() <= 300) {
+                setSprinting(true);
+            }
+            sprintingStartClock.reset();
+        } else if (keyCode == Input.Keys.ESCAPE)
+            mc.uiManager.displayGuiScreen(new GuiIngamePause());
+    }
+
+    /**
+     * Invoked when a key is released.
+     *
+     * @param keyCode the key-code that was released
+     */
+    private void onKeyUp(int keyCode) {
+
+    }
+
+    /**
+     * Updates the breaking of the selected block
+     *
+     * @param pointer pointer touching down. -1, if desktop click
+     */
+    private void updateBlockBreaking(int pointer) {
+        if ((pointer == -1 || !(((MobilePlayerController) this.camController)).pressingButtonWithRotationPointer)) {
+            swingItem();
+            RayTracer.RayTraceResult result = rayTracer.getRayTraceResult();
+            if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK)
+                this.breakingBlocks = true;
+        }
+    }
+
+    private void onBlockBreakingAbort() {
+        this.breakingBlocks = false;
+        this.playerController.onBlockBreakingAbort();
+    }
+
+    private void breakMouseOver() {
+        RayTracer.RayTraceResult result = rayTracer.getRayTraceResult();
+        if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK) {
+            assert result.getBlockPos() != null;
+            int x = result.getBlockPos().getX(), y = result.getBlockPos().getY(), z = result.getBlockPos().getZ();
+            ChunkBase chunk = world.getNearChunkFor(currentChunk, x, z);
+            {
+                BlockPos blockPos = new BlockPos(x, y, z);
+                Objects.requireNonNull(chunk, "Cannot break mouse over block pos: " + blockPos + ". Chunk for position is null!");
+            }
+            IBlockState prevBlockState = chunk.getBlockState(x, y, z);
+            assert prevBlockState != null;
+            chunk.setBlock(x, y, z, null);
+            mc.theWorld.getParticleEngine().spawnBlockBreakingParticles(x, y, z, prevBlockState.getBlock());
+        }
+    }
+
+    /**
+     * @return the state if the player should be rendered
+     */
+    @Override
+    public boolean isVisible() {
+        return cameraMode != CameraMode.FIRST_PERSON;
+    }
+
+    public boolean isBreakingBlocks() {
+        return breakingBlocks;
+    }
+
+    @NotNull
+    @Override
+    public ClientSkin getSkin() {
+        return (ClientSkin) super.getSkin();
+    }
+
+    /**
+     * Enum representing all camera modes
+     */
+    public enum CameraMode {
+        FIRST_PERSON, THIRD_PERSON;
+
+        public CameraMode next() {
+            return values()[(Arrays.asList(values()).indexOf(this) + 1) % values().length];
+        }
     }
 
     /**
@@ -543,38 +613,11 @@ public class EntityPlayerSP extends PlayerBase {
     }
 
     /**
-     * Clock instance used to determine, if the player has stopped walking and quickly started again so sprinting can be toggled.
-     */
-    private final Clock sprintingStartClock = new Clock(false);
-
-    /**
-     * Invoked when a key is pressed
-     *
-     * @param keyCode the key-code that was just pressed down
-     */
-    private void onKeyDown(int keyCode) {
-        if (keyCode == mc.gameSettings.keyBindings.keyBindForward.getValue()) {
-            if (sprintingStartClock.getTimePassed() <= 300) {
-                setSprinting(true);
-            }
-            sprintingStartClock.reset();
-        } else if (keyCode == Input.Keys.ESCAPE)
-            mc.uiManager.displayGuiScreen(new GuiIngamePause());
-    }
-
-    /**
-     * Invoked when a key is released.
-     *
-     * @param keyCode the key-code that was released
-     */
-    private void onKeyUp(int keyCode) {
-
-    }
-
-    /**
      * Class Wrapper converting mouse and keyboard input into player rotation and movement
      */
-    private static class DesktopPlayerController extends EntityPlayerSP.PlayerInputAdapter {
+    private static class DesktopPlayerController extends PlayerInputAdapter {
+
+        private int lastX = Gdx.input.getX(), lastY = Gdx.input.getY();
 
         /**
          * @param player sets {@link #player}
@@ -582,8 +625,6 @@ public class EntityPlayerSP extends PlayerBase {
         DesktopPlayerController(@NotNull EntityPlayerSP player) {
             super(player);
         }
-
-        private int lastX = Gdx.input.getX(), lastY = Gdx.input.getY();
 
         @Override
         public boolean touchDragged(int screenX, int screenY, int pointer) {
@@ -688,74 +729,48 @@ public class EntityPlayerSP extends PlayerBase {
         }
     }
 
-    boolean breakingBlocks = false;
-
-    /**
-     * Updates the breaking of the selected block
-     *
-     * @param pointer pointer touching down. -1, if desktop click
-     */
-    private void updateBlockBreaking(int pointer) {
-        if ((pointer == -1 || !(((EntityPlayerSP.MobilePlayerController) this.camController)).pressingButtonWithRotationPointer)) {
-            swingItem();
-            RayTracer.RayTraceResult result = rayTracer.getRayTraceResult();
-            if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK)
-                breakingBlocks = true;
-        }
-    }
-
-    private void onBlockBreakingAbort() {
-        breakingBlocks = false;
-        playerController.onBlockBreakingAbort();
-    }
-
-    private void breakMouseOver() {
-        RayTracer.RayTraceResult result = rayTracer.getRayTraceResult();
-        if (result.type == RayTracer.RayTraceResult.EnumResultType.BLOCK) {
-            assert result.getBlockPos() != null;
-            int x = result.getBlockPos().getX(), y = result.getBlockPos().getY(), z = result.getBlockPos().getZ();
-            ChunkBase chunk = world.getNearChunkFor(currentChunk, x, z);
-            {
-                BlockPos blockPos = new BlockPos(x, y, z);
-                Objects.requireNonNull(chunk, "Cannot break mouse over block pos: " + blockPos + ". Chunk for position is null!");
-            }
-            IBlockState prevBlockState = chunk.getBlockState(x, y, z);
-            assert prevBlockState != null;
-            chunk.setBlock(x, y, z, null);
-            mc.theWorld.getParticleEngine().spawnBlockBreakingParticles(x, y, z, prevBlockState.getBlock());
-        }
-    }
-
     /**
      * Class Wrapper converting mobile touch input into player movement and rotation
      */
-    private static class MobilePlayerController extends EntityPlayerSP.PlayerInputAdapter {
+    private static class MobilePlayerController extends PlayerInputAdapter {
 
         /**
          * Temp vector for rotation calculation
          */
         @NotNull
         private final Vector3 tmp = new Vector3();
-
-        /**
-         * State if the player preses a button with it's rotation pointer. -> Only possible button = jump button (for now)
-         */
-        boolean pressingButtonWithRotationPointer;
-
-        /**
-         * Last frames player pitch in degrees
-         */
-        private float lastPitchDegrees;
-
-        /**
-         * Last frames position of the finger
-         */
-        private int lastScreenX, lastScreenY;
-
         /**
          * Minecraft instance
          */
         private final ClientMinecraft mc;
+        /**
+         * Timer for resetting the amount the pointer has moved every second
+         */
+        private final Clock blockBreakingClock = new Clock(false);
+        /**
+         * Button layout overlay instance
+         */
+        private final ButtonLayout buttonLayout = new ButtonLayout();
+        /**
+         * State if the player preses a button with it's rotation pointer. -> Only possible button = jump button (for now)
+         */
+        boolean pressingButtonWithRotationPointer;
+        /**
+         * Last frames player pitch in degrees
+         */
+        private float lastPitchDegrees;
+        /**
+         * Last frames position of the finger
+         */
+        private int lastScreenX, lastScreenY;
+        /**
+         * Delta time the player has been staring at a point while holding down the finger.
+         */
+        private float blockBreakDelta = 0;
+        /**
+         * State if the player has already broken a block in the current press of the pointer
+         */
+        private boolean breakingBlocks = false;
 
         /**
          * @param player sets {@link #player}
@@ -767,7 +782,7 @@ public class EntityPlayerSP extends PlayerBase {
         }
 
         /**
-         * Input processing function invoked by {@link EntityPlayerSP.MobilePlayerController.ButtonLayout}
+         * Input processing function invoked by {@link ButtonLayout}
          *
          * @param screenX cursor x coord
          * @param screenY cursor y coord
@@ -816,21 +831,6 @@ public class EntityPlayerSP extends PlayerBase {
         }
 
         /**
-         * Delta time the player has been staring at a point while holding down the finger.
-         */
-        private float blockBreakDelta = 0;
-
-        /**
-         * Timer for resetting the amount the pointer has moved every second
-         */
-        private final Clock blockBreakingClock = new Clock(false);
-
-        /**
-         * State if the player has already broken a block in the current press of the pointer
-         */
-        private boolean breakingBlocks = false;
-
-        /**
          * Updates the block breaking input
          */
         private void updateBlockBreaking() {
@@ -856,6 +856,48 @@ public class EntityPlayerSP extends PlayerBase {
                     this.player.onBlockBreakingAbort();
                 }
             }
+        }
+
+        /**
+         * Renders a key overlay
+         */
+        @Override
+        public void render() {
+            buttonLayout.render();
+        }
+
+        @Override
+        public boolean touchDragged(int screenX, int screenY, int pointer) {
+            buttonLayout.touchDragged(screenX, screenY, pointer);
+            return super.touchDragged(screenX, screenY, pointer);
+        }
+
+        /**
+         * On touch down
+         *
+         * @param screenX touch down x coord
+         * @param screenY touch down y coord
+         * @param pointer pointer index
+         * @param button  button index
+         * @return state
+         */
+        @Override
+        public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+
+
+            buttonLayout.touchDown(screenX, screenY, pointer, button);
+            if (buttonLayout.rotationPointer == pointer) {
+                lastScreenX = screenX;
+                lastScreenY = screenY;
+            }
+
+            return super.touchDown(screenX, screenY, pointer, button);
+        }
+
+        @Override
+        public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+            buttonLayout.touchUp(screenX, screenY, pointer, button);
+            return super.touchUp(screenX, screenY, pointer, button);
         }
 
         /**
@@ -922,6 +964,14 @@ public class EntityPlayerSP extends PlayerBase {
              * Array storing all buttons controlling keyBinds corresponding to a given move direction. eg. left, right backwards forwards.
              */
             private final Button[] moveButtons;
+            /**
+             * Pointer id which is actually controlling the player's rotation
+             */
+            private int rotationPointer = -1;
+            /**
+             * The amount of pixel the mouse has moved during the last second.
+             */
+            private int pointerMovedInLastSecond = 0;
 
             ButtonLayout() {
                 super(mc.spriteBatch);
@@ -1018,16 +1068,6 @@ public class EntityPlayerSP extends PlayerBase {
                 return true;
             }
 
-            /**
-             * Pointer id which is actually controlling the player's rotation
-             */
-            private int rotationPointer = -1;
-
-            /**
-             * The amount of pixel the mouse has moved during the last second.
-             */
-            private int pointerMovedInLastSecond = 0;
-
             @Override
             public boolean touchDragged(int screenX, int screenY, int pointer) {
 
@@ -1054,67 +1094,5 @@ public class EntityPlayerSP extends PlayerBase {
             }
         }
 
-        /**
-         * Button layout overlay instance
-         */
-        private final EntityPlayerSP.MobilePlayerController.ButtonLayout buttonLayout = new EntityPlayerSP.MobilePlayerController.ButtonLayout();
-
-        /**
-         * Renders a key overlay
-         */
-        @Override
-        public void render() {
-            buttonLayout.render();
-        }
-
-        @Override
-        public boolean touchDragged(int screenX, int screenY, int pointer) {
-            buttonLayout.touchDragged(screenX, screenY, pointer);
-            return super.touchDragged(screenX, screenY, pointer);
-        }
-
-
-        /**
-         * On touch down
-         *
-         * @param screenX touch down x coord
-         * @param screenY touch down y coord
-         * @param pointer pointer index
-         * @param button  button index
-         * @return state
-         */
-        @Override
-        public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-
-
-            buttonLayout.touchDown(screenX, screenY, pointer, button);
-            if (buttonLayout.rotationPointer == pointer) {
-                lastScreenX = screenX;
-                lastScreenY = screenY;
-            }
-
-            return super.touchDown(screenX, screenY, pointer, button);
-        }
-
-        @Override
-        public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-            buttonLayout.touchUp(screenX, screenY, pointer, button);
-            return super.touchUp(screenX, screenY, pointer, button);
-        }
-
-    }
-
-    /**
-     * @return the state if the player should be rendered
-     */
-    @Override
-    public boolean isVisible() {
-        return cameraMode != EntityPlayerSP.CameraMode.FIRST_PERSON;
-    }
-
-    @NotNull
-    @Override
-    public ClientSkin getSkin() {
-        return (ClientSkin) super.getSkin();
     }
 }

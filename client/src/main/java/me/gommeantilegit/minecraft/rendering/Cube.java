@@ -1,13 +1,12 @@
 package me.gommeantilegit.minecraft.rendering;
 
 import com.badlogic.gdx.graphics.Mesh;
-import com.badlogic.gdx.graphics.g3d.utils.MeshBuilder;
 import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
 import me.gommeantilegit.minecraft.shader.api.CommonShader;
-import me.gommeantilegit.minecraft.shader.programs.StdShader;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
 import me.gommeantilegit.minecraft.world.chunk.builder.OptimizedMeshBuilder;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import static com.badlogic.gdx.graphics.GL20.GL_TRIANGLES;
 import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBUTES;
@@ -22,12 +21,16 @@ public class Cube {
      * Texture pixel region sizes.
      */
     private final float textureWidth, textureHeight, textureDepth;
+
+    @NotNull
     private final CustomTexture texture;
 
     private int textureOffsetX0, textureOffsetY0;
 
     public float x, y, z;
     public float xRot, yRot, zRot;
+
+    @Nullable
     private Mesh mesh;
 
     public float rotationPointX;
@@ -46,8 +49,7 @@ public class Cube {
 
     public Cube(int textureOffsetX0,
                 int textureOffsetY0,
-                float x, float y, float z, float width, float height, float depth, float textureWidth, float textureHeight, float textureDepth, CustomTexture texture) {
-        this.texture = texture;
+                float x, float y, float z, float width, float height, float depth, float textureWidth, float textureHeight, float textureDepth, @NotNull CustomTexture texture) {
         this.textureOffsetX0 = textureOffsetX0;
         this.textureOffsetY0 = textureOffsetY0;
         this.textureDepth = textureDepth;
@@ -59,6 +61,7 @@ public class Cube {
         this.width = width;
         this.height = height;
         this.depth = depth;
+        this.texture = texture;
     }
 
     public void render(@NotNull CommonShader shaderProgram) {
