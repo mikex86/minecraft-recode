@@ -43,7 +43,7 @@ public class SoundResource {
     public static void initSounds() {
         if (!SOUND_RESOURCES.isEmpty())
             throw new IllegalStateException("SoundResources already initialized!");
-        String[] soundPaths = Gdx.files.classpath("sound/sounds.txt").readString(StandardCharsets.UTF_8.name()).split("\n");
+        String[] soundPaths = Gdx.files.classpath("sound/sounds.txt").readString(StandardCharsets.UTF_8.name()).replace("\r", "").split("\n");
         for (String soundPath : soundPaths) {
             LazyProperty<SoundResource> lazyProperty = new LazyProperty<>(() -> new SoundResource(soundPath));
             SOUND_RESOURCES.add(lazyProperty);

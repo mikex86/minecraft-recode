@@ -187,7 +187,10 @@ public abstract class ChunkCreatorBase implements Tickable {
     public synchronized ChunkBase tryCreateChunkFor(@NotNull Vec2i position) {
         Vec2i origin = world.getChunkOrigin(position.getX(), position.getY());
         ChunkBase prev = world.getWorldChunkHandler().getChunkAt(origin.getX(), origin.getY());
-        return Objects.requireNonNullElseGet(prev, () -> createChunk(origin));
+        if (prev == null) {
+            return createChunk(origin);
+        }
+        return prev;
     }
 
     /**

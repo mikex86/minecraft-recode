@@ -115,7 +115,7 @@ public class GMC {
         int readHashCode;
         Set<String> handledProperties = new HashSet<>();
         Set<Map.Entry<String, Field>> entries = properties.entrySet();
-        List<String> propertyNames = entries.stream().map(Map.Entry::getKey).collect(Collectors.toUnmodifiableList());
+        List<String> propertyNames = entries.stream().map(Map.Entry::getKey).collect(Collectors.toList());
 
         while ((readHashCode = dataIn.readInt()) != -1) { // object terminator --> -1
             for (Map.Entry<String, Field> property : entries) {
@@ -134,8 +134,7 @@ public class GMC {
                 break;
             }
         }
-        for (
-                Map.Entry<String, Field> entry : entries) {
+        for (Map.Entry<String, Field> entry : entries) {
             String propertyName = entry.getKey();
             if (handledProperties.contains(propertyName)) {
                 continue;

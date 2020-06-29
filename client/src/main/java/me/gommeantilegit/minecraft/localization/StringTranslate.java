@@ -31,7 +31,9 @@ public class StringTranslate {
      */
     public StringTranslate() {
         FileHandle languagesFile = Gdx.files.classpath("lang/languages.txt");
-        String[] languageNames = languagesFile.readString("UTF-8").split("\n");
+        String[] languageNames = languagesFile.readString("UTF-8")
+                .replace("\r", "")
+                .split("\n");
         this.languages = new Language[languageNames.length];
         int i = 0;
         for (String languageName : languageNames) {

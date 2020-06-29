@@ -40,7 +40,7 @@ public class ChunkMeshRebuilder implements AsyncOperation {
         Thread thread = new Thread(r, "ChunkRebuilder-PoolThread");
         thread.setDaemon(true);
         thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
-        thread.setPriority(Thread.MAX_PRIORITY);
+        thread.setPriority(Thread.MIN_PRIORITY);
         return thread;
     });
 

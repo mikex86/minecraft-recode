@@ -36,7 +36,11 @@ public class ServerChunkCreator extends ChunkCreatorBase {
         synchronized (this) { // synchronizing to prevent other threads from racing to create a "NON EXISTING" chunk multiple times
             Vec2i origin = world.getChunkOrigin(position.getX(), position.getY());
             prev = ((ServerWorld) world).getWorldChunkHandler().getChunkAt(origin.getX(), origin.getY());
-            chunk = Objects.requireNonNullElseGet(prev, () -> createChunk(origin));
+            if (prev == null) {
+                chunk = createChunk(origin);
+            } else {
+                chunk = prev;
+            }
         }
         if (prev == null) {
             ((ServerWorld) world).getWorldGenerator().onChunkCreated(chunk); // Invoking the terrain generation

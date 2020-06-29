@@ -10,6 +10,7 @@ import java.util.Date;
 /**
  * Handler object for assigning log files where logs are saved
  */
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public class LogFileHandler {
 
     @NotNull
@@ -41,6 +42,7 @@ public class LogFileHandler {
      */
     @NotNull
     public File newLogFile(@NotNull String applicationExitState) {
+        this.logFileDirectory.mkdirs();
         return new File(logFileDirectory, SDF.format(new Date()) + "_" + applicationExitState + ".log");
     }
 

@@ -23,27 +23,27 @@ dependencies {
 }
 
 configure<JavaPluginConvention> {
-    sourceCompatibility = JavaVersion.VERSION_1_9
+    sourceCompatibility = JavaVersion.VERSION_1_8
 }
 
 application {
     mainClassName = "me.gommeantilegit.minecraft.server.MinecraftServer"
 }
 
-val fatJar = task("fatJar", type = org.gradle.jvm.tasks.Jar::class) {
-    baseName = "${project.name}-fat"
-    manifest {
-        attributes["Implementation-Title"] = "Gradle Jar File Example"
-        attributes["Implementation-Version"] = version
-        attributes["Main-Class"] = "me.gommeantilegit.minecraft.server.MinecraftServer"
-    }
-    from(configurations.runtimeClasspath.get().map({ if (it.isDirectory) it else zipTree(it) }))
-    with(tasks.jar.get() as CopySpec)
-}
-
-
-tasks {
-    "build" {
-        dependsOn(fatJar)
-    }
-}
+//val fatJar = task("fatJar", type = org.gradle.jvm.tasks.Jar::class) {
+//    baseName = "${project.name}-fat"
+//    manifest {
+//        attributes["Implementation-Title"] = "Gradle Jar File Example"
+//        attributes["Implementation-Version"] = version
+//        attributes["Main-Class"] = "me.gommeantilegit.minecraft.server.MinecraftServer"
+//    }
+//    from(configurations.runtimeClasspath.get().map({ if (it.isDirectory) it else zipTree(it) }))
+//    with(tasks.jar.get() as CopySpec)
+//}
+//
+//
+//tasks {
+//    "build" {
+//        dependsOn(fatJar)
+//    }
+//}
