@@ -30,6 +30,6 @@ dependencies {
     implementation(project(":logging"))
     implementation(project(":utils"))
     implementation(project(":networking"))
-    implementation("org.jetbrains:annotations:19.0.0")
+    implementation("org.jetbrains:annotations:22.0.0")
     implementation("io.netty:netty-all:5.0.0.Alpha2")
 }

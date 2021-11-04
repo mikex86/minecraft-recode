@@ -28,7 +28,7 @@ public class ServerPacketDecoder extends MappedPacketDecoder<ServerPacket> {
      */
     @Override
     protected void registerPacketDecoders() {
-        Reflections serverPackets = new Reflections(ConfigurationBuilder.build(ServerRequestUserInfoPacket.class.getPackage().getName()).addClassLoader(getClass().getClassLoader()));
+        Reflections serverPackets = new Reflections(ConfigurationBuilder.build(ServerRequestUserInfoPacket.class.getPackage().getName()).addClassLoaders(getClass().getClassLoader()));
         Set<Class<? extends ServerPacket>> serverPacketClasses = serverPackets.getSubTypesOf(ServerPacket.class);
         for (Class<? extends ServerPacket> packetClass : serverPacketClasses) {
             if (packetClass.isAnnotationPresent(PacketInfo.class)) {

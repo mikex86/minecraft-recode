@@ -15,10 +15,6 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":utils"))
     implementation("io.netty:netty-all:5.0.0.Alpha2")
-    implementation("org.reflections:reflections:0.9.11")
-    implementation("org.jetbrains:annotations:19.0.0")
-}
-
-configure<JavaPluginConvention> {
-    sourceCompatibility = JavaVersion.VERSION_1_8
+    implementation("org.reflections:reflections:0.10.2")
+    implementation("org.jetbrains:annotations:22.0.0")
 }

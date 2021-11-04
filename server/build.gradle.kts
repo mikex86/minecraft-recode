@@ -17,17 +17,13 @@ dependencies {
     implementation(project(":logging"))
     implementation(project(":webui"))
     implementation("io.netty:netty-all:5.0.0.Alpha2")
-    implementation("com.google.code.gson:gson:2.8.5")
+    implementation("com.google.code.gson:gson:2.8.9")
     testImplementation("junit", "junit", "4.12")
-    implementation("org.jetbrains:annotations:19.0.0")
-}
-
-configure<JavaPluginConvention> {
-    sourceCompatibility = JavaVersion.VERSION_1_8
+    implementation("org.jetbrains:annotations:22.0.0")
 }
 
 application {
-    mainClassName = "me.gommeantilegit.minecraft.server.MinecraftServer"
+    mainClass.set("me.gommeantilegit.minecraft.server.MinecraftServer")
 }
 
 //val fatJar = task("fatJar", type = org.gradle.jvm.tasks.Jar::class) {

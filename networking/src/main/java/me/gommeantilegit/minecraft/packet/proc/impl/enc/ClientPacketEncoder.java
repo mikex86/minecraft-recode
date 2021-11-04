@@ -23,7 +23,7 @@ public class ClientPacketEncoder extends MappedPacketEncoder<ClientPacket> {
      */
     @Override
     protected void registerPacketEncoders() {
-        Reflections clientPackets = new Reflections(ConfigurationBuilder.build(ClientHandshakePacket.class.getName().substring(0, ClientHandshakePacket.class.getName().lastIndexOf('.'))).addClassLoader(getClass().getClassLoader()));
+        Reflections clientPackets = new Reflections(ConfigurationBuilder.build(ClientHandshakePacket.class.getName().substring(0, ClientHandshakePacket.class.getName().lastIndexOf('.'))).addClassLoaders(getClass().getClassLoader()));
         Set<Class<? extends ClientPacket>> clientPacketClasses = clientPackets.getSubTypesOf(ClientPacket.class);
         for (Class<? extends ClientPacket> packetClass : clientPacketClasses) {
             if (packetClass.isAnnotationPresent(PacketInfo.class)) {

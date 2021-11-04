@@ -36,12 +36,11 @@ public class IngameHud extends Overlay2D {
 
         int sectionDrawCalls = mc.theWorld.getWorldRenderer().getChunkSectionDrawCalls();
 
-        if (this.fps != fps || this.drawCalls != sectionDrawCalls) {
+        if (this.fps != fps || this.drawCalls != sectionDrawCalls || mc.thePlayer.motionX != mc.thePlayer.lastMotionX || mc.thePlayer.motionY != mc.thePlayer.lastMotionY || mc.thePlayer.motionZ != mc.thePlayer.lastMotionZ) {
             this.fpsString = "FPS: " + fps + "\nSection-Draw-calls: " + sectionDrawCalls + "\nFree memory: " + (Runtime.getRuntime().freeMemory() / (float) Runtime.getRuntime().totalMemory()) * 100 + "%\nFree Memory: " +
                     humanReadableByteCount(Runtime.getRuntime().freeMemory(), true) + "\nTotal Memory: " + humanReadableByteCount(Runtime.getRuntime().totalMemory(), true) +
                     "\nMax memory " + humanReadableByteCount(Runtime.getRuntime().maxMemory(), true) + "\nGrowable: " + humanReadableByteCount(Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory(), true) + "\nLoaded chunks: " + mc.theWorld.getWorldChunkHandler().getLoadedChunks().size()
-                    + "\nPlayer position: " + mc.thePlayer.getUpdatedPositionVector() + "\nSpeed: " +
-                    (Math.sqrt(mc.thePlayer.motionX * mc.thePlayer.motionX + mc.thePlayer.motionY * mc.thePlayer.motionY + mc.thePlayer.motionZ * mc.thePlayer.motionZ) * 20) * 3.6 + " km/h";
+                    + "\nPlayer position: " + mc.thePlayer.getUpdatedPositionVector();
             this.drawCalls = sectionDrawCalls;
             this.fps = fps;
         }
