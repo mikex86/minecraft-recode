@@ -154,7 +154,7 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
         this.chunkLoader.tick(partialTicks);
 
         this.blockStateSemaphore.tick(partialTicks);
-//        this.worldTime++; TODO: ADD BACK
+        this.worldTime++;
     }
 
     protected abstract void tickChunks(float partialTicks, @NotNull Collection<ChunkBase> chunks);
@@ -191,7 +191,7 @@ public abstract class WorldBase implements Tickable, AsyncOperation {
      * @param z             z position
      * @param newBlockState the new block state
      */
-    public void setBlock(int x, int y, int z, @Nullable BlockState newBlockState) {
+    public void setBlock(int x, int y, int z, @Nullable IBlockState newBlockState) {
         ChunkBase chunk = getChunkForPosition(x, z);
         if (chunk == null)
             throw new IllegalStateException("Couldn't set block state of coordinates [x: " + x + ", y:" + y + ", " + z + "] to blockID: " + newBlockState + ". No ChunkBase containing coordinates.");

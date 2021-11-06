@@ -23,11 +23,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 
 /**
- * An minimalistic hash map optimized for long keys. Not thread-safe.
+ * A minimalistic hash map optimized for long keys. Not thread-safe.
  *
  * @param <T> The class to store.
  * @author Markus
  */
+@SuppressWarnings("unchecked")
 public final class LongHashMap<T> {
 
     public static class Entry {
@@ -51,7 +52,6 @@ public final class LongHashMap<T> {
         this(16);
     }
 
-    @SuppressWarnings("unchecked")
     public LongHashMap(int capacity) {
         this.capacity = capacity;
         this.threshold = capacity * 4 / 3;

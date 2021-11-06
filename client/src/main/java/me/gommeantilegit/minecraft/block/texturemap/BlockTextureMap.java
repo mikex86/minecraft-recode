@@ -1,15 +1,15 @@
 package me.gommeantilegit.minecraft.block.texturemap;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import kotlin.Pair;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
-import me.gommeantilegit.minecraft.annotations.IOAccess;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
-import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
 import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
@@ -17,14 +17,13 @@ import me.gommeantilegit.minecraft.utils.Pointer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 @SideOnly(side = Side.CLIENT)
 public class BlockTextureMap {
 
-    /**
-     * Maximal width of a row in pixel
-     */
-    private final int maxWidth;
+    private static final int TEXTURE_ATLAS_SIZE = 1024;
 
     /**
      * The Block renderer registry where every block has a parent renderer
@@ -33,14 +32,14 @@ public class BlockTextureMap {
     private final ClientBlockRendererTypeRegistry rendererTypeRegistry;
 
     /**
-     * The actual width of the image.
+     * The width of the image.
      */
-    private int width;
+    private final int width = TEXTURE_ATLAS_SIZE;
 
     /**
-     * The actual height of the image
+     * The height of the image
      */
-    private int height;
+    private final int height = TEXTURE_ATLAS_SIZE;
 
     /**
      * Counter UV SOUND_RESOURCES
@@ -57,16 +56,19 @@ public class BlockTextureMap {
     private final Pointer<CustomTexture> texturePointer = new Pointer<>();
 
     /**
-     * Pointer storing the the texture wrapper wrapped around the value of {@link #texturePointer}
+     * Pointer storing the texture wrapper wrapped around the value of {@link #texturePointer}
      */
     @NotNull
     private final Pointer<TextureWrapper> textureWrapper = new Pointer<>();
+
+    @NotNull
+    private final Map<String, Vector2> resourcePositions = new HashMap<>();
 
     /**
      * List of pairs storing the texture resource paths with their parent uv position in the final texture map image
      */
     @NotNull
-    private final ArrayList<Pair<String, Vector2>> textureResources = new ArrayList<>();
+    private final ArrayList<Pair<Pixmap, Vector2>> textureResources = new ArrayList<>();
 
     /**
      * Parent minecraft instance
@@ -74,56 +76,54 @@ public class BlockTextureMap {
     @NotNull
     private final ClientMinecraft mc;
 
-    /**
-     * @param maxWidth sets {@link #maxWidth}
-     */
-    public BlockTextureMap(int maxWidth, @NotNull ClientMinecraft mc, @NotNull ClientBlockRendererTypeRegistry rendererTypeRegistry) {
-        this.maxWidth = maxWidth;
+    public BlockTextureMap(@NotNull ClientMinecraft mc, @NotNull ClientBlockRendererTypeRegistry rendererTypeRegistry) {
         this.mc = mc;
         this.rendererTypeRegistry = rendererTypeRegistry;
     }
 
-    /**
-     * Sets up the texture map by placing every block texture on the texture map
-     */
     public void setupTextureMap() {
-        for (BlockTypeRenderer value : rendererTypeRegistry.getRendererRegistry().values()) {
-            for (String textureResource : value.getTextureResources()) {
-                addTexture("textures/blocks/" + textureResource + ".png");
-            }
-        }
     }
 
     private int greatestImageHeightOfRow;
 
+
     /**
-     * adds the resource path to the resources of the map
+     * Adds the texture to the resources of the map
      *
-     * @param blockCustomTexture the given classpath resource
+     * @param textureResource the resource path to the texture to add
      * @return the top left corner where in the final texturePointer map the block added will be.
      */
-    @IOAccess
     @NotNull
-    public Vector2 addTexture(@NotNull String blockCustomTexture) {
-        Pixmap img = new Pixmap(Gdx.files.classpath(blockCustomTexture));
-
+    public Vector2 addTexture(@NotNull String textureResource) {
+        {
+            Vector2 pos;
+            if ((pos = this.resourcePositions.get(textureResource)) != null) {
+                return pos; // return the position where this texture is already placed
+            }
+        }
+        FileHandle fileHandle = Gdx.files.classpath(textureResource);
+        Pixmap img = new Pixmap(fileHandle);
         Vector2 position = new Vector2(u, v);
         if (img.getHeight() > greatestImageHeightOfRow) {
             greatestImageHeightOfRow = img.getHeight();
         }
-        if (u + img.getWidth() > maxWidth) {
+        if (u + img.getWidth() > width) {
             u = 0;
             v += greatestImageHeightOfRow;
-        } else
+            if (v > height) {
+                throw new IllegalArgumentException("Texture atlas too small!");
+            }
+        } else {
             u += img.getWidth();
-        this.textureResources.add(new Pair<>(blockCustomTexture, position));
+        }
+        this.textureResources.add(new Pair<>(img, position));
+        this.resourcePositions.put(textureResource, position);
         return position;
     }
 
     public void build() {
         Pixmap img = buildImage();
-        this.width = img.getWidth();
-        this.height = img.getHeight();
+        PixmapIO.writePNG(Gdx.files.local("debug.png"), img);
         this.texturePointer.value = new CustomTexture(img);
         this.texturePointer.value.setWrap(Texture.TextureWrap.MirroredRepeat, Texture.TextureWrap.MirroredRepeat); // Repeating texture mirrored to prevent texture floating point rounding errors leading to white pixels
         this.textureWrapper.value = new TextureWrapper(this.texturePointer.value, this.mc.spriteBatch);
@@ -137,8 +137,8 @@ public class BlockTextureMap {
     private Pixmap buildImage() {
         int imgHeight = this.v + greatestImageHeightOfRow;
         Pixmap img = new Pixmap(this.u, imgHeight, Pixmap.Format.RGBA8888);
-        for (Pair<String, Vector2> entry : this.textureResources) {
-            Pixmap pixmap = new Pixmap(Gdx.files.classpath(entry.getFirst()));
+        for (Pair<Pixmap, Vector2> entry : this.textureResources) {
+            Pixmap pixmap = entry.getFirst();
             Vector2 pos = entry.getSecond();
             img.drawPixmap(pixmap, (int) pos.x, (int) pos.y);
         }
@@ -166,10 +166,6 @@ public class BlockTextureMap {
 
     public int getWidth() {
         return width;
-    }
-
-    public int getMaxWidth() {
-        return maxWidth;
     }
 
     public int getHeight() {

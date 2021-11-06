@@ -62,12 +62,12 @@ public abstract class AbstractMinecraft implements Tickable {
      * The minecraft versions prefix like "Alpha" or "Beta"
      */
     @NotNull
-    public static final String MINECRAFT_VERSION_PREFIX = "Alpha";
+    public static final String MINECRAFT_VERSION_PREFIX = "Recode";
 
     /**
      * The minecraft versions prefix char like 'a' for alpha or 'b' for beta
      */
-    public static final char MINECRAFT_VERSION_PREFIX_CHAR = 'a';
+    public static final char MINECRAFT_VERSION_PREFIX_CHAR = 'v';
 
     protected ChunkFragmenter chunkFragmenter;
 

@@ -46,11 +46,17 @@ public abstract class GuiScreen extends Overlay2D implements Tickable {
         super(null);
     }
 
-    /**
-     * Draws a screen full of dirt textures
-     */
     protected void drawDefaultBackground() {
-        if (mc.theWorld == null) {
+        drawDefaultBackground(mc.theWorld == null);
+    }
+
+    /**
+     * Draws the default background screen
+     *
+     * @param dirt if true, draw a screen full of dirt textures, if false, draw a transparent darkening rect
+     */
+    protected void drawDefaultBackground(boolean dirt) {
+        if (dirt) {
             if (backgroundTextureWrapper == null) {
                 backgroundTextureWrapper = new TextureWrapper("textures/gui/gui_background.png", spriteBatch);
                 backgroundTextureWrapper.getGlTexture().setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);

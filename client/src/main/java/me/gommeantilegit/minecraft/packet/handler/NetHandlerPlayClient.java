@@ -115,7 +115,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
                 mc.theWorld.getChunkLoader().addViewer(mc.thePlayer);
                 mc.theWorld.spawnEntityInWorld(mc.thePlayer); // Spawning player
 
-                setWorldSetup(true);
+                setWorldSetup();
             }
         });
 
@@ -190,7 +190,7 @@ public class NetHandlerPlayClient extends MappedPacketHandler<ServerPacket> {
         return worldSetup;
     }
 
-    private void setWorldSetup(boolean state) {
+    private void setWorldSetup() {
         this.worldSetup = true;
     }
 }

@@ -6,9 +6,10 @@ import me.gommeantilegit.minecraft.annotations.NeedsOpenGLContext;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.entity.Entity;
 import me.gommeantilegit.minecraft.entity.IRenderableEntity;
+import me.gommeantilegit.minecraft.entity.mesh.MeshBuildingEntity;
 import me.gommeantilegit.minecraft.entity.renderer.model.IEntityModel;
 import me.gommeantilegit.minecraft.entity.renderer.model.impl.ParticleModel;
-import me.gommeantilegit.minecraft.rendering.mesh.MeshBuilding;
+import me.gommeantilegit.minecraft.rendering.mesh.IMeshBuilding;
 import me.gommeantilegit.minecraft.shader.api.CommonShader;
 import me.gommeantilegit.minecraft.texture.TextureWrapper;
 import me.gommeantilegit.minecraft.texture.custom.CustomTexture;
@@ -22,7 +23,7 @@ import static me.gommeantilegit.minecraft.rendering.Constants.STD_VERTEX_ATTRIBU
 import static me.gommeantilegit.minecraft.util.RenderUtils.rect;
 
 @SideOnly(side = Side.CLIENT)
-public class Particle extends Entity implements MeshBuilding, IRenderableEntity<CommonShader, Particle> {
+public class Particle extends MeshBuildingEntity implements IRenderableEntity<CommonShader, Particle> {
 
     @NotNull
     private static final ParticleModel PARTICLE_MODEL = new ParticleModel();
@@ -91,7 +92,7 @@ public class Particle extends Entity implements MeshBuilding, IRenderableEntity<
         this.textureRegion = textureRegion;
         this.model = PARTICLE_MODEL;
 
-        //Initializing particle SOUND_RESOURCES
+        //Initializing particle values
         {
             this.setSize(0.2f, 0.2f);
             this.heightOffset = this.bbHeight / 2.0f;

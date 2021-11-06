@@ -7,10 +7,6 @@ plugins {
 group = "me.gommeantilegit.minecraft"
 version = "1.0-SNAPSHOT"
 
-application {
-    mainClass.set("DesktopLauncher")
-}
-
 repositories {
     mavenCentral()
 }
@@ -23,7 +19,6 @@ dependencies {
     implementation(project(":core"))
     implementation("org.jetbrains:annotations:22.0.0")
 }
-
 
 
 val fatJar = task("fatJar", type = org.gradle.jvm.tasks.Jar::class) {
