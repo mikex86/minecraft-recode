@@ -1,4 +1,4 @@
-rootProject.name = 'libgdxtest2'
+rootProject.name = 'minecraft-recode'
 include 'core'
 include 'utils'
 include 'networking'

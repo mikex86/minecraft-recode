@@ -14,7 +14,7 @@ repositories {
 dependencies {
     implementation("com.badlogicgames.gdx:gdx-platform:1.10.0")
     implementation("com.badlogicgames.gdx:gdx-backend-lwjgl3:1.10.0")
-    runtime(files("lib/natives.jar"))
+    runtimeOnly(files("lib/natives.jar"))
     implementation(project(":client"))
     implementation(project(":core"))
     implementation("org.jetbrains:annotations:22.0.0")
