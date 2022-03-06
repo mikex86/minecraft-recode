@@ -123,7 +123,6 @@ public class BlockTextureMap {
 
     public void build() {
         Pixmap img = buildImage();
-        PixmapIO.writePNG(Gdx.files.local("debug.png"), img);
         this.texturePointer.value = new CustomTexture(img);
         this.texturePointer.value.setWrap(Texture.TextureWrap.MirroredRepeat, Texture.TextureWrap.MirroredRepeat); // Repeating texture mirrored to prevent texture floating point rounding errors leading to white pixels
         this.textureWrapper.value = new TextureWrapper(this.texturePointer.value, this.mc.spriteBatch);

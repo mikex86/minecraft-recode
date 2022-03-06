@@ -1,6 +1,6 @@
 plugins {
     `java-library`
-    kotlin("jvm") version "1.3.72"
+    kotlin("jvm") version "1.6.10"
 }
 
 group = "me.gommeantilegit.minecraft"
