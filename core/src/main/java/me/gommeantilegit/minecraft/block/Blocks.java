@@ -2,6 +2,7 @@ package me.gommeantilegit.minecraft.block;
 
 import me.gommeantilegit.minecraft.AbstractMinecraft;
 import me.gommeantilegit.minecraft.annotations.ThreadSafe;
+import me.gommeantilegit.minecraft.block.material.Material;
 import me.gommeantilegit.minecraft.block.material.Materials;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.block.state.palette.GlobalBlockStatePalette;

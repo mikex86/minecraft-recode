@@ -5,6 +5,7 @@ import me.gommeantilegit.minecraft.hud.scaling.DPI;
 import me.gommeantilegit.minecraft.netty.NettyClient;
 import me.gommeantilegit.minecraft.ui.button.GuiButton;
 import me.gommeantilegit.minecraft.ui.screen.GuiScreen;
+import me.gommeantilegit.minecraft.world.chunk.ClientChunk;
 import org.jetbrains.annotations.NotNull;
 
 import java.net.ConnectException;
@@ -83,14 +84,19 @@ public class GuiConnecting extends GuiScreen {
 
     @Override
     public void render() {
-        if (mc.theWorld != null && mc.thePlayer.world != null && mc.nettyClient.netHandlerPlayClient.isWorldSetup() && mc.thePlayer.spawned) {
+        boolean worldLoaded = worldLoaded();
+        if (worldLoaded) {
             Gdx.input.setCursorCatched(true);
             mc.inputHandler.registerInputProcessor(mc.thePlayer.camController); // Registering the player cam controller as input processor. Needs to be unregistered on disconnect!
             mc.uiManager.displayGuiScreen(null);
             return;
         }
-        drawDefaultBackground();
+        drawDefaultBackground(true);
         mc.uiManager.fontRenderer.drawCenteredStringWithShadow(mc.nettyClient == null || mc.nettyClient.channel == null || !mc.nettyClient.channel.isActive() ? "Connecting to the server..." : "Logging in...", DPI.scaledWidth / 2, DPI.scaledHeight / 2 - 50, 0xffffffff);
         super.render();
+    }
+
+    private boolean worldLoaded() {
+        return mc.theWorld != null && mc.thePlayer.world != null && mc.nettyClient.netHandlerPlayClient.isWorldSetup() && mc.thePlayer.spawned && ((ClientChunk) mc.thePlayer.getCurrentChunk()).getChunkSection((int) mc.thePlayer.posY).hasMesh();
     }
 }

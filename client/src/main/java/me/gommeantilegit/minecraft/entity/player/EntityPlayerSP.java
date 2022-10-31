@@ -6,10 +6,12 @@ import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.graphics.PerspectiveCamera;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.math.collision.BoundingBox;
 import me.gommeantilegit.minecraft.ClientMinecraft;
 import me.gommeantilegit.minecraft.Side;
 import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.block.Block;
+import me.gommeantilegit.minecraft.block.Blocks;
 import me.gommeantilegit.minecraft.block.sound.BlockSoundType;
 import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.entity.player.controller.PlayerController;
@@ -17,6 +19,8 @@ import me.gommeantilegit.minecraft.entity.player.packet.PacketSender;
 import me.gommeantilegit.minecraft.entity.player.skin.ClientSkin;
 import me.gommeantilegit.minecraft.gamesettings.settingtypes.KeyBindSetting;
 import me.gommeantilegit.minecraft.hud.scaling.DPI;
+import me.gommeantilegit.minecraft.phys.AxisAlignedBB;
+import me.gommeantilegit.minecraft.raytrace.IRayTracer;
 import me.gommeantilegit.minecraft.raytrace.RayTracer;
 import me.gommeantilegit.minecraft.raytrace.RenderingRayTracer;
 import me.gommeantilegit.minecraft.rendering.GLContext;
@@ -224,20 +228,20 @@ public class EntityPlayerSP extends RenderablePlayer {
             this.packetSender.sendMovePackets();
         }
 
-//        motionY *= 0;
-//        if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
-//            motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
-//            motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
-////            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
-////            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
-//        }
-//
-//        if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
-//            motionY = 1;
-//        }
-//        if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
-//            motionY = -1;
-//        }
+        motionY *= 0;
+        if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
+            motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
+            motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
+//            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+//            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+        }
+
+        if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
+            motionY = 1;
+        }
+        if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
+            motionY = -1;
+        }
         updatedPositionVector.set(posX, posY, posZ);
     }
 
@@ -399,11 +403,11 @@ public class EntityPlayerSP extends RenderablePlayer {
         StdShader stdShader = this.mc.shaderManager.stdShader;
 
         viewBobPosOffset.set(
-                (float) sin(f1 * (float) PI) * f2 * 0.5F,
+                        (float) sin(f1 * (float) PI) * f2 * 0.5F,
 //                0,
-                (float) -abs(cos(f1 * (float) PI) * f2),
-                0
-        )
+                        (float) -abs(cos(f1 * (float) PI) * f2),
+                        0
+                )
                 .rotate(-(rotationPitch), 1, 0, 0)
                 .rotate(rotationYaw, 0, 1, 0);
 
@@ -714,8 +718,22 @@ public class EntityPlayerSP extends RenderablePlayer {
         @Override
         public boolean touchDown(int screenX, int screenY, int pointer, int button) {
             //Handling block breaking
-            if (button == 0) {
+            if (button == 0) { // left click
                 player.updateBlockBreaking(-1);
+            } else if (button == 1) { // right click
+                IRayTracer.RayTraceResult hitResult = player.rayTracer.getRayTraceResult();
+                if (hitResult.type == IRayTracer.RayTraceResult.EnumResultType.BLOCK) {
+                    BlockPos blockPos = Objects.requireNonNull(hitResult.getBlockPos(), "HitResult BlockPos returned null for block type result");
+                    EnumFacing hitSide = Objects.requireNonNull(hitResult.getHitSide(), "HitResult HitSide returned null for block type result");
+                    BlockPos newPos = blockPos.offset(hitSide);
+                    AxisAlignedBB blockBoundingBox = new AxisAlignedBB(
+                            newPos.getX(), newPos.getY(), newPos.getZ(),
+                            newPos.getX() + 1, newPos.getY() + 1, newPos.getZ() + 1
+                    );
+                    if (player.world.getBlock(newPos) == null && !player.getBoundingBox().expand(abs(player.motionX), abs(player.motionY), abs(player.motionZ)).intersects(blockBoundingBox)) {
+                        player.world.setBlock(newPos.getX(), newPos.getY(), newPos.getZ(), player.mc.getBlocks().stone.getDefaultBlockState()); // TODO: CHANGE WHEN INVENTORY IS IMPLEMETED
+                    }
+                }
             }
             return super.touchDown(screenX, screenY, pointer, button);
         }

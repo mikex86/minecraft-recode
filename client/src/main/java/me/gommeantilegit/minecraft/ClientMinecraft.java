@@ -242,8 +242,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 return null;
             }));
 
-            this.blockRendererRegistry.init(); // must be called before setup of the texture map
-            this.textureManager.blockTextureMap.setupTextureMap();
+            this.blockRendererRegistry.init();
 
             this.gameSettings = new GameSettings(this);
 

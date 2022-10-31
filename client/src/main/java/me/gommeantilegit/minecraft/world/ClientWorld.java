@@ -6,6 +6,8 @@ import me.gommeantilegit.minecraft.annotations.SideOnly;
 import me.gommeantilegit.minecraft.annotations.ThreadSafe;
 import me.gommeantilegit.minecraft.block.state.palette.IBlockStatePalette;
 import me.gommeantilegit.minecraft.entity.Entity;
+import me.gommeantilegit.minecraft.entity.mesh.EntityMeshSetupHandler;
+import me.gommeantilegit.minecraft.entity.mesh.MeshBuildingEntity;
 import me.gommeantilegit.minecraft.entity.particle.ParticleEngine;
 import me.gommeantilegit.minecraft.entity.player.EntityPlayerSP;
 import me.gommeantilegit.minecraft.logging.crash.CrashReport;
@@ -52,10 +54,14 @@ public class ClientWorld extends WorldBase {
     @NotNull
     private final ParticleEngine particleEngine;
 
+    @NotNull
+    private final EntityMeshSetupHandler entityMeshSetupHandler;
+
     public ClientWorld(@NotNull EntityPlayerSP viewer, @NotNull ClientMinecraft mc, int worldHeight, @NotNull IBlockStatePalette blockStatePalette) {
         super(mc, worldHeight, blockStatePalette, new ClientBlockStateSemaphore());
         this.worldRenderer = new WorldRenderer(this, viewer, mc, mc.shaderManager.stdShader, mc.textureManager, mc.entityRenderer);
         this.renderManager = new RenderManager(this);
+        this.entityMeshSetupHandler = new EntityMeshSetupHandler(this);
         this.chunkCreator = new ClientChunkCreator(mc, this);
         this.worldChunkHandler = new ClientWorldChunkHandler();
         this.chunkLoader = new ClientChunkLoader(this, mc);
@@ -144,14 +150,18 @@ public class ClientWorld extends WorldBase {
     @Override
     @ThreadSafe
     public void spawnEntityInWorld(@NotNull Entity entity) {
-        super.spawnEntityInWorld(entity);
+        if (entity instanceof MeshBuildingEntity meshBuilding) {
+            this.entityMeshSetupHandler.scheduleMeshCreation(meshBuilding, super::spawnEntityInWorld);
+        } else {
+            super.spawnEntityInWorld(entity);
+        }
     }
 
     @Override
     public void stopAsyncWork() {
         super.stopAsyncWork();
-        this.getParticleEngine().stopAsyncWork();
         this.chunkMeshRebuilder.stopAsyncWork();
+        this.entityMeshSetupHandler.stopAsyncWork();
     }
 
     /**
@@ -244,5 +254,10 @@ public class ClientWorld extends WorldBase {
     @Override
     public ClientBlockStateSemaphore getBlockStateSemaphore() {
         return (ClientBlockStateSemaphore) super.getBlockStateSemaphore();
+    }
+
+    @NotNull
+    public EntityMeshSetupHandler getEntityMeshSetupHandler() {
+        return entityMeshSetupHandler;
     }
 }

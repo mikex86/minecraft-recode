@@ -241,8 +241,9 @@ public class Entity {
         setEntityRenderPosition();
 
         List<AxisAlignedBB> boundingBoxes = this.world.getBoundingBoxes(this.getBoundingBox().expand(-0.05f, -0.05f, -0.05f));
-        for (AxisAlignedBB abb : boundingBoxes)
+        for (AxisAlignedBB abb : boundingBoxes) {
             this.world.collision(boundingBoxes, this, abb);
+        }
     }
 
     /**
@@ -328,6 +329,7 @@ public class Entity {
                     motionZ += tmp;
                 }
             }
+
         }
 
         //PHYSICS
@@ -354,8 +356,8 @@ public class Entity {
                 ++i;
             }
 
+            this.getBoundingBox().move(0.0f, 0.0f, motionZ);
         }
-        this.getBoundingBox().move(0.0f, 0.0f, motionZ);
 
         this.setCollidedHorizontally(newX != motionX || newZ != motionZ);
         this.setOnGround(newY != motionY && newY < 0.0f);
@@ -385,7 +387,7 @@ public class Entity {
             {
                 BlockPos standingOn = getPosStandingOn();
                 ChunkBase forPos = world.getNearChunkFor(this.currentChunk, standingOn.getX(), standingOn.getZ());
-                if (this.getDistanceWalkedOnStepModified() > (float) this.nextStepDistance && forPos.getBlockState(standingOn) != null) {
+                if (this.getDistanceWalkedOnStepModified() > (float) this.nextStepDistance && forPos != null && forPos.getBlockState(standingOn) != null) {
                     this.nextStepDistance = (int) this.getDistanceWalkedOnStepModified() + 1;
 
                     //TODO: WHEN FLUIDS ARE IMPLEMENTED

@@ -7,7 +7,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Represents an object that has a mesh that needs to be built
  */
-public interface MeshBuilding {
+public interface IMeshBuilding {
 
     /**
      * Called to build the mesh

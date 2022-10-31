@@ -64,7 +64,7 @@ public class ParticleEngine implements AsyncOperation {
                     float xp = (float) blockX + ((float) xx + 0.5f) / (float) SD;
                     float yp = (float) blockY + ((float) yy + 0.5f) / (float) SD;
                     float zp = (float) blockZ + ((float) zz + 0.5f) / (float) SD;
-                    scheduleParticle(new Particle(mc.theWorld, xp, yp, zp,
+                    spawnParticle(new Particle(mc.theWorld, xp, yp, zp,
                             xp - (float) blockX - 0.5f,
                             yp - (float) blockY - 0.5f,
                             zp - (float) blockZ - 0.5f,
@@ -91,7 +91,7 @@ public class ParticleEngine implements AsyncOperation {
      * @param particle the particle to be spawned
      */
     @ThreadSafe
-    private void scheduleParticle(@NotNull Particle particle) {
+    private void spawnParticle(@NotNull Particle particle) {
         this.executorService.submit(() -> {
             particle.setupMesh(); // Mesh building complete before it gets added to the queue
             GLContext.getGlContext().runOnGLContext(() -> {

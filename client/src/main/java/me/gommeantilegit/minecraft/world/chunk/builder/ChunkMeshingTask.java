@@ -1,9 +1,7 @@
 package me.gommeantilegit.minecraft.world.chunk.builder;
 
-import me.gommeantilegit.minecraft.block.BlockTypeRenderer;
 import me.gommeantilegit.minecraft.block.ClientBlockRendererTypeRegistry;
 import me.gommeantilegit.minecraft.block.access.IReadableBlockStateAccess;
-import me.gommeantilegit.minecraft.block.state.IBlockState;
 import me.gommeantilegit.minecraft.util.math.vecmath.intvectors.Vec3i;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
