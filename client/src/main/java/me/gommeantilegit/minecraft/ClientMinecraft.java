@@ -261,7 +261,7 @@ public abstract class ClientMinecraft extends AbstractMinecraft implements Appli
                 return null;
             }));
 
-            this.inputHandler.registerInputProcessor(new GameInput());
+            this.inputHandler.registerInputProcessor(new GameInput(this));
 
             this.startupProfiler.actionEnd();
             this.startupProfiler.printResults();

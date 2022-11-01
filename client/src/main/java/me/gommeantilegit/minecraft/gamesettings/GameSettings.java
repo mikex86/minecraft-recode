@@ -166,12 +166,15 @@ public class GameSettings {
         @NotNull
         public final BooleanSetting smoothLighting = new BooleanSetting("Smooth Lighting").setValue(true);
 
+        @NotNull
+        public final BooleanSetting fullscreen = new BooleanSetting("Fullscreen").setValue(false);
+
         /**
          * Array of all video settings
          */
         @NotNull
         public Setting<?>[] settingsList = {
-                graphics, renderDistance, limitFrameRate, enable3D, viewBobbing, smoothLighting
+                graphics, renderDistance, limitFrameRate, enable3D, viewBobbing, smoothLighting, fullscreen
         };
 
         /**
@@ -254,12 +257,18 @@ public class GameSettings {
         @NotNull
         public final KeyBindSetting keyBindSwitchPerspective = new KeyBindSetting("Switch Perspective", Input.Keys.F5);
 
+        @NotNull
+        public final KeyBindSetting keyBindScreenshot = new KeyBindSetting("Screenshot", Input.Keys.F2);
+
+        @NotNull
+        public final KeyBindSetting keyBindFullscreen = new KeyBindSetting("Fullscreen", Input.Keys.F11);
+
         /**
          * List of all keybinds
          */
         @NotNull
         public final KeyBindSetting[] keyBindList = {
-                keyBindForward, keyBindLeft, keyBindBack, keyBindRight, keyBindJump, keyBindSprint, keyBindSneak, keyBindDrop, keyBindInventory, keyBindChat, keyBindSwitchPerspective
+                keyBindForward, keyBindLeft, keyBindBack, keyBindRight, keyBindJump, keyBindSprint, keyBindSneak, keyBindDrop, keyBindInventory, keyBindChat, keyBindSwitchPerspective, keyBindScreenshot, keyBindFullscreen
         };
     }
 }
