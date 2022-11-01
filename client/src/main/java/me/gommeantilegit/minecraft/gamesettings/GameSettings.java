@@ -251,12 +251,15 @@ public class GameSettings {
         @NotNull
         public final KeyBindSetting keyBindSneak = new KeyBindSetting("Sneak", Input.Keys.SHIFT_LEFT);
 
+        @NotNull
+        public final KeyBindSetting keyBindSwitchPerspective = new KeyBindSetting("Switch Perspective", Input.Keys.F5);
+
         /**
          * List of all keybinds
          */
         @NotNull
         public final KeyBindSetting[] keyBindList = {
-                keyBindForward, keyBindLeft, keyBindBack, keyBindRight, keyBindJump, keyBindSprint, keyBindSneak, keyBindDrop, keyBindInventory, keyBindChat
+                keyBindForward, keyBindLeft, keyBindBack, keyBindRight, keyBindJump, keyBindSprint, keyBindSneak, keyBindDrop, keyBindInventory, keyBindChat, keyBindSwitchPerspective
         };
     }
 }

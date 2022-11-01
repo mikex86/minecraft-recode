@@ -180,6 +180,8 @@ public class EntityPlayerSP extends RenderablePlayer {
     private boolean posPacketReceived = false;
     private boolean breakingBlocks = false;
 
+    private boolean flyingHack = false;
+
     public EntityPlayerSP(@Nullable ClientWorld world, @NotNull ClientMinecraft mc, @NotNull String username, @NotNull ClientSkin skin) {
         super(world, 20, username, skin);
         this.mc = mc;
@@ -228,20 +230,23 @@ public class EntityPlayerSP extends RenderablePlayer {
             this.packetSender.sendMovePackets();
         }
 
-        motionY *= 0;
-        if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
-            motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
-            motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
+        if (flyingHack) {
+            motionY *= 0;
+            if (keyDown(mc.gameSettings.keyBindings.keyBindForward.getValue())) {
+                motionX += (float) cos(toRadians(rotationYaw + 90)) * 1;
+                motionZ += (float) -sin(toRadians(rotationYaw + 90)) * 1;
 //            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
 //            motionX = MathUtils.clamp(motionX, -3.9f * 1, 3.9f * 1);
+            }
+
+            if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
+                motionY = 1;
+            }
+            if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
+                motionY = -1;
+            }
         }
 
-        if (keyDown(mc.gameSettings.keyBindings.keyBindJump.getValue())) {
-            motionY = 1;
-        }
-        if (keyDown(mc.gameSettings.keyBindings.keyBindSneak.getValue())) {
-            motionY = -1;
-        }
         updatedPositionVector.set(posX, posY, posZ);
     }
 
@@ -299,10 +304,6 @@ public class EntityPlayerSP extends RenderablePlayer {
         this.setSneaking(sneak);
 
         setJumping(jump);
-
-        //TODO: GAME SETTING
-        if (keyDown(Input.Keys.F5))
-            this.cameraMode = cameraMode.next();
     }
 
     @NotNull
@@ -464,8 +465,13 @@ public class EntityPlayerSP extends RenderablePlayer {
                 setSprinting(true);
             }
             sprintingStartClock.reset();
-        } else if (keyCode == Input.Keys.ESCAPE)
+        } else if (keyCode == Input.Keys.ESCAPE) {
             mc.uiManager.displayGuiScreen(new GuiIngamePause());
+        } else if (keyCode == mc.gameSettings.keyBindings.keyBindSwitchPerspective.getValue()) {
+            this.cameraMode = cameraMode.next();
+        } else if (keyCode == Input.Keys.F8) {
+            this.flyingHack = !flyingHack;
+        }
     }
 
     /**

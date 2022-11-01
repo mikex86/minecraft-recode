@@ -9,10 +9,10 @@ uniform sampler2D boundTexture;
 /* Texture mapping uniforms */
 uniform bool texture_mapping_bool;
 
-uniform int texture_pix_u0;
-uniform int texture_pix_v0;
-uniform int texture_pix_u1;
-uniform int texture_pix_v1;
+uniform float texture_pix_u0;
+uniform float texture_pix_v0;
+uniform float texture_pix_u1;
+uniform float texture_pix_v1;
 
 /* Color control */
 uniform bool override_color;
@@ -51,10 +51,10 @@ void main() {
     if(!texture_mapping_bool) {
         texColor = texture2D(boundTexture, fragTextureCoords);
     } else {
-        float texture_u0 = float(texture_pix_u0);
-        float texture_v0 = float(texture_pix_v0);
-        float texture_u1 = float(texture_pix_u1);
-        float texture_v1 = float(texture_pix_v1);
+        float texture_u0 = texture_pix_u0;
+        float texture_v0 = texture_pix_v0;
+        float texture_u1 = texture_pix_u1;
+        float texture_v1 = texture_pix_v1;
 
         float dif_u = texture_u1 - texture_u0;
         float dif_v = texture_v1 - texture_v0;

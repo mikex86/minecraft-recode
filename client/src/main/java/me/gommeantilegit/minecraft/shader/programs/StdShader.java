@@ -150,20 +150,20 @@ public class StdShader extends CommonShader {
         setUniformBoolean("texture_mapping_bool", true);
     }
 
-    public void setPixelU0(int pu0) {
-        setUniformi("texture_pix_u0", pu0);
+    public void setPixelU0(float pu0) {
+        setUniformf("texture_pix_u0", pu0);
     }
 
-    public void setPixelV0(int pv0) {
-        setUniformi("texture_pix_v0", pv0);
+    public void setPixelV0(float pv0) {
+        setUniformf("texture_pix_v0", pv0);
     }
 
-    public void setPixelU1(int pu1) {
-        setUniformi("texture_pix_u1", pu1);
+    public void setPixelU1(float pu1) {
+        setUniformf("texture_pix_u1", pu1);
     }
 
-    public void setPixelV1(int pv1) {
-        setUniformi("texture_pix_v1", pv1);
+    public void setPixelV1(float pv1) {
+        setUniformf("texture_pix_v1", pv1);
     }
 
     public void disableTextureMapping() {
