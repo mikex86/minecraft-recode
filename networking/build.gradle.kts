@@ -17,4 +17,5 @@ dependencies {
     implementation("io.netty:netty-all:5.0.0.Alpha2")
     implementation("org.reflections:reflections:0.10.2")
     implementation("org.jetbrains:annotations:22.0.0")
+    api("com.badlogicgames.gdx:gdx:1.11.0")
 }

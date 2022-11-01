@@ -15,16 +15,16 @@ dependencies {
     testImplementation("junit", "junit", "4.12")
     if (rootProject.name == "MinecraftLibGDX") {
         //LibGDX for android
-        implementation("com.badlogicgames.gdx:gdx-platform:1.9.8")
-        implementation("com.badlogicgames.gdx:gdx-backend-android:1.9.8")
-        implementation("com.badlogicgames.gdx:gdx:1.9.8")
-        implementation("com.badlogicgames.gdx:gdx-freetype:1.9.8")
-        implementation("com.badlogicgames.gdx:gdx-backend-android:1.9.8")
+        implementation("com.badlogicgames.gdx:gdx-platform:1.11.0")
+        implementation("com.badlogicgames.gdx:gdx-backend-android:1.11.0")
+        implementation("com.badlogicgames.gdx:gdx:1.11.0")
+        implementation("com.badlogicgames.gdx:gdx-freetype:1.11.0")
+        implementation("com.badlogicgames.gdx:gdx-backend-android:1.11.0")
     } else {
         // LibGDX for PC
-        implementation("com.badlogicgames.gdx:gdx:1.9.8")
-        implementation("com.badlogicgames.gdx:gdx-freetype:1.9.8")
-        implementation("com.badlogicgames.gdx:gdx-backend-android:1.9.8")
+        implementation("com.badlogicgames.gdx:gdx:1.11.0")
+        implementation("com.badlogicgames.gdx:gdx-freetype:1.11.0")
+        implementation("com.badlogicgames.gdx:gdx-backend-android:1.11.0")
     }
     implementation(project(":core"))
     implementation(project(":logging"))

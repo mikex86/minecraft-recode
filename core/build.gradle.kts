@@ -19,4 +19,5 @@ dependencies {
     implementation("org.jetbrains:annotations:22.0.0")
     implementation(project(":logging"))
     implementation(project(":utils"))
+    implementation("com.badlogicgames.gdx:gdx:1.11.0")
 }

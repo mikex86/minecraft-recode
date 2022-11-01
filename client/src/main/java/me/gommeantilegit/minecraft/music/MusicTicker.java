@@ -201,7 +201,7 @@ public class MusicTicker implements Tickable {
             ArrayList<FileHandle> subFiles = new ArrayList<>();
             // The music file names for the given music type are stored in a music.txt file in the according music type directory
             FileHandle musicTxt = Gdx.files.classpath(folderResourceString + "/music.txt");
-            String[] split = musicTxt.readString(StandardCharsets.UTF_8.name()).split("\r\n");
+            String[] split = musicTxt.readString(StandardCharsets.UTF_8.name()).replace("\r", "").split("\n");
             for (String musicFileStr : split) {
                 subFiles.add(Gdx.files.classpath(folderResourceString + "/" + musicFileStr + ".ogg"));
             }

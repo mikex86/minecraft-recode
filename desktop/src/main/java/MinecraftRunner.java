@@ -27,26 +27,15 @@ public class MinecraftRunner {
     @NotNull
     private static final ArrayList<Lwjgl3Window> WINDOWS = new ArrayList<>();
 
-    public static void runMinecraft() throws ClassNotFoundException {
-        Class.forName(AbstractMinecraft.class.getName());
-        Thread openGLThread = new Thread("OpenGL-Thread") {
-
-            @Override
-            public void run() {
-                Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
-                config.useVsync(false);
-//                config.useOpenGL3(true, 3, 2);
-                config.setWindowIcon(Files.FileType.Classpath, "icons/icon_32x32.png");
-                config.setTitle("Minecraft " + MINECRAFT_VERSION_PREFIX_CHAR + MINECRAFT_VERSION_STRING);
-                config.setIdleFPS(30);
-                config.setWindowedMode(854, 480);
-                config.setBackBufferConfig(8, 8, 8, 8, 32, 0, 0);
-                new MinecraftApp(config);
-            }
-        };
-        openGLThread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
-        openGLThread.setPriority(Thread.MAX_PRIORITY);
-        openGLThread.start();
+    public static void runMinecraft() {
+        Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
+        config.useVsync(false);
+        config.setWindowIcon(Files.FileType.Classpath, "icons/icon_32x32.png");
+        config.setTitle("Minecraft " + MINECRAFT_VERSION_PREFIX_CHAR + MINECRAFT_VERSION_STRING);
+        config.setIdleFPS(30);
+        config.setWindowedMode(854, 480);
+        config.setBackBufferConfig(8, 8, 8, 8, 32, 0, 0);
+        new MinecraftApp(config);
     }
 
     static class MinecraftApp extends Lwjgl3Application {

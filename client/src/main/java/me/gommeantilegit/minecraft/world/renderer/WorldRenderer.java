@@ -381,10 +381,10 @@ public class WorldRenderer {
 
         int xOffset = (int) (worldTime / cloudMovingSpeed);
 
-        this.shader.setPixelU0(xC + xOffset);
-        this.shader.setPixelU1(xC + xOffset + this.textureManager.cloudsTexture.getWidth());
-        this.shader.setPixelV0(zC);
-        this.shader.setPixelV1(zC + this.textureManager.cloudsTexture.getHeight());
+        this.shader.setPixelU0((xC + xOffset) / this.textureManager.cloudsTexture.getWidth());
+        this.shader.setPixelU1((xC + xOffset + this.textureManager.cloudsTexture.getWidth()) / this.textureManager.cloudsTexture.getWidth());
+        this.shader.setPixelV0(zC / this.textureManager.cloudsTexture.getHeight());
+        this.shader.setPixelV1((zC + this.textureManager.cloudsTexture.getHeight()) / this.textureManager.cloudsTexture.getHeight());
         cloudMesh.render(this.shader, GL_TRIANGLES);
 
         this.shader.disableTextureMapping();

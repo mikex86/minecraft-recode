@@ -162,7 +162,7 @@ public class SoundResource {
 
     @NotNull
     private static HashMap<String, Long> getSoundLengths() {
-        String[] split = Gdx.files.classpath("sound/sound_lengths.txt").readString("UTF-8").split("\r\n");
+        String[] split = Gdx.files.classpath("sound/sound_lengths.txt").readString("UTF-8").replace("\r", "").split("\n");
         HashMap<String, Long> map = new HashMap<>();
         for (String s : split) {
             String[] args = s.split("=");

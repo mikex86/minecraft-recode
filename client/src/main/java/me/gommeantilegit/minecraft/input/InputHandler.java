@@ -118,11 +118,11 @@ public class InputHandler implements InputProcessor {
     }
 
     @Override
-    public boolean scrolled(int amount) {
+    public boolean scrolled(float amountX, float amountY) {
         synchronized (inputProcessors) {
             for (int i = 0; i < inputProcessors.size(); i++) {
                 InputProcessor p = inputProcessors.get(i);
-                p.scrolled(amount);
+                p.scrolled(amountX, amountY);
             }
         }
         return true;

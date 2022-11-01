@@ -172,7 +172,7 @@ public class GuiMainMenu extends GuiScreen {
      */
     @NotNull
     private static String[] readSplashes() {
-        return Gdx.files.classpath("text/splashes.txt").readString("UTF-8").split("\r\n");
+        return Gdx.files.classpath("text/splashes.txt").readString("UTF-8").replace("\r", "").split("\n");
     }
 
     private static Mesh stoneBlockMesh;

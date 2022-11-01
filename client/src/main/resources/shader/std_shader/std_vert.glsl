@@ -1,69 +1,32 @@
-#version 150
+#version 120
 
-/* Default precisions */
-//#ifdef GL_ES
-precision highp float;
-precision highp int;
-precision lowp sampler2D;
-precision lowp samplerCube;
+attribute vec3 a_Position;
+attribute vec3 a_Normal;
+attribute vec4 a_Color;
+attribute vec2 a_TextureCoord;
 
-//#else
-//in vec3 a_Position;
-//in vec3 a_Normal;
-//in vec4 a_Color;
-//in vec2 a_TextureCoord;
-//
-//uniform vec3 lightDirection;
-//
-///* Matrices */
-//uniform mat4 transMat;
-//uniform mat4 viewMat;
-//uniform mat4 projectionMat;
-//
-//uniform bool enableLighting;
-//
-//uniform float minDiffuseLighting;
-//
-///*
-//    Fog Uniform variables
-//*/
-//uniform bool enableFog;
-//uniform float fogStart;
-//uniform float fogEnd;
-//
-//out vec3 lightingColor;
-//out vec4 fragColorAttr;
-//out vec2 fragTextureCoords;
-//out float fogVisibility;
-//#endif
-
-in highp vec3 a_Position;
-in highp vec3 a_Normal;
-in highp vec4 a_Color;
-in highp vec2 a_TextureCoord;
-
-uniform highp vec3 lightDirection;
+uniform vec3 lightDirection;
 
 /* Matrices */
-uniform highp mat4 transMat;
-uniform highp mat4 viewMat;
-uniform highp mat4 projectionMat;
+uniform mat4 transMat;
+uniform mat4 viewMat;
+uniform mat4 projectionMat;
 
 uniform bool enableLighting;
 
-uniform highp float minDiffuseLighting;
+uniform float minDiffuseLighting;
 
 /*
     Fog Uniform variables
 */
 uniform bool enableFog;
-uniform highp float fogStart;
-uniform highp float fogEnd;
+uniform float fogStart;
+uniform float fogEnd;
 
-out highp vec3 lightingColor;
-out highp vec4 fragColorAttr;
-out highp vec2 fragTextureCoords;
-out highp float fogVisibility;
+varying vec3 lightingColor;
+varying vec4 fragColorAttr;
+varying vec2 fragTextureCoords;
+varying float fogVisibility;
 
 /*
  Calculates the brightness of the processed vertex using dot with per vertex diffused lighting.
@@ -92,13 +55,13 @@ float getFogFactor(float dst) {
 
 void main() {
 
-    highp mat4 matViewProj = projectionMat * (viewMat * transMat);
+    mat4 matViewProj = projectionMat * (viewMat * transMat);
 
     fragColorAttr = a_Color;
 
     fragTextureCoords = a_TextureCoord;
 
-    lowp float dotLighting;
+    float dotLighting;
 
     if (enableLighting)
     dotLighting = calculateDiffusedLighting(minDiffuseLighting);
@@ -111,7 +74,7 @@ void main() {
     lightingColor = vec3(dotLighting);
 
     if (enableFog){
-        lowp float distanceToCamera = length((viewMat * (transMat * vec4(a_Position, 1))).xyz);
+        float distanceToCamera = length((viewMat * (transMat * vec4(a_Position, 1))).xyz);
         fogVisibility = getFogFactor(distanceToCamera);
     }
     gl_Position = matViewProj * vec4(a_Position, 1);

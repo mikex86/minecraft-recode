@@ -1,6 +1,6 @@
 public class DesktopLauncher {
 
-    public static void main(String[] arg) throws ClassNotFoundException {
+    public static void main(String[] arg) {
         MinecraftRunner.runMinecraft();
     }
 }

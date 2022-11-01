@@ -83,12 +83,14 @@ public class CrashReport {
         SystemInfo systemInfo = Hardware.getSystemInfo();
         HardwareAbstractionLayer hardware = systemInfo.getHardware();
         CentralProcessor cpu = hardware.getProcessor();
-        str.append("CPU: ").append(cpu.getFamily()).append(" ").append(cpu.getIdentifier()).append(" ").append(cpu.getProcessorID()).append(" ").append(cpu.getPhysicalProcessorCount()).append("x ").append(cpu.getName()).append("\n");
+        CentralProcessor.ProcessorIdentifier cpuIdentifier = cpu.getProcessorIdentifier();
+        str.append("CPU: ").append(cpuIdentifier.getFamily()).append(" ").append(cpuIdentifier.getIdentifier()).append(" ").append(cpuIdentifier.getProcessorID()).append(" ").append(cpu.getPhysicalProcessorCount()).append("x ").append(cpuIdentifier.getName()).append("\n");
         str.append("RAM: ").append(humanReadableByteCount(hardware.getMemory().getTotal(), false)).append("\n");
         str.append("GPU-VENDOR: ").append(Hardware.GPU_VENDOR).append("\n");
         str.append("GPU-NAME: ").append(Hardware.GPU_NAME).append("\n");
         OperatingSystem operatingSystem = systemInfo.getOperatingSystem();
-        str.append("OS: ").append(operatingSystem.getManufacturer()).append(" ").append(operatingSystem.getFamily()).append(" ").append(operatingSystem.getVersion()).append("\n");
+        OperatingSystem.OSVersionInfo osVersionInfo = operatingSystem.getVersionInfo();
+        str.append("OS: ").append(operatingSystem.getManufacturer()).append(" ").append(operatingSystem.getFamily()).append(osVersionInfo).append("\n");
         str.append("OS-Filesystem: ").append(operatingSystem.getFileSystem().getClass().getSimpleName()).append("\n");
     }
 

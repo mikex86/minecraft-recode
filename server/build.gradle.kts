@@ -20,6 +20,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.8.9")
     testImplementation("junit", "junit", "4.12")
     implementation("org.jetbrains:annotations:22.0.0")
+    implementation("com.badlogicgames.gdx:gdx:1.11.0")
 }
 
 val fatJar = task("fatJar", type = org.gradle.jvm.tasks.Jar::class) {
